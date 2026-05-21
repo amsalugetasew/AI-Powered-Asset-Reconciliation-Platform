@@ -1,0 +1,330 @@
+import React, { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+import { toast } from 'react-toastify'
+import { 
+  FiUpload, 
+  FiDownload, 
+  FiClock, 
+  FiCheckCircle, 
+  FiXCircle, 
+  FiLoader,
+  FiTrendingUp,
+  FiAlertCircle,
+  FiFileText,
+  FiFilter,
+  FiSearch
+} from 'react-icons/fi'
+
+const Dashboard = () => {
+  const [reconciliations, setReconciliations] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [stats, setStats] = useState({
+    total: 0,
+    completed: 0,
+    processing: 0,
+    pending: 0
+  })
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    fetchReconciliations()
+  }, [])
+
+  useEffect(() => {
+    calculateStats()
+  }, [reconciliations])
+
+  const fetchReconciliations = async () => {
+    try {
+      const response = await axios.get('/api/reconciliation/list')
+      setReconciliations(response.data.reconciliations)
+    } catch (error) {
+      toast.error('Failed to fetch reconciliations')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const calculateStats = () => {
+    setStats({
+      total: reconciliations.length,
+      completed: reconciliations.filter(r => r.status === 'completed').length,
+      processing: reconciliations.filter(r => r.status === 'processing').length,
+      pending: reconciliations.filter(r => r.status === 'pending').length
+    })
+  }
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'completed':
+        return <FiCheckCircle className="text-green-500" />
+      case 'failed':
+        return <FiXCircle className="text-red-500" />
+      case 'processing':
+        return <FiLoader className="text-blue-500 animate-spin" />
+      default:
+        return <FiClock className="text-yellow-500" />
+    }
+  }
+
+  const getStatusBadge = (status) => {
+    const colors = {
+      completed: 'bg-green-100 text-green-800 border-green-200',
+      failed: 'bg-red-100 text-red-800 border-red-200',
+      processing: 'bg-blue-100 text-blue-800 border-blue-200',
+      pending: 'bg-yellow-100 text-yellow-800 border-yellow-200'
+    }
+    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'
+  }
+
+  const handleDownload = async (id) => {
+    try {
+      const response = await axios.get(`/api/reconciliation/download/${id}`, {
+        responseType: 'blob'
+      })
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `reconciliation_report_${id}.xlsx`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      
+      toast.success('Report downloaded successfully')
+    } catch (error) {
+      toast.error('Failed to download report')
+    }
+  }
+
+  const filteredReconciliations = reconciliations.filter(recon => {
+    const matchesSearch = recon.customer_file.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         recon.internal_file.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesFilter = filterStatus === 'all' || recon.status === filterStatus
+    return matchesSearch && matchesFilter
+  })
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <FiLoader className="animate-spin h-12 w-12 text-[#8E288D]" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-gradient-to-br from-[#8E288D] to-[#7A1E79] rounded-xl shadow-lg p-6
+         text-white transform hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-100 text-sm font-medium">Total Jobs</p>
+              <p className="text-3xl font-bold mt-2">{stats.total}</p>
+            </div>
+            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+              <FiFileText className="h-8 w-8" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-green-100 text-sm font-medium">Completed</p>
+              <p className="text-3xl font-bold mt-2">{stats.completed}</p>
+            </div>
+            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+              <FiCheckCircle className="h-8 w-8" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-yellow-100 text-sm font-medium">Processing</p>
+              <p className="text-3xl font-bold mt-2">{stats.processing}</p>
+            </div>
+            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+              <FiLoader className="h-8 w-8" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-purple-100 text-sm font-medium">Pending</p>
+              <p className="text-3xl font-bold mt-2">{stats.pending}</p>
+            </div>
+            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
+              <FiClock className="h-8 w-8" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Bar */}
+      <div className="bg-white rounded-xl shadow-md p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Reconciliation Jobs</h2>
+            <p className="text-gray-600 mt-1">Manage and track your asset reconciliations</p>
+          </div>
+          <Link
+            to="/upload"
+            className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+          >
+            <FiUpload className="mr-2 h-5 w-5" />
+            New Reconciliation
+          </Link>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="mt-6 flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <input
+              type="text"
+              placeholder="Search by filename..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+          <div className="relative">
+            <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none bg-white"
+            >
+              <option value="all">All Status</option>
+              <option value="completed">Completed</option>
+              <option value="processing">Processing</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Reconciliations List */}
+      {filteredReconciliations.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-md p-12 text-center">
+          <FiUpload className="mx-auto h-16 w-16 text-gray-400" />
+          <h3 className="mt-4 text-lg font-medium text-gray-900">No reconciliations found</h3>
+          <p className="mt-2 text-sm text-gray-500">
+            {searchTerm || filterStatus !== 'all' 
+              ? 'Try adjusting your search or filter' 
+              : 'Get started by uploading your first files'}
+          </p>
+          {!searchTerm && filterStatus === 'all' && (
+            <div className="mt-6">
+              <Link
+                to="/upload"
+                className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700"
+              >
+                <FiUpload className="mr-2" />
+                Upload Files
+              </Link>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-6">
+          {filteredReconciliations.map((recon) => (
+            <div
+              key={recon.id}
+              className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-2xl font-bold text-gray-800">#{recon.id}</span>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadge(recon.status)}`}>
+                        {getStatusIcon(recon.status)}
+                        <span className="ml-1 capitalize">{recon.status}</span>
+                      </span>
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <FiFileText className="mr-2 h-4 w-4" />
+                        <span className="font-medium">Customer:</span>
+                        <span className="ml-2">{recon.customer_file}</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <FiFileText className="mr-2 h-4 w-4" />
+                        <span className="font-medium">Finance:</span>
+                        <span className="ml-2">{recon.internal_file}</span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500">
+                        <FiClock className="mr-2 h-4 w-4" />
+                        {new Date(recon.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {recon.status === 'completed' && (
+                    <div className="ml-6 flex flex-col space-y-2">
+                      <button
+                        onClick={() => navigate(`/results/${recon.id}`)}
+                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                      >
+                        View Results
+                      </button>
+                      <button
+                        onClick={() => handleDownload(recon.id)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center justify-center"
+                      >
+                        <FiDownload className="mr-2 h-4 w-4" />
+                        Download
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {recon.status === 'completed' && (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-green-600">{recon.statistics.rule_matched}</p>
+                        <p className="text-xs text-gray-600 mt-1">Exact Matched</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-blue-600">{recon.statistics.ai_matched}</p>
+                        <p className="text-xs text-gray-600 mt-1">AI Matched</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-yellow-600">{recon.statistics.manual_review}</p>
+                        <p className="text-xs text-gray-600 mt-1">Need Manual Review</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-red-600">{recon.statistics.customer_unmatched}</p>
+                        <p className="text-xs text-gray-600 mt-1">Unmatched</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-purple-600">
+                          {((recon.statistics.rule_matched + recon.statistics.ai_matched) / recon.statistics.total_customer_records * 100).toFixed(1)}%
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">Match Rate</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default Dashboard
