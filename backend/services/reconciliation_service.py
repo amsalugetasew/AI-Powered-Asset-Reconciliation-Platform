@@ -132,9 +132,14 @@ class ReconciliationService:
             remaining_customer_with_index['source_index'] = remaining_customer_with_index.index
             remaining_internal_with_index['source_index'] = remaining_internal_with_index.index
             
+            # Separate data ingestion for LLM: Exclude serial number and tag numbers
+            cols_to_exclude = ['serial_no', 'old_tag_number', 'new_tag_number']
+            llm_customer_df = remaining_customer_with_index.drop(columns=cols_to_exclude, errors='ignore')
+            llm_internal_df = remaining_internal_with_index.drop(columns=cols_to_exclude, errors='ignore')
+            
             # Convert to list of dicts for AI processing
-            customer_records = remaining_customer_with_index.to_dict('records')
-            internal_records = remaining_internal_with_index.to_dict('records')
+            customer_records = llm_customer_df.to_dict('records')
+            internal_records = llm_internal_df.to_dict('records')
             
             # Limit AI processing to avoid high costs (process max 100 records)
             customer_records_limited = customer_records[:100]
@@ -165,6 +170,19 @@ class ReconciliationService:
                     print(f"    → BELOW THRESHOLD (< {self.manual_review_threshold})")
             
             print(f"\nResults: {len(ai_matched)} AI matched, {len(manual_review)} manual review")
+            
+            # Re-populate the excluded fields (serial_no, tag numbers) for the final report
+            for m in ai_matched + manual_review:
+                c_idx = m.get('customer_source_index')
+                i_idx = m.get('internal_source_index')
+                if c_idx is not None and c_idx in remaining_customer.index:
+                    m['customer_old_tag'] = remaining_customer.at[c_idx, 'old_tag_number']
+                    m['customer_new_tag'] = remaining_customer.at[c_idx, 'new_tag_number']
+                    m['customer_serial_no'] = remaining_customer.at[c_idx, 'serial_no']
+                if i_idx is not None and i_idx in remaining_internal.index:
+                    m['internal_old_tag'] = remaining_internal.at[i_idx, 'old_tag_number']
+                    m['internal_new_tag'] = remaining_internal.at[i_idx, 'new_tag_number']
+                    m['internal_serial_no'] = remaining_internal.at[i_idx, 'serial_no']
             
             # Remove AI-matched records from remaining by index
             ai_matched_customer_indices = [m['customer_source_index'] for m in ai_matched + manual_review if m.get('customer_source_index') is not None]
