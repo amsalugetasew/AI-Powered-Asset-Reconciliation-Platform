@@ -1,5 +1,6 @@
 import pandas as pd
 from typing import Tuple, List, Dict
+from fuzzywuzzy import fuzz
 
 class RuleMatcher:
     """Rule-based exact matching for asset reconciliation"""
@@ -104,8 +105,17 @@ class RuleMatcher:
                 
                 # Exact match
                 if customer_value == internal_value:
+                    # Calculate fuzzy matching score based on description column
+                    desc_c = str(c_row.get('description', ''))
+                    desc_i = str(i_row.get('description', ''))
+                    
+                    if desc_c.strip() and desc_i.strip() and desc_c.lower() != 'nan' and desc_i.lower() != 'nan':
+                        confidence = round(fuzz.token_set_ratio(desc_c, desc_i) / 100.0, 4)
+                    else:
+                        confidence = 1.0
+                        
                     match_record = RuleMatcher._create_match_record(
-                        c_row, i_row, match_type, 1.0
+                        c_row, i_row, match_type, confidence
                     )
                     matches.append(match_record)
                     matched_customer_indices.add(c_row['source_index'])
