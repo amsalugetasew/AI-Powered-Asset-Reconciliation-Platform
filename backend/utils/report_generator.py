@@ -120,7 +120,7 @@ class ReportGenerator:
                     'internal_asset_number',
                     'customer_old_tag','customer_new_tag',
                     'customer_year', 'customer_category',
-                    'customer_description','customer_serial_no','customer_department', 'customer_district', 'customer_book_value'
+                    'customer_description','customer_serial_no','customer_department', 'customer_district', 'customer_book_value',
                     'match_type', 'match_method', 'confidence_score'
                 ]
                 

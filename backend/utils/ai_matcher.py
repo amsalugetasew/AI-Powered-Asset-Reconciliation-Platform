@@ -358,6 +358,7 @@ JSON response:
                 'customer_district': customer_record.get('district', ''),
                 'customer_book_value': customer_record.get('book_value', 0.0),
                 'customer_asset_number': customer_record.get('asset_number', ''),
+                'customer_source_index': customer_record.get('source_index', None),
                 
                 # Internal data
                 'internal_old_tag': matched_internal.get('old_tag_number', ''),
@@ -370,6 +371,7 @@ JSON response:
                 'internal_district': matched_internal.get('district', ''),
                 'internal_book_value': matched_internal.get('book_value', 0.0),
                 'internal_asset_number': matched_internal.get('asset_number', ''),
+                'internal_source_index': matched_internal.get('source_index', None),
                 
                 # Metadata
                 'match_type': 'AI',

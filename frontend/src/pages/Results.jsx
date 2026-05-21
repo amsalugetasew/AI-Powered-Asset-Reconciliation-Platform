@@ -270,7 +270,7 @@ const Results = () => {
             </div>
             <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
               <span className="text-sm font-medium text-gray-700">✓ AI Matched</span>
-              <span className="text-sm font-bold text-blue-700">{stats.ai_matched} records</span>
+              <span className="text-sm font-bold text-[#8E288D]">{stats.ai_matched} records</span>
             </div>
             <div className="flex justify-between items-center p-2 bg-yellow-50 rounded">
               <span className="text-sm font-medium text-gray-700">⚠ Manual Review</span>
@@ -321,7 +321,7 @@ const Results = () => {
             </div>
             <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
               <span className="text-sm font-medium text-gray-700">✓ AI Matched</span>
-              <span className="text-sm font-bold text-blue-700">{stats.ai_matched} records</span>
+              <span className="text-sm font-bold text-[#8E288D]">{stats.ai_matched} records</span>
             </div>
             <div className="flex justify-between items-center p-2 bg-yellow-50 rounded">
               <span className="text-sm font-medium text-gray-700">⚠ Manual Review</span>
@@ -365,33 +365,33 @@ const Results = () => {
         {/* <h3 className="text-xl font-semibold text-gray-900 mb-6">Detailed Statistics</h3> */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h4 className="text-md font-semibold text-gray-700 mb-3 pb-2 border-b-2 border-purple-200">Customer Data</h4>
+              <h4 className="text-md font-semibold text-gray-700 mb-3 pb-2 border-b-2 border-purple-200"><div className='flex'><FiUsers className="h-6 w-6 text-purple-600 mr-2" />Customer Data</div></h4>
             <dl className="space-y-3">
               <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
                 <dt className="text-sm font-medium text-gray-600">Total Records</dt>
                 <dd className="text-sm font-bold text-gray-900">{stats.total_customer_records}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-green-300 rounded">
                 <dt className="text-sm font-medium text-gray-600">Reconciled (Total)</dt>
                 <dd className="text-sm font-bold text-green-600">{customerReconciled}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-green-200 rounded">
                 <dt className="text-sm font-medium text-gray-600 pl-4">→ By Rule</dt>
                 <dd className="text-sm font-bold text-green-600">{stats.rule_matched}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-blue-200 rounded">
                 <dt className="text-sm font-medium text-gray-600 pl-4">→ By AI</dt>
                 <dd className="text-sm font-bold text-[#8E288D]">{stats.ai_matched}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-purple-200 rounded">
                 <dt className="text-sm font-medium text-gray-600">Manual Review</dt>
                 <dd className="text-sm font-bold text-yellow-600">{stats.manual_review}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-red-200 rounded">
                 <dt className="text-sm font-medium text-gray-600">Not Reconciled</dt>
                 <dd className="text-sm font-bold text-red-600">{stats.customer_unmatched}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-pink-300 rounded">
                 <dt className="text-sm font-medium text-gray-600">Duplicates</dt>
                 <dd className="text-sm font-bold text-purple-600">{stats.customer_duplicates !== undefined ? stats.customer_duplicates : 0}</dd>
               </div>
@@ -399,33 +399,33 @@ const Results = () => {
           </div>
           
           <div>
-            <h4 className="text-md font-semibold text-gray-700 mb-3 pb-2 border-b-2 border-teal-200">Finance Data</h4>
+            <h4 className="text-md font-semibold text-gray-700 mb-3 pb-2 border-b-2 border-teal-200"><div className='flex'><FiDatabase className="h-6 w-6 text-teal-600 mr-2" />Finance Data</div></h4>
             <dl className="space-y-3">
               <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
                 <dt className="text-sm font-medium text-gray-600">Total Records</dt>
                 <dd className="text-sm font-bold text-gray-900">{stats.total_internal_records}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-green-300 rounded">
                 <dt className="text-sm font-medium text-gray-600">Reconciled (Total)</dt>
                 <dd className="text-sm font-bold text-green-600">{internalReconciled}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-green-200 rounded">
                 <dt className="text-sm font-medium text-gray-600 pl-4">→ By Rule</dt>
                 <dd className="text-sm font-bold text-green-600">{stats.rule_matched}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-blue-200 rounded">
                 <dt className="text-sm font-medium text-gray-600 pl-4">→ By AI</dt>
                 <dd className="text-sm font-bold text-[#8E288D]">{stats.ai_matched}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-purple-200 rounded">
                 <dt className="text-sm font-medium text-gray-600">Manual Review</dt>
                 <dd className="text-sm font-bold text-yellow-600">{stats.manual_review}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-red-200 rounded">
                 <dt className="text-sm font-medium text-gray-600">Not Reconciled</dt>
                 <dd className="text-sm font-bold text-red-600">{stats.internal_unmatched}</dd>
               </div>
-              <div className="flex justify-between items-center p-2 hover:bg-gray-50 rounded">
+              <div className="flex justify-between items-center p-2 bg-pink-300 rounded">
                 <dt className="text-sm font-medium text-gray-600">Duplicates</dt>
                 <dd className="text-sm font-bold text-purple-600">{stats.internal_duplicates !== undefined ? stats.internal_duplicates : 0}</dd>
               </div>

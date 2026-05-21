@@ -74,11 +74,11 @@ class ReconciliationService:
             df_non_empty = df[~empty_tags]
             
             # Find duplicates based on tag/serial for non-empty rows
-            # Using keep='first' correctly identifies only the EXTRA records as duplicates
-            tag_dupes_mask = df_non_empty.duplicated(subset=['new_tag_number', 'serial_no'], keep='first')
+            # Using keep=False correctly identifies ALL instances of duplicates
+            tag_dupes_mask = df_non_empty.duplicated(subset=['new_tag_number', 'serial_no'], keep=False)
             
             # For rows with empty tags, identify fully identical rows as duplicates
-            empty_dupes_mask = df_empty.duplicated(keep='first')
+            empty_dupes_mask = df_empty.duplicated(keep=False)
             
             duplicates_df = pd.concat([
                 df_non_empty[tag_dupes_mask],
@@ -126,9 +126,15 @@ class ReconciliationService:
         print(f"Remaining internal records: {len(remaining_internal)}")
         
         if self.ai_matcher and len(remaining_customer) > 0 and len(remaining_internal) > 0:
+            # Add index as a field to track records after AI processing
+            remaining_customer_with_index = remaining_customer.copy()
+            remaining_internal_with_index = remaining_internal.copy()
+            remaining_customer_with_index['source_index'] = remaining_customer_with_index.index
+            remaining_internal_with_index['source_index'] = remaining_internal_with_index.index
+            
             # Convert to list of dicts for AI processing
-            customer_records = remaining_customer.to_dict('records')
-            internal_records = remaining_internal.to_dict('records')
+            customer_records = remaining_customer_with_index.to_dict('records')
+            internal_records = remaining_internal_with_index.to_dict('records')
             
             # Limit AI processing to avoid high costs (process max 100 records)
             customer_records_limited = customer_records[:100]
@@ -160,16 +166,17 @@ class ReconciliationService:
             
             print(f"\nResults: {len(ai_matched)} AI matched, {len(manual_review)} manual review")
             
-            # Remove AI-matched records from remaining
-            ai_matched_customer_tags = {m['customer_old_tag'] for m in ai_matched + manual_review}
-            ai_matched_internal_tags = {m['internal_old_tag'] for m in ai_matched + manual_review}
+            # Remove AI-matched records from remaining by index
+            ai_matched_customer_indices = [m['customer_source_index'] for m in ai_matched + manual_review if m.get('customer_source_index') is not None]
+            ai_matched_internal_indices = [m['internal_source_index'] for m in ai_matched + manual_review if m.get('internal_source_index') is not None]
             
-            remaining_customer = remaining_customer[
-                ~remaining_customer['old_tag_number'].isin(ai_matched_customer_tags)
-            ]
-            remaining_internal = remaining_internal[
-                ~remaining_internal['old_tag_number'].isin(ai_matched_internal_tags)
-            ]
+            remaining_customer = remaining_customer.drop(index=ai_matched_customer_indices, errors='ignore')
+            remaining_internal = remaining_internal.drop(index=ai_matched_internal_indices, errors='ignore')
+            
+            # Clean up source_index from match dicts so it doesn't appear in the report
+            for m in ai_matched + manual_review:
+                m.pop('customer_source_index', None)
+                m.pop('internal_source_index', None)
             
             # Include fuzzy matches in the manual review group
             manual_review.extend(fuzzy_matches)
