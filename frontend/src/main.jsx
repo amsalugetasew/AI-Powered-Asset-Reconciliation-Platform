@@ -5,7 +5,7 @@ import App from './App'
 import './index.css'
 
 // Configure axios defaults
-axios.defaults.baseURL = 'http://localhost:5000'
+// baseURL removed so axios uses relative paths and goes through the Vite proxy
 
 // Add request interceptor to include token
 axios.interceptors.request.use(

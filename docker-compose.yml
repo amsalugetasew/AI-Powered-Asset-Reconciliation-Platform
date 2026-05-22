@@ -36,7 +36,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - AI_PROVIDER=${AI_PROVIDER:-openai}
     ports:
-      - "5000:5000"
+      - "6000:6000"
     depends_on:
       mysql:
         condition: service_healthy
@@ -51,7 +51,7 @@ services:
       dockerfile: Dockerfile
     container_name: assetsync_frontend
     ports:
-      - "3000:80"
+      - "3001:80"
     depends_on:
       - backend
 
