@@ -11,23 +11,23 @@ class FuzzyMatcher:
         scores = []
         weights = []
         
-        # Description similarity (weight: 0.25)
+        # Description similarity (weight: 0.35)
         if customer_row.get('description') and internal_row.get('description'):
             desc_score = fuzz.token_set_ratio(
                 str(customer_row['description']),
                 str(internal_row['description'])
             ) / 100.0
             scores.append(desc_score)
-            weights.append(0.25)
+            weights.append(0.35)
         
-        # Serial number similarity (weight: 0.20)
-        if customer_row.get('serial_no') and internal_row.get('serial_no'):
-            serial_score = fuzz.ratio(
-                str(customer_row['serial_no']),
-                str(internal_row['serial_no'])
-            ) / 100.0
-            scores.append(serial_score)
-            weights.append(0.20)
+        # # Serial number similarity (weight: 0.20)
+        # if customer_row.get('serial_no') and internal_row.get('serial_no'):
+        #     serial_score = fuzz.ratio(
+        #         str(customer_row['serial_no']),
+        #         str(internal_row['serial_no'])
+        #     ) / 100.0
+        #     scores.append(serial_score)
+        #     weights.append(0.20)
         
         # Department similarity (weight: 0.10)
         if customer_row.get('department') and internal_row.get('department'):
@@ -47,14 +47,14 @@ class FuzzyMatcher:
             scores.append(asset_score)
             weights.append(0.10)
             
-        # Category similarity (weight: 0.10)
+        # Category similarity (weight: 0.15)
         if customer_row.get('category') and internal_row.get('category'):
             cat_score = fuzz.token_set_ratio(
                 str(customer_row['category']),
                 str(internal_row['category'])
             ) / 100.0
             scores.append(cat_score)
-            weights.append(0.10)
+            weights.append(0.15)
             
         # District similarity (weight: 0.10)
         if customer_row.get('district') and internal_row.get('district'):
@@ -65,7 +65,7 @@ class FuzzyMatcher:
             scores.append(dist_score)
             weights.append(0.10)
             
-        # Year similarity (weight: 0.10)
+        # Year similarity (weight: 0.15)
         if pd.notna(customer_row.get('year')) and pd.notna(internal_row.get('year')):
             try:
                 c_year = int(customer_row['year'])
@@ -76,7 +76,7 @@ class FuzzyMatcher:
                     year_diff = abs(c_year - i_year)
                     year_score = max(0.0, 1.0 - (year_diff * 0.1))
                     scores.append(year_score)
-                weights.append(0.10)
+                weights.append(0.15)
             except (ValueError, TypeError):
                 pass
         
@@ -145,11 +145,12 @@ class FuzzyMatcher:
                     'customer_year': c_row['year'],
                     'customer_category': c_row['category'],
                     'customer_description': c_row['description'],
-                    'customer_serial_no': c_row['serial_no'],
+                    # 'customer_serial_no': 0,#c_row['serial_no'],
                     'customer_department': c_row['department'],
                     'customer_district': c_row['district'],
                     'customer_book_value': c_row['book_value'],
                     'customer_asset_number': c_row['asset_number'],
+                    'customer_source_index': c_row.get('source_index', None),
                     
                     # Internal data
                     'internal_old_tag': best_match['old_tag_number'],
@@ -157,11 +158,12 @@ class FuzzyMatcher:
                     'internal_year': best_match['year'],
                     'internal_category': best_match['category'],
                     'internal_description': best_match['description'],
-                    'internal_serial_no': best_match['serial_no'],
+                    # 'internal_serial_no': 0,#best_match['serial_no'],
                     'internal_department': best_match['department'],
                     'internal_district': best_match['district'],
                     'internal_book_value': best_match['book_value'],
                     'internal_asset_number': best_match['asset_number'],
+                    'internal_source_index': best_match.get('source_index', None),
                     
                     # Metadata
                     'match_type': 'FUZZY',

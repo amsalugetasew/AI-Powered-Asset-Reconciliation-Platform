@@ -48,7 +48,7 @@ def test_ai_matcher():
             'department': 'IT Department',
             'year': '2023',
             'book_value': 15000.0,
-            'serial_no': '',
+            # 'serial_no': '',
             'district': 'District A',
             'asset_number': 'A001'
         }
@@ -64,7 +64,7 @@ def test_ai_matcher():
             'department': 'IT Department',
             'year': '2023',
             'book_value': 15000.0,
-            'serial_no': '',
+            # 'serial_no': '',
             'district': 'District A',
             'asset_number': 'A002'
         },
@@ -76,7 +76,7 @@ def test_ai_matcher():
             'department': 'IT Department',
             'year': '2023',
             'book_value': 8000.0,
-            'serial_no': '',
+            # 'serial_no': '',
             'district': 'District A',
             'asset_number': 'A003'
         },
@@ -88,7 +88,7 @@ def test_ai_matcher():
             'department': 'Admin',
             'year': '2022',
             'book_value': 500.0,
-            'serial_no': '',
+            # 'serial_no': '',
             'district': 'District B',
             'asset_number': 'A004'
         },
@@ -100,7 +100,7 @@ def test_ai_matcher():
             'department': 'IT Department',
             'year': '2023',
             'book_value': 3000.0,
-            'serial_no': '',
+            # 'serial_no': '',
             'district': 'District A',
             'asset_number': 'A005'
         }

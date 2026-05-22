@@ -118,9 +118,11 @@ class ReportGenerator:
                     'internal_district', 
                     'internal_book_value', 
                     'internal_asset_number',
-                    'customer_old_tag','customer_new_tag',
+                    'customer_old_tag', 'customer_new_tag',
                     'customer_year', 'customer_category',
-                    'customer_description','customer_serial_no','customer_department', 'customer_district', 'customer_book_value',
+                    'customer_description',
+                    'customer_serial_no',
+                    'customer_department', 'customer_district', 'customer_book_value',
                     'match_type', 'match_method', 'confidence_score'
                 ]
                 
@@ -137,26 +139,26 @@ class ReportGenerator:
             
             # Sheet 2: Rule-Based Matches
             if not rule_matched_df.empty:
-                _reorder_matched_columns(rule_matched_df).to_excel(writer, sheet_name='Rule_Matched', index=False)
+                _reorder_matched_columns(rule_matched_df).to_excel(writer, sheet_name='Exact_Matched_By_Tag', index=False)
             else:
                 pd.DataFrame({'Message': ['No rule-based matches found']}).to_excel(
-                    writer, sheet_name='Exact_Matched', index=False
+                    writer, sheet_name='Exact_Matched_By_Tag', index=False
                 )
             
             # Sheet 3: AI-Assisted Matches
             if not ai_matched_df.empty:
-                _reorder_matched_columns(ai_matched_df).to_excel(writer, sheet_name='AI_Matched', index=False)
+                _reorder_matched_columns(ai_matched_df).to_excel(writer, sheet_name='AI_Matched_Need_Manual_Review', index=False)
             else:
                 pd.DataFrame({'Message': ['No AI-assisted matches found']}).to_excel(
-                    writer, sheet_name='AI_Matched', index=False
+                    writer, sheet_name='AI_Matched_Need_Manual_Review', index=False
                 )
             
             # Sheet 4: Manual Review
             if not manual_review_df.empty:
-                _reorder_matched_columns(manual_review_df).to_excel(writer, sheet_name='Manual_Review', index=False)
+                _reorder_matched_columns(manual_review_df).to_excel(writer, sheet_name='Matched_Need_Manual_Review', index=False)
             else:
                 pd.DataFrame({'Message': ['No records requiring manual review']}).to_excel(
-                    writer, sheet_name='Manual_Review', index=False
+                    writer, sheet_name='Matched_Need_Manual_Review', index=False
                 )
             
             # Sheet 5: Customer Unmatched
@@ -169,10 +171,10 @@ class ReportGenerator:
             
             # Sheet 6: Internal Unmatched
             if not internal_unmatched_df.empty:
-                internal_unmatched_df.to_excel(writer, sheet_name='Mine_Unmatched', index=False)
+                internal_unmatched_df.to_excel(writer, sheet_name='Finance_Unmatched', index=False)
             else:
                 pd.DataFrame({'Message': ['No unmatched internal records']}).to_excel(
-                    writer, sheet_name='Mine_Unmatched', index=False
+                    writer, sheet_name='Finance_Unmatched', index=False
                 )
             
             # Sheet 7: Customer Duplicates
@@ -185,10 +187,10 @@ class ReportGenerator:
             
             # Sheet 8: Internal Duplicates
             if not internal_duplicates_df.empty:
-                internal_duplicates_df.to_excel(writer, sheet_name='Internal_Duplicates', index=False)
+                internal_duplicates_df.to_excel(writer, sheet_name='Finance_Duplicates', index=False)
             else:
-                pd.DataFrame({'Message': ['No duplicate internal records']}).to_excel(
-                    writer, sheet_name='Internal_Duplicates', index=False
+                pd.DataFrame({'Message': ['No duplicate Finance records']}).to_excel(
+                    writer, sheet_name='Finance_Duplicates', index=False
                 )
         
         return filepath

@@ -4,6 +4,7 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 import { FiUpload, FiFile, FiX, FiCheckCircle, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
 import * as XLSX from 'xlsx'
+import { logActivity } from '../services/activityService'
 
 const Upload = () => {
   const [customerFile, setCustomerFile] = useState(null)
@@ -26,9 +27,11 @@ const Upload = () => {
       
       if (type === 'customer') {
         setCustomerFile(file)
+        logActivity(window.location.pathname, 'UPLOAD_CUSTOMER_FILE')
         await previewFile(file, 'customer')
       } else {
         setInternalFile(file)
+        logActivity(window.location.pathname, 'UPLOAD_FINANCE_FILE')
         await previewFile(file, 'internal')
       }
     }
@@ -113,6 +116,8 @@ const Upload = () => {
       setReconciliationId(recId)
       setUploadComplete(true)
       toast.success('Files uploaded successfully!')
+      
+      logActivity(window.location.pathname, `START_RECONCILIATION_ID_${recId}`)
 
       // Start processing
       setUploading(false)
@@ -155,7 +160,8 @@ const Upload = () => {
                     <div className="flex flex-col sm:flex-row text-sm text-gray-600 items-center justify-center">
                       <label
                         htmlFor="customer-file"
-                        className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none"
+                        className="relative cursor-pointer bg-white
+                         rounded-md font-medium text-[#8E288D] hover:text-[#7A1E79] focus-within:outline-none"
                       >
                         <span>Upload a file</span>
                         <input
@@ -175,7 +181,7 @@ const Upload = () => {
               ) : (
                 <div className="flex items-center justify-between p-4 bg-primary-50 rounded-md">
                   <div className="flex items-center">
-                    <FiFile className="h-8 w-8 text-primary-600" />
+                    <FiFile className="h-8 w-8 text-[#8E288D]" />
                     <span className="ml-2 text-sm text-gray-900 break-all">{customerFile.name}</span>
                   </div>
                   <button
@@ -195,13 +201,16 @@ const Upload = () => {
                 Finance Asset File
               </label>
               {!internalFile ? (
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary-400 transition-colors">
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed 
+                rounded-md hover:border-primary-400 transition-colors">
                   <div className="space-y-1 text-center">
                     <FiUpload className="mx-auto h-12 w-12 text-gray-400" />
                     <div className="flex flex-col sm:flex-row text-sm text-gray-600 items-center justify-center">
                       <label
                         htmlFor="internal-file"
-                        className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none"
+                        className="relative cursor-pointer bg-white rounded-md 
+                        font-medium text-[#8E288D] hover:text-[#7A1E79] 
+                        focus-within:outline-none"
                       >
                         <span>Upload a file</span>
                         <input
@@ -221,7 +230,7 @@ const Upload = () => {
               ) : (
                 <div className="flex items-center justify-between p-4 bg-primary-50 rounded-md">
                   <div className="flex items-center">
-                    <FiFile className="h-8 w-8 text-primary-600" />
+                    <FiFile className="h-8 w-8 text-[#8E288D]" />
                     <span className="ml-2 text-sm text-gray-900 break-all">{internalFile.name}</span>
                   </div>
                   <button
@@ -241,7 +250,9 @@ const Upload = () => {
             <button
               type="submit"
               disabled={!customerFile || !internalFile || uploading || processing}
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-6 py-3 border border-transparent 
+              text-base font-medium rounded-md shadow-sm text-white 
+              bg-[#8E288D] hover:bg-[#7A1E79] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploading ? 'Uploading...' : processing ? 'Processing...' : 'Start Reconciliation'}
             </button>

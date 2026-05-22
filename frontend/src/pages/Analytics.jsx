@@ -56,7 +56,7 @@ const Analytics = () => {
   ]
 
   const pieData = [
-    { name: 'Rule-Based', value: analytics.total_rule_matched, color: '#8E288D' },
+    { name: 'Rule-Based', value: analytics.total_rule_matched, color: '#008080' },
     { name: 'AI-Assisted', value: analytics.total_ai_matched, color: '#CFB53B' },
     { name: 'Manual Review', value: analytics.total_manual_review, color: '#f59e0b' }
   ]
@@ -69,14 +69,14 @@ const Analytics = () => {
       <h1 className="text-3xl font-semibold text-gray-900 mb-8">Analytics Dashboard</h1>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <FiFileText className="h-6 w-6 text-primary-600" />
+                <FiFileText className="h-6 w-6 text-[#8E288D]" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-5 w-10 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">
                     Total Reconciliations
@@ -94,7 +94,7 @@ const Analytics = () => {
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <FiTrendingUp className="h-6 w-6 text-green-600" />
+                <FiTrendingUp className="h-6 w-6 text-[#008080]" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -114,7 +114,7 @@ const Analytics = () => {
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <FiCheckCircle className="h-6 w-6 text-blue-600" />
+                <FiCheckCircle className="h-6 w-6 text-[#008080]" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -212,7 +212,7 @@ const Analytics = () => {
                 verticalAlign="bottom"
                 align="center"
                 wrapperStyle={{
-                  fontSize: "12px",
+                  fontSize: "15px",
                   paddingLeft: "18px",
                 }}
               />

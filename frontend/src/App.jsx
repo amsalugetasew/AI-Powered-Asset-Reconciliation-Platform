@@ -11,6 +11,7 @@ import Upload from './pages/Upload'
 import Results from './pages/Results'
 import Analytics from './pages/Analytics'
 import Layout from './components/Layout'
+import ActivityLogger from './components/ActivityLogger'
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -22,6 +23,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
+        <ActivityLogger />
         <ToastContainer position="top-right" autoClose={3000} />
         <Routes>
           <Route path="/login" element={<Login />} />

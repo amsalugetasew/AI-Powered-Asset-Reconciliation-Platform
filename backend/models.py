@@ -82,3 +82,81 @@ class Reconciliation(db.Model):
             },
             'report_path': self.report_path
         }
+
+class ActivityLog(db.Model):
+    """Log of user actions"""
+    __tablename__ = 'activity_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_email = db.Column(db.String(120), nullable=False)
+    page_visited = db.Column(db.String(255))
+    action_performed = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_email': self.user_email,
+            'page_visited': self.page_visited,
+            'action_performed': self.action_performed,
+            'timestamp': self.timestamp.isoformat()
+        }
+
+class ReconciliationRecord(db.Model):
+    """Row-by-row reconciliation results from the report"""
+    __tablename__ = 'reconciliation_records'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    reconciliation_id = db.Column(db.Integer, db.ForeignKey('reconciliations.id', ondelete='CASCADE'), nullable=False)
+    match_category = db.Column(db.String(100), nullable=False)
+    
+    # Unified JSON
+    full_record_json = db.Column(db.JSON, nullable=True)
+    
+    # Internal physical columns
+    internal_old_tag = db.Column(db.String(255), nullable=True)
+    internal_new_tag = db.Column(db.String(255), nullable=True)
+    internal_year = db.Column(db.String(50), nullable=True)
+    internal_category = db.Column(db.String(100), nullable=True)
+    internal_description = db.Column(db.Text, nullable=True)
+    internal_serial_no = db.Column(db.String(255), nullable=True)
+    internal_department = db.Column(db.String(255), nullable=True)
+    internal_district = db.Column(db.String(255), nullable=True)
+    internal_book_value = db.Column(db.Float, nullable=True)
+    internal_asset_number = db.Column(db.String(100), nullable=True)
+    
+    # Customer physical columns
+    customer_old_tag = db.Column(db.String(255), nullable=True)
+    customer_new_tag = db.Column(db.String(255), nullable=True)
+    customer_year = db.Column(db.String(50), nullable=True)
+    customer_category = db.Column(db.String(100), nullable=True)
+    customer_description = db.Column(db.Text, nullable=True)
+    customer_serial_no = db.Column(db.String(255), nullable=True)
+    customer_department = db.Column(db.String(255), nullable=True)
+    customer_district = db.Column(db.String(255), nullable=True)
+    customer_book_value = db.Column(db.Float, nullable=True)
+    
+    # Match metadata
+    match_type = db.Column(db.String(100), nullable=True)
+    match_method = db.Column(db.String(100), nullable=True)
+    confidence_score = db.Column(db.Float, nullable=True)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship back to Reconciliation
+    reconciliation = db.relationship('Reconciliation', backref=db.backref('records', cascade='all, delete-orphan'))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'reconciliation_id': self.reconciliation_id,
+            'match_category': self.match_category,
+            'full_record_json': self.full_record_json,
+            'internal_old_tag': self.internal_old_tag,
+            'internal_new_tag': self.internal_new_tag,
+            'customer_old_tag': self.customer_old_tag,
+            'customer_new_tag': self.customer_new_tag,
+            'match_type': self.match_type,
+            'confidence_score': self.confidence_score,
+            'created_at': self.created_at.isoformat()
+        }

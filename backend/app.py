@@ -3,6 +3,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import config
 from models import db
+from flask_migrate import Migrate
 import os
 import logging
 
@@ -26,6 +27,7 @@ def create_app(config_name='default'):
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     jwt = JWTManager(app)
     db.init_app(app)
+    migrate = Migrate(app, db)
     
     # JWT error handlers
     @jwt.expired_token_loader
@@ -63,11 +65,13 @@ def create_app(config_name='default'):
     # Register blueprints
     from routes.auth_routes import auth_bp
     from routes.reconciliation_routes import reconciliation_bp
+    from routes.activity_routes import activity_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(reconciliation_bp)
+    app.register_blueprint(activity_bp)
     
-    # Create database tables
+    # Create database tables is handled by Flask-Migrate/Alembic now, but keeping for safety if tables don't exist
     with app.app_context():
         db.create_all()
     
@@ -80,4 +84,4 @@ def create_app(config_name='default'):
 
 if __name__ == '__main__':
     app = create_app(os.getenv('FLASK_ENV', 'development'))
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=6000, debug=True)

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import { logActivity } from '../services/activityService'
 import { 
   FiUpload, 
   FiDownload, 
@@ -13,7 +14,8 @@ import {
   FiAlertCircle,
   FiFileText,
   FiFilter,
-  FiSearch
+  FiSearch,
+  FiDatabase
 } from 'react-icons/fi'
 
 const Dashboard = () => {
@@ -60,11 +62,11 @@ const Dashboard = () => {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'completed':
-        return <FiCheckCircle className="text-green-500" />
+        return <FiCheckCircle className="text-[#008080]" />
       case 'failed':
-        return <FiXCircle className="text-red-500" />
+        return <FiXCircle className="text-pink-500" />
       case 'processing':
-        return <FiLoader className="text-blue-500 animate-spin" />
+        return <FiLoader className="text-[#CFB53B] animate-spin" />
       default:
         return <FiClock className="text-yellow-500" />
     }
@@ -73,8 +75,8 @@ const Dashboard = () => {
   const getStatusBadge = (status) => {
     const colors = {
       completed: 'bg-green-100 text-green-800 border-green-200',
-      failed: 'bg-red-100 text-red-800 border-red-200',
-      processing: 'bg-blue-100 text-blue-800 border-blue-200',
+      failed: 'bg-pink-100 text-pink-800 border-pink-200',
+      processing: 'bg-yellow-100 text-white border-[#f59e0b]',
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200'
     }
     return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'
@@ -82,6 +84,7 @@ const Dashboard = () => {
 
   const handleDownload = async (id) => {
     try {
+      logActivity(window.location.pathname, `DOWNLOAD_REPORT_ID_${id}`)
       const response = await axios.get(`/api/reconciliation/download/${id}`, {
         responseType: 'blob'
       })
@@ -97,6 +100,17 @@ const Dashboard = () => {
       toast.success('Report downloaded successfully')
     } catch (error) {
       toast.error('Failed to download report')
+    }
+  }
+
+  const handleRecord = async (id) => {
+    try {
+      logActivity(window.location.pathname, `RECORD_RESULTS_ID_${id}`)
+      toast.info('Recording results to database...')
+      const response = await axios.post(`/api/reconciliation/record/${id}`)
+      toast.success(response.data.message || 'Results recorded successfully')
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to record results')
     }
   }
 
@@ -147,7 +161,7 @@ const Dashboard = () => {
         <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-yellow-100 text-sm font-medium">Processing</p>
+              <p className="text-white text-sm font-medium">Processing</p>
               <p className="text-3xl font-bold mt-2">{stats.processing}</p>
             </div>
             <div className="bg-white bg-opacity-20 p-3 rounded-lg">
@@ -178,7 +192,10 @@ const Dashboard = () => {
           </div>
           <Link
             to="/upload"
-            className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+            className="inline-flex items-center justify-center 
+            px-6 py-3 bg-gradient-to-r from-[#8E288D] to-[#7A1E79]  
+            text-white rounded-lg hover:from-[#008080] hover:to-[#008070]
+            transition-all shadow-md hover:shadow-lg transform hover:scale-105"
           >
             <FiUpload className="mr-2 h-5 w-5" />
             New Reconciliation
@@ -188,7 +205,7 @@ const Dashboard = () => {
         {/* Search and Filter */}
         <div className="mt-6 flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
-            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#8E288D] h-5 w-5" />
             <input
               type="text"
               placeholder="Search by filename..."
@@ -274,17 +291,27 @@ const Dashboard = () => {
                   {recon.status === 'completed' && (
                     <div className="ml-6 flex flex-col space-y-2">
                       <button
-                        onClick={() => navigate(`/results/${recon.id}`)}
-                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                        onClick={() => {
+                          logActivity(window.location.pathname, `VIEW_RESULTS_ID_${recon.id}`)
+                          navigate(`/results/${recon.id}`)
+                        }}
+                        className="px-4 py-2 bg-[#8E288D] text-white rounded-lg hover:bg-[#7A1E79] transition-colors text-sm font-medium"
                       >
                         View Results
                       </button>
                       <button
                         onClick={() => handleDownload(recon.id)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center justify-center"
+                        className="px-4 py-2 bg-[#008080] text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center justify-center"
                       >
                         <FiDownload className="mr-2 h-4 w-4" />
                         Download
+                      </button>
+                      <button
+                        onClick={() => handleRecord(recon.id)}
+                        className="px-4 py-2 bg-[#CFB53B] text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm font-medium flex items-center justify-center"
+                      >
+                        <FiDatabase className="mr-2 h-4 w-4" />
+                        Record
                       </button>
                     </div>
                   )}
@@ -294,11 +321,11 @@ const Dashboard = () => {
                   <div className="mt-6 pt-6 border-t border-gray-200">
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-green-600">{recon.statistics.rule_matched}</p>
+                        <p className="text-2xl font-bold text-[#008080]">{recon.statistics.rule_matched}</p>
                         <p className="text-xs text-gray-600 mt-1">Exact Matched</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-blue-600">{recon.statistics.ai_matched}</p>
+                        <p className="text-2xl font-bold text-[#8E288D]">{recon.statistics.ai_matched}</p>
                         <p className="text-xs text-gray-600 mt-1">AI Matched</p>
                       </div>
                       <div className="text-center">
@@ -306,11 +333,11 @@ const Dashboard = () => {
                         <p className="text-xs text-gray-600 mt-1">Need Manual Review</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-red-600">{recon.statistics.customer_unmatched}</p>
+                        <p className="text-2xl font-bold text-pink-600">{recon.statistics.customer_unmatched}</p>
                         <p className="text-xs text-gray-600 mt-1">Unmatched</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-purple-600">
+                        <p className="text-2xl font-bold text-[#008080]">
                           {((recon.statistics.rule_matched + recon.statistics.ai_matched) / recon.statistics.total_customer_records * 100).toFixed(1)}%
                         </p>
                         <p className="text-xs text-gray-600 mt-1">Match Rate</p>

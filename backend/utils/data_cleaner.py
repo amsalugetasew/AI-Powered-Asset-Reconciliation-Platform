@@ -101,7 +101,6 @@ class DataCleaner:
         """Clean all values in DataFrame"""
         df = df.copy()
         
-        # Clean text columns
         text_columns = ['old_tag_number', 'new_tag_number', 'category', 
                        'description', 'serial_no', 'department', 'district', 'asset_number']
         for col in text_columns:

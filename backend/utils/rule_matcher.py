@@ -135,11 +135,12 @@ class RuleMatcher:
             'customer_year': customer_row['year'],
             'customer_category': customer_row['category'],
             'customer_description': customer_row['description'],
-            'customer_serial_no': customer_row['serial_no'],
+            # 'customer_serial_no': 0,#customer_row['serial_no'],
             'customer_department': customer_row['department'],
             'customer_district': customer_row['district'],
             'customer_book_value': customer_row['book_value'],
             'customer_asset_number': customer_row['asset_number'],
+            'customer_source_index': customer_row.get('source_index', None),
             
             # Internal data
             'internal_old_tag': internal_row['old_tag_number'],
@@ -147,11 +148,12 @@ class RuleMatcher:
             'internal_year': internal_row['year'],
             'internal_category': internal_row['category'],
             'internal_description': internal_row['description'],
-            'internal_serial_no': internal_row['serial_no'],
+            # 'internal_serial_no':0,# internal_row['serial_no'],
             'internal_department': internal_row['department'],
             'internal_district': internal_row['district'],
             'internal_book_value': internal_row['book_value'],
             'internal_asset_number': internal_row['asset_number'],
+            'internal_source_index': internal_row.get('source_index', None),
             
             # Metadata
             'match_type': match_type,

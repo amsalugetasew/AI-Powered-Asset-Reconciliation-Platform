@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import axios from 'axios'
+import { logActivity } from '../services/activityService'
 
 const AuthContext = createContext()
 
@@ -58,6 +59,11 @@ export const AuthProvider = ({ children }) => {
     setToken(access_token)
     setUser(user)
     
+    // Log login activity using setTimeout so token is registered
+    setTimeout(() => {
+        logActivity('/login', 'USER_LOGIN');
+    }, 100);
+    
     return response.data
   }
 
@@ -79,6 +85,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = () => {
+    logActivity(window.location.pathname, 'USER_LOGOUT');
     localStorage.removeItem('token')
     setToken(null)
     setUser(null)

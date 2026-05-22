@@ -3,8 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { FiDownload, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiXCircle, FiDatabase, FiUsers } from 'react-icons/fi'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, 
+  Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+// import { PieChart } from 'lucid'
+import { CheckCircle, XCircle, AlertTriangle, Package } from 'lucide-react';
+import { logActivity } from '../services/activityService'
 const Results = () => {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -29,6 +32,7 @@ const Results = () => {
 
   const handleDownload = async () => {
     try {
+      logActivity(window.location.pathname, `DOWNLOAD_REPORT_ID_${id}`)
       const response = await axios.get(`/api/reconciliation/download/${id}`, {
         responseType: 'blob'
       })
@@ -44,6 +48,17 @@ const Results = () => {
       toast.success('Report downloaded successfully')
     } catch (error) {
       toast.error('Failed to download report')
+    }
+  }
+
+  const handleRecord = async () => {
+    try {
+      logActivity(window.location.pathname, `RECORD_RESULTS_ID_${id}`)
+      toast.info('Recording results to database...')
+      const response = await axios.post(`/api/reconciliation/record/${id}`)
+      toast.success(response.data.message || 'Results recorded successfully')
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to record results')
     }
   }
 
@@ -68,7 +83,7 @@ const Results = () => {
 
   // Overall distribution chart
   const chartData = [
-    { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
+    { name: 'Rule Matched', value: stats.rule_matched, color: '#008080' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
     { name: 'Manual Review', value: stats.manual_review, color: '#f59e0b' },
     { name: 'Unmatched', value: stats.customer_unmatched, color: '#ef4444' }
@@ -77,7 +92,7 @@ const Results = () => {
   // Customer records breakdown
   const customerReconciled = stats.rule_matched + stats.ai_matched
   const customerData = [
-    { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
+    { name: 'Rule Matched', value: stats.rule_matched, color: '#008080' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
     { name: 'Manual Review', value: stats.manual_review, color: '#f59e0b' },
     { name: 'Not Reconciled', value: stats.customer_unmatched, color: '#ef4444' }
@@ -86,7 +101,7 @@ const Results = () => {
   // Internal records breakdown (assuming similar distribution)
   const internalReconciled = stats.rule_matched + stats.ai_matched
   const internalData = [
-    { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
+    { name: 'Rule Matched', value: stats.rule_matched, color: '#008080' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
     { name: 'Manual Review', value: stats.manual_review, color: '#f59e0b' },
     { name: 'Not Reconciled', value: stats.internal_unmatched, color: '#ef4444' }
@@ -125,20 +140,33 @@ const Results = () => {
 
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900">
+          <h1 className="text-3xl font-semibold  text-gray-900">
             Reconciliation Results #{id}
           </h1>
           <p className="mt-2 text-sm text-gray-700">
             Completed on {new Date(reconciliation.completed_at).toLocaleString()}
           </p>
         </div>
-        <button
-          onClick={handleDownload}
-          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-        >
-          <FiDownload className="mr-2" />
-          Download Report
-        </button>
+        <div className="mt-4 sm:mt-0 flex space-x-3">
+          <button
+            onClick={handleRecord}
+            className="inline-flex items-center px-4 py-3 border 
+            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#CFB53B]
+            hover:bg-yellow-600"
+          >
+            <FiDatabase className="mr-2" />
+            Record to DB
+          </button>
+          <button
+            onClick={handleDownload}
+            className="inline-flex items-center px-4 py-3 border 
+            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#008080]
+            hover:bg-[#7A1E79]"
+          >
+            <FiDownload className="mr-2" />
+            Download Report
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -166,11 +194,11 @@ const Results = () => {
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <FiCheckCircle className="h-6 w-6 text-green-500" />
+                <FiCheckCircle className="h-6 w-6 text-[#008080]" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Rule Matched</dt>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Exact Matched</dt>
                   <dd className="text-lg font-semibold text-gray-900">{stats.rule_matched}</dd>
                 </dl>
               </div>
@@ -182,7 +210,7 @@ const Results = () => {
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <FiAlertCircle className="h-6 w-6 text-blue-500" />
+                <FiAlertCircle className="h-6 w-6 text-[#8E288D]" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -198,7 +226,7 @@ const Results = () => {
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <FiXCircle className="h-6 w-6 text-red-500" />
+                <FiXCircle className="h-6 w-6 text-pink-500" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -231,9 +259,9 @@ const Results = () => {
       </div> */}
 
       {/* Detailed Breakdown Charts */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6"> */}
         {/* Customer Records Breakdown */}
-        <div className="bg-white shadow rounded-lg p-6">
+        {/* <div className="bg-white shadow rounded-lg p-6">
           <div className="flex items-center mb-4">
             <FiUsers className="h-6 w-6 text-purple-600 mr-2" />
             <h3 className="text-lg font-semibold text-gray-900">Customer Records Breakdown</h3>
@@ -243,7 +271,7 @@ const Results = () => {
               <span className="text-sm font-medium text-gray-700">Total Customer Records:</span>
               <span className="text-2xl font-bold text-purple-600">{stats.total_customer_records}</span>
             </div>
-          </div>
+          </div> */}
           {/* <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -263,7 +291,7 @@ const Results = () => {
               <Tooltip contentStyle={{ fontSize: '14px', fontWeight: '500' }} />
             </PieChart>
           </ResponsiveContainer> */}
-          <div className="mt-4 space-y-2">
+          {/* <div className="mt-4 space-y-2">
             <div className="flex justify-between items-center p-2 bg-green-50 rounded">
               <span className="text-sm font-medium text-gray-700">✓ Rule Matched</span>
               <span className="text-sm font-bold text-green-700">{stats.rule_matched} records</span>
@@ -281,10 +309,10 @@ const Results = () => {
               <span className="text-sm font-bold text-red-700">{stats.customer_unmatched} records</span>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Internal Records Breakdown */}
-        <div className="bg-white shadow rounded-lg p-6">
+        {/* <div className="bg-white shadow rounded-lg p-6">
           <div className="flex items-center mb-4">
             <FiDatabase className="h-6 w-6 text-teal-600 mr-2" />
             <h3 className="text-lg font-semibold text-gray-900">Finance Records Breakdown</h3>
@@ -294,7 +322,7 @@ const Results = () => {
               <span className="text-sm font-medium text-gray-700">Total Finance Records:</span>
               <span className="text-2xl font-bold text-teal-600">{stats.total_internal_records}</span>
             </div>
-          </div>
+          </div> */}
           {/* <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -314,7 +342,7 @@ const Results = () => {
               <Tooltip contentStyle={{ fontSize: '14px', fontWeight: '500' }} />
             </PieChart>
           </ResponsiveContainer> */}
-          <div className="mt-4 space-y-2">
+          {/* <div className="mt-4 space-y-2">
             <div className="flex justify-between items-center p-2 bg-green-50 rounded">
               <span className="text-sm font-medium text-gray-700">✓ Rule Matched</span>
               <span className="text-sm font-bold text-green-700">{stats.rule_matched} records</span>
@@ -333,7 +361,7 @@ const Results = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Overall Statistics Summary */}
       <div className="mt-0 bg-white shadow rounded-lg p-6">
@@ -355,10 +383,11 @@ const Results = () => {
               ))}
             </Pie>
             <Tooltip contentStyle={{ fontSize: '15px', fontWeight: '500' }} />
-            <Legend wrapperStyle={{ fontSize: '14px', fontWeight: '500' }} />
+            <Legend wrapperStyle={{ fontSize: '15px', fontWeight: '500' }} />
           </PieChart>
         </ResponsiveContainer>
       </div>
+      
 
       {/* Detailed Statistics Table */}
       <div className="mt-8 bg-white shadow rounded-lg p-6">

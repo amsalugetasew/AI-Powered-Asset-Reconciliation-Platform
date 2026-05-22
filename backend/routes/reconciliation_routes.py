@@ -3,8 +3,10 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
+import pandas as pd
+import json
 
-from models import db, Reconciliation
+from models import db, Reconciliation, ReconciliationRecord
 from services.reconciliation_service import ReconciliationService
 from config import Config
 
@@ -256,3 +258,143 @@ def get_analytics():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@reconciliation_bp.route('/record/<int:reconciliation_id>', methods=['POST'])
+@jwt_required()
+def record_results(reconciliation_id):
+    """Parse the Excel report and save records to the database"""
+    try:
+        user_id = int(get_jwt_identity())
+        
+        reconciliation = Reconciliation.query.filter_by(
+            id=reconciliation_id,
+            user_id=user_id
+        ).first()
+        
+        if not reconciliation:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+            
+        if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
+            return jsonify({'error': 'Report not found or not yet generated'}), 404
+            
+        # Delete existing records for this reconciliation to handle re-recording (upsert)
+        ReconciliationRecord.query.filter_by(reconciliation_id=reconciliation_id).delete()
+        db.session.flush() # Flush instead of commit so we can do it all in one transaction
+        
+        # Parse Excel file
+        excel_file = pd.ExcelFile(reconciliation.report_path)
+        sheet_mapping = {
+            'Exact_Matched_By_Tag': 'Exact Match',
+            'AI_Matched_Need_Manual_Review': 'AI Match',
+            'Matched_Need_Manual_Review': 'Manual Review',
+            'Customer_Unmatched': 'Customer Unmatched',
+            'Finance_Unmatched': 'Finance Unmatched',
+            'Customer_Duplicates': 'Duplicate',
+            'Finance_Duplicates': 'Duplicate'
+        }
+        
+        parsed_records_kwargs = []
+        all_tags = set()
+        
+        for sheet_name, match_type in sheet_mapping.items():
+            if sheet_name in excel_file.sheet_names:
+                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                
+                # Check if this sheet is empty (contains 'Message' column)
+                if 'Message' in df.columns and len(df.columns) == 1:
+                    continue
+                
+                for _, row in df.iterrows():
+                    row_dict = row.to_dict()
+                    
+                    # Clean NaNs for DB insertion and JSON serialization
+                    cleaned_dict = {}
+                    for col, val in row_dict.items():
+                        if pd.isna(val):
+                            cleaned_dict[col] = None
+                        else:
+                            cleaned_dict[col] = val
+                            
+                    record_kwargs = {
+                        'reconciliation_id': reconciliation_id,
+                        'match_category': match_type,
+                        'full_record_json': cleaned_dict
+                    }
+                    
+                    # Map standard physical columns dynamically
+                    for col, val in cleaned_dict.items():
+                        # Direct match (e.g., 'customer_description', 'match_type')
+                        if hasattr(ReconciliationRecord, col) and col not in ['id', 'reconciliation_id', 'created_at', 'match_category', 'full_record_json']:
+                            record_kwargs[col] = val
+                        # Attempt to map unprefixed columns (e.g., 'description' in an Unmatched sheet)
+                        elif not col.startswith('customer_') and not col.startswith('internal_'):
+                            if 'Customer' in sheet_name or 'customer' in sheet_name.lower():
+                                mapped_col = f"customer_{col}"
+                                if hasattr(ReconciliationRecord, mapped_col):
+                                    record_kwargs[mapped_col] = val
+                            elif 'Finance' in sheet_name or 'internal' in sheet_name.lower():
+                                mapped_col = f"internal_{col}"
+                                if hasattr(ReconciliationRecord, mapped_col):
+                                    record_kwargs[mapped_col] = val
+                    
+                    # Identify unique tag
+                    tag = record_kwargs.get('internal_new_tag')
+                    if not tag:
+                        tag = record_kwargs.get('customer_new_tag')
+                        
+                    if tag:
+                        all_tags.add(tag)
+                        
+                    parsed_records_kwargs.append((tag, record_kwargs))
+
+        # Query existing records that match these tags
+        existing_records_by_tag = {}
+        if all_tags:
+            existing_records = ReconciliationRecord.query.filter(
+                db.or_(
+                    ReconciliationRecord.internal_new_tag.in_(list(all_tags)),
+                    ReconciliationRecord.customer_new_tag.in_(list(all_tags))
+                )
+            ).all()
+            
+            for rec in existing_records:
+                if rec.internal_new_tag:
+                    existing_records_by_tag[rec.internal_new_tag] = rec
+                if rec.customer_new_tag and rec.customer_new_tag not in existing_records_by_tag:
+                    existing_records_by_tag[rec.customer_new_tag] = rec
+                    
+        records_to_insert = []
+        records_to_update = 0
+                    
+        # Apply upsert logic
+        for tag, kwargs in parsed_records_kwargs:
+            if tag and tag in existing_records_by_tag:
+                # Update existing
+                existing_record = existing_records_by_tag[tag]
+                for k, v in kwargs.items():
+                    setattr(existing_record, k, v)
+                records_to_update += 1
+            else:
+                # Insert new
+                new_record = ReconciliationRecord(**kwargs)
+                records_to_insert.append(new_record)
+                if tag:
+                    # Add to dictionary so any intra-file duplicates update this instead of inserting again
+                    existing_records_by_tag[tag] = new_record
+        
+        if records_to_insert:
+            db.session.bulk_save_objects(records_to_insert)
+            
+        db.session.commit()
+            
+        return jsonify({
+            'message': f'Successfully recorded {len(records_to_insert) + records_to_update} results to database ({records_to_update} updated, {len(records_to_insert)} newly inserted)',
+            'count': len(records_to_insert) + records_to_update
+        }), 201
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+

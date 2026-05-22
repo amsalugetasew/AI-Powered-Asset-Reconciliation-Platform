@@ -65,6 +65,15 @@ class ReconciliationService:
         total_customer_uploaded = len(customer_df_original)
         total_internal_uploaded = len(internal_df_original)
         
+        # Create copies for matching with cleared serial numbers
+        customer_match_df = customer_df_original.copy()
+        internal_match_df = internal_df_original.copy()
+        
+        if 'serial_no' in customer_match_df.columns:
+            customer_match_df['serial_no'] = ''
+        if 'serial_no' in internal_match_df.columns:
+            internal_match_df['serial_no'] = ''
+        
         print(f"  Total customer records uploaded: {total_customer_uploaded}")
         print(f"  Total internal records uploaded: {total_internal_uploaded}")
         
@@ -93,8 +102,8 @@ class ReconciliationService:
             
             return main_df, duplicates_df
             
-        customer_df, customer_duplicates = extract_duplicates(customer_df_original)
-        internal_df, internal_duplicates = extract_duplicates(internal_df_original)
+        customer_df, customer_duplicates = extract_duplicates(customer_match_df)
+        internal_df, internal_duplicates = extract_duplicates(internal_match_df)
         
         print(f"  Customer: {len(customer_df)} unique + {len(customer_duplicates)} duplicates")
         print(f"  Internal: {len(internal_df)} unique + {len(internal_duplicates)} duplicates")
@@ -178,11 +187,9 @@ class ReconciliationService:
                 if c_idx is not None and c_idx in remaining_customer.index:
                     m['customer_old_tag'] = remaining_customer.at[c_idx, 'old_tag_number']
                     m['customer_new_tag'] = remaining_customer.at[c_idx, 'new_tag_number']
-                    m['customer_serial_no'] = remaining_customer.at[c_idx, 'serial_no']
                 if i_idx is not None and i_idx in remaining_internal.index:
                     m['internal_old_tag'] = remaining_internal.at[i_idx, 'old_tag_number']
                     m['internal_new_tag'] = remaining_internal.at[i_idx, 'new_tag_number']
-                    m['internal_serial_no'] = remaining_internal.at[i_idx, 'serial_no']
             
             # Remove AI-matched records from remaining by index
             ai_matched_customer_indices = [m['customer_source_index'] for m in ai_matched + manual_review if m.get('customer_source_index') is not None]
@@ -208,6 +215,36 @@ class ReconciliationService:
         # Combine fuzzy and AI matches
         ai_matched_df = pd.DataFrame(ai_matched) if ai_matched else pd.DataFrame()
         manual_review_df = pd.DataFrame(manual_review) if manual_review else pd.DataFrame()
+        
+        # --- RESTORE ORIGINAL SERIAL NUMBERS ---
+        def restore_serial(df, orig_df, is_customer=True, is_match=False):
+            if df.empty: return df
+            if is_match:
+                prefix = 'customer' if is_customer else 'internal'
+                idx_col = f'{prefix}_source_index'
+                serial_col = f'{prefix}_serial_no'
+                if idx_col in df.columns:
+                    valid_idx = df[idx_col].dropna().index
+                    df.loc[valid_idx, serial_col] = df.loc[valid_idx, idx_col].astype(int).map(orig_df['serial_no'])
+            else:
+                if 'serial_no' in df.columns:
+                    df['serial_no'] = orig_df.loc[df.index, 'serial_no']
+            return df
+            
+        rule_matched_df = restore_serial(rule_matched_df, customer_df_original, True, True)
+        rule_matched_df = restore_serial(rule_matched_df, internal_df_original, False, True)
+        
+        ai_matched_df = restore_serial(ai_matched_df, customer_df_original, True, True)
+        ai_matched_df = restore_serial(ai_matched_df, internal_df_original, False, True)
+        
+        manual_review_df = restore_serial(manual_review_df, customer_df_original, True, True)
+        manual_review_df = restore_serial(manual_review_df, internal_df_original, False, True)
+        
+        remaining_customer = restore_serial(remaining_customer, customer_df_original, True, False)
+        remaining_internal = restore_serial(remaining_internal, internal_df_original, False, False)
+        
+        customer_duplicates = restore_serial(customer_duplicates, customer_df_original, True, False)
+        internal_duplicates = restore_serial(internal_duplicates, internal_df_original, False, False)
         
         # Step 5: Generate report
         print("Step 5: Generating report...")
