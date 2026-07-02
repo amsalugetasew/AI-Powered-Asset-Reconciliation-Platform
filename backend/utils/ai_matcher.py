@@ -31,7 +31,9 @@ class AIMatcher:
             api_key=api_key, 
             base_url="https://api.groq.com/openai/v1"
         )
-        self.model = model or 'llama-3.3-70b-versatile'
+        # self.model = model or 'llama-3.3-70b-versatile'
+        self.model = model or 'gpt-oss-120b' or 'qwen-3.6-27b' or 'llama-3.3-70b-versatile'
+        print(f"  - Available models: {[m.id for m in self.client.models.list()]}")
         self.fuzzy_threshold = fuzzy_threshold
         self.rate_limit_delay = rate_limit_delay
         self.max_retries = max_retries

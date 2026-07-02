@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+import os
 from typing import Dict, List
 
 class DataCleaner:
@@ -32,10 +33,22 @@ class DataCleaner:
     
     @staticmethod
     def read_excel(file_path: str) -> pd.DataFrame:
-        """Read Excel file and return DataFrame"""
+        """
+        Read Excel file and return DataFrame.
+        For large files, pandas handles memory efficiently.
+        """
         try:
+            # Check file size for logging
+            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+            
+            if file_size_mb > 50:
+                print(f"  Large file detected ({file_size_mb:.1f}MB) - this may take a moment...")
+            
+            # Read entire file - pandas is optimized for this
             df = pd.read_excel(file_path, engine='openpyxl')
+            print(f"  ✓ Read {len(df)} rows from Excel file ({file_size_mb:.1f}MB)")
             return df
+                
         except Exception as e:
             raise ValueError(f"Error reading Excel file: {str(e)}")
     

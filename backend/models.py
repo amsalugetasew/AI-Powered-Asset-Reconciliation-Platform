@@ -77,8 +77,8 @@ class Reconciliation(db.Model):
                 'manual_review': self.manual_review,
                 'customer_unmatched': self.customer_unmatched,
                 'internal_unmatched': self.internal_unmatched,
-                'customer_duplicates': self.customer_duplicates,
-                'internal_duplicates': self.internal_duplicates
+                'customer_duplicates': getattr(self, 'customer_duplicates', 0),
+                'internal_duplicates': getattr(self, 'internal_duplicates', 0)
             },
             'report_path': self.report_path
         }

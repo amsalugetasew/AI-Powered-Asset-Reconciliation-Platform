@@ -49,6 +49,85 @@ class ReconciliationService:
         else:
             print("✗ No API key found - AI matching disabled")
     
+    @staticmethod
+    def extract_duplicates(df: pd.DataFrame, batch_size: int = 50000) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Separate duplicate records from the input DataFrame with memory-efficient batch processing.
+        Keep the first row in each duplicate group for matching, and place only additional repeated rows into the duplicate report.
+        
+        Args:
+            df: Input DataFrame
+            batch_size: Size of batches for processing large datasets
+            
+        Returns:
+            Tuple of (main_df, duplicates_df)
+        """
+        if df.empty:
+            return df.copy(), df.copy()
+        
+        print(f"  Detecting duplicates in {len(df)} records...")
+        
+        # For small datasets, use original logic
+        if len(df) <= batch_size:
+            empty_tags = (df['new_tag_number'] == '') & (df['serial_no'] == '')
+            df_empty = df[empty_tags].copy()
+            df_non_empty = df[~empty_tags].copy()
+
+            tag_dupes_mask = df_non_empty.duplicated(subset=['new_tag_number', 'serial_no'], keep='first')
+            empty_dupes_mask = df_empty.duplicated(keep='first')
+
+            duplicates_df = pd.concat([
+                df_non_empty[tag_dupes_mask],
+                df_empty[empty_dupes_mask]
+            ]).sort_index().copy()
+
+            main_df = pd.concat([
+                df_non_empty[~tag_dupes_mask],
+                df_empty[~empty_dupes_mask]
+            ]).sort_index().copy()
+            
+            print(f"    ✓ Found {len(duplicates_df)} duplicates, {len(main_df)} unique records")
+            return main_df, duplicates_df
+        
+        # For large datasets, use memory-efficient batch processing
+        print(f"    Using batch processing (batch size: {batch_size})...")
+        
+        empty_tags = (df['new_tag_number'] == '') & (df['serial_no'] == '')
+        df_empty = df[empty_tags]
+        df_non_empty = df[~empty_tags]
+        
+        # Process non-empty tags
+        tag_dupes_mask = pd.Series([False] * len(df_non_empty), index=df_non_empty.index)
+        seen_tags = set()
+        
+        for i in range(0, len(df_non_empty), batch_size):
+            batch = df_non_empty.iloc[i:i+batch_size]
+            for idx, row in batch.iterrows():
+                key = (row['new_tag_number'], row['serial_no'])
+                if key in seen_tags:
+                    tag_dupes_mask[idx] = True
+                else:
+                    seen_tags.add(key)
+            
+            if i > 0:
+                print(f"      Processed {min(i+batch_size, len(df_non_empty))}/{len(df_non_empty)} records")
+        
+        # Process empty tags
+        empty_dupes_mask = df_empty.duplicated(keep='first')
+        
+        duplicates_df = pd.concat([
+            df_non_empty[tag_dupes_mask],
+            df_empty[empty_dupes_mask]
+        ]).sort_index()
+
+        main_df = pd.concat([
+            df_non_empty[~tag_dupes_mask],
+            df_empty[~empty_dupes_mask]
+        ]).sort_index()
+        
+        print(f"    ✓ Found {len(duplicates_df)} duplicates, {len(main_df)} unique records")
+        return main_df, duplicates_df
+
     def process_reconciliation(self, customer_file_path: str, internal_file_path: str,
                               reconciliation_id: int) -> Dict:
         """
@@ -77,33 +156,10 @@ class ReconciliationService:
         print(f"  Total customer records uploaded: {total_customer_uploaded}")
         print(f"  Total internal records uploaded: {total_internal_uploaded}")
         
-        def extract_duplicates(df):
-            empty_tags = (df['new_tag_number'] == '') & (df['serial_no'] == '')
-            df_empty = df[empty_tags]
-            df_non_empty = df[~empty_tags]
-            
-            # Find duplicates based on tag/serial for non-empty rows
-            # Using keep=False correctly identifies ALL instances of duplicates
-            tag_dupes_mask = df_non_empty.duplicated(subset=['new_tag_number', 'serial_no'], keep=False)
-            
-            # For rows with empty tags, identify fully identical rows as duplicates
-            empty_dupes_mask = df_empty.duplicated(keep=False)
-            
-            duplicates_df = pd.concat([
-                df_non_empty[tag_dupes_mask],
-                df_empty[empty_dupes_mask]
-            ]).copy()
-            
-            # Keep first occurrences in main dataframe
-            main_df = pd.concat([
-                df_non_empty[~tag_dupes_mask],
-                df_empty[~empty_dupes_mask]
-            ]).sort_index()
-            
-            return main_df, duplicates_df
-            
-        customer_df, customer_duplicates = extract_duplicates(customer_match_df)
-        internal_df, internal_duplicates = extract_duplicates(internal_match_df)
+        # Use configured batch size for large datasets
+        batch_size = getattr(self.config, 'BATCH_SIZE', 50000)
+        customer_df, customer_duplicates = self.extract_duplicates(customer_match_df, batch_size)
+        internal_df, internal_duplicates = self.extract_duplicates(internal_match_df, batch_size)
         
         print(f"  Customer: {len(customer_df)} unique + {len(customer_duplicates)} duplicates")
         print(f"  Internal: {len(internal_df)} unique + {len(internal_duplicates)} duplicates")
@@ -119,8 +175,9 @@ class ReconciliationService:
         
         # Step 3: Fuzzy matching
         print("Step 3: Performing fuzzy matching...")
+        batch_size = getattr(self.config, 'BATCH_SIZE', 10000)
         fuzzy_matches, remaining_customer, remaining_internal = FuzzyMatcher.fuzzy_match(
-            unmatched_customer, unmatched_internal, threshold=0.60
+            unmatched_customer, unmatched_internal, threshold=0.60, batch_size=batch_size
         )
         
         # Step 4: AI-assisted matching (if available and needed)
@@ -150,9 +207,10 @@ class ReconciliationService:
             customer_records = llm_customer_df.to_dict('records')
             internal_records = llm_internal_df.to_dict('records')
             
-            # Limit AI processing to avoid high costs (process max 100 records)
-            customer_records_limited = customer_records[:100]
-            print(f"Processing {len(customer_records_limited)} customer records with AI...")
+            # Limit AI processing to avoid high costs
+            max_ai_records = getattr(self.config, 'MAX_AI_RECORDS', 1000)
+            customer_records_limited = customer_records[:max_ai_records]
+            print(f"Processing {len(customer_records_limited)} customer records with AI (limit: {max_ai_records})...")
             
             ai_matches = self.ai_matcher.ai_match_batch(
                 customer_records_limited, 

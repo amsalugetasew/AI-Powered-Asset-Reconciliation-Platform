@@ -22,10 +22,14 @@ class Config:
     }
     
     # File Upload
-    MAX_CONTENT_LENGTH = int(os.getenv('MAX_FILE_SIZE', 50)) * 1024 * 1024  # MB to bytes
+    MAX_CONTENT_LENGTH = int(os.getenv('MAX_FILE_SIZE', 100)) * 1024 * 1024  # MB to bytes
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.getenv('UPLOAD_FOLDER', 'uploads'))
     REPORTS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.getenv('REPORTS_FOLDER', 'reports'))
     ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
+    
+    # Batch Processing for Large Datasets
+    BATCH_SIZE = int(os.getenv('BATCH_SIZE', 10000))
+    MAX_AI_RECORDS = int(os.getenv('MAX_AI_RECORDS', 1000))
     
     # AI Configuration
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')

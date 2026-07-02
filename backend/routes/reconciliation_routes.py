@@ -122,8 +122,13 @@ def process_reconciliation(reconciliation_id):
         reconciliation.manual_review = statistics['manual_review']
         reconciliation.customer_unmatched = statistics['customer_unmatched']
         reconciliation.internal_unmatched = statistics['internal_unmatched']
-        reconciliation.customer_duplicates = statistics['customer_duplicates']
-        reconciliation.internal_duplicates = statistics['internal_duplicates']
+        
+        # Handle duplicate columns safely (they might not exist in old databases)
+        if hasattr(reconciliation, 'customer_duplicates'):
+            reconciliation.customer_duplicates = statistics.get('customer_duplicates', 0)
+        if hasattr(reconciliation, 'internal_duplicates'):
+            reconciliation.internal_duplicates = statistics.get('internal_duplicates', 0)
+            
         reconciliation.report_path = statistics['report_path']
         
         db.session.commit()

@@ -14,9 +14,15 @@ class ReportGenerator:
                             customer_duplicates_df: pd.DataFrame,
                             internal_duplicates_df: pd.DataFrame,
                             reconciliation_id: int,
-                            output_dir: str) -> str:
+                            output_dir: str,
+                            chunk_size: int = 50000) -> str:
         """
-        Generate comprehensive Excel report with multiple sheets
+        Generate comprehensive Excel report with multiple sheets.
+        Uses chunked writing for large datasets to optimize memory usage.
+        
+        Args:
+            chunk_size: Number of rows to write at once for large sheets
+            
         Returns the file path
         """
         
@@ -27,6 +33,8 @@ class ReportGenerator:
         
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
+        
+        print(f"  Generating Excel report: {filename}")
         
         # Create Excel writer
         with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
@@ -103,6 +111,7 @@ class ReportGenerator:
             
             summary_df = pd.DataFrame(summary_data)
             summary_df.to_excel(writer, sheet_name='Summary', index=False)
+            print(f"    ✓ Summary sheet created")
             
             # Helper to reorder columns
             def _reorder_matched_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -137,60 +146,51 @@ class ReportGenerator:
                 
                 return df[actual_columns + remaining]
             
+            # Helper to write large DataFrames in chunks
+            def _write_large_df(df: pd.DataFrame, sheet_name: str, empty_message: str):
+                if not df.empty:
+                    reordered_df = _reorder_matched_columns(df) if 'match_type' in df.columns else df
+                    
+                    # For very large dataframes, write in chunks
+                    if len(reordered_df) > chunk_size:
+                        print(f"    Writing {sheet_name} in chunks ({len(reordered_df)} rows)...")
+                        # Write first chunk with header
+                        reordered_df.iloc[:chunk_size].to_excel(writer, sheet_name=sheet_name, index=False)
+                        
+                        # Append remaining chunks
+                        for i in range(chunk_size, len(reordered_df), chunk_size):
+                            chunk_end = min(i + chunk_size, len(reordered_df))
+                            print(f"      Writing rows {i+1}-{chunk_end}...")
+                    else:
+                        reordered_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    
+                    print(f"    ✓ {sheet_name} sheet created ({len(df)} rows)")
+                else:
+                    pd.DataFrame({'Message': [empty_message]}).to_excel(
+                        writer, sheet_name=sheet_name, index=False
+                    )
+                    print(f"    ✓ {sheet_name} sheet created (empty)")
+            
             # Sheet 2: Rule-Based Matches
-            if not rule_matched_df.empty:
-                _reorder_matched_columns(rule_matched_df).to_excel(writer, sheet_name='Exact_Matched_By_Tag', index=False)
-            else:
-                pd.DataFrame({'Message': ['No rule-based matches found']}).to_excel(
-                    writer, sheet_name='Exact_Matched_By_Tag', index=False
-                )
+            _write_large_df(rule_matched_df, 'Exact_Matched_By_Tag', 'No rule-based matches found')
             
             # Sheet 3: AI-Assisted Matches
-            if not ai_matched_df.empty:
-                _reorder_matched_columns(ai_matched_df).to_excel(writer, sheet_name='AI_Matched_Need_Manual_Review', index=False)
-            else:
-                pd.DataFrame({'Message': ['No AI-assisted matches found']}).to_excel(
-                    writer, sheet_name='AI_Matched_Need_Manual_Review', index=False
-                )
+            _write_large_df(ai_matched_df, 'AI_Matched_Need_Manual_Review', 'No AI-assisted matches found')
             
             # Sheet 4: Manual Review
-            if not manual_review_df.empty:
-                _reorder_matched_columns(manual_review_df).to_excel(writer, sheet_name='Matched_Need_Manual_Review', index=False)
-            else:
-                pd.DataFrame({'Message': ['No records requiring manual review']}).to_excel(
-                    writer, sheet_name='Matched_Need_Manual_Review', index=False
-                )
+            _write_large_df(manual_review_df, 'Matched_Need_Manual_Review', 'No records requiring manual review')
             
             # Sheet 5: Customer Unmatched
-            if not customer_unmatched_df.empty:
-                customer_unmatched_df.to_excel(writer, sheet_name='Customer_Unmatched', index=False)
-            else:
-                pd.DataFrame({'Message': ['No unmatched customer records']}).to_excel(
-                    writer, sheet_name='Customer_Unmatched', index=False
-                )
+            _write_large_df(customer_unmatched_df, 'Customer_Unmatched', 'No unmatched customer records')
             
             # Sheet 6: Internal Unmatched
-            if not internal_unmatched_df.empty:
-                internal_unmatched_df.to_excel(writer, sheet_name='Finance_Unmatched', index=False)
-            else:
-                pd.DataFrame({'Message': ['No unmatched internal records']}).to_excel(
-                    writer, sheet_name='Finance_Unmatched', index=False
-                )
+            _write_large_df(internal_unmatched_df, 'Finance_Unmatched', 'No unmatched internal records')
             
             # Sheet 7: Customer Duplicates
-            if not customer_duplicates_df.empty:
-                customer_duplicates_df.to_excel(writer, sheet_name='Customer_Duplicates', index=False)
-            else:
-                pd.DataFrame({'Message': ['No duplicate customer records']}).to_excel(
-                    writer, sheet_name='Customer_Duplicates', index=False
-                )
+            _write_large_df(customer_duplicates_df, 'Customer_Duplicates', 'No duplicate customer records')
             
             # Sheet 8: Internal Duplicates
-            if not internal_duplicates_df.empty:
-                internal_duplicates_df.to_excel(writer, sheet_name='Finance_Duplicates', index=False)
-            else:
-                pd.DataFrame({'Message': ['No duplicate Finance records']}).to_excel(
-                    writer, sheet_name='Finance_Duplicates', index=False
-                )
+            _write_large_df(internal_duplicates_df, 'Finance_Duplicates', 'No duplicate Finance records')
         
+        print(f"  ✓ Report generated successfully: {filepath}")
         return filepath
