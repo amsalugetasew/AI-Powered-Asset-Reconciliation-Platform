@@ -117,7 +117,8 @@ class ReconciliationRecord(db.Model):
     
     # Approval status (with defaults for backward compatibility)
     approval_status = db.Column(db.String(50), default='pending', nullable=True)
-    # Values: 'pending', 'reconciled', 'not_reconciled'
+    # Values: 'pending', 'reconciled', 'unreconciled', 'surplus_assets',
+    #         'exist_in_physical_not_erp', 'exist_in_erp_not_physical'
     approved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     approved_at = db.Column(db.DateTime, nullable=True)
     

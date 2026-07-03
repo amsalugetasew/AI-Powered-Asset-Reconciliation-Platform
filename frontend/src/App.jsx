@@ -82,11 +82,11 @@ function App() {
             <Route path="results/:id" element={<Results />} />
             <Route path="analytics" element={<Analytics />} />
             
-            {/* Manager+ Routes */}
+            {/* Approval — all logged-in users can view; approval actions gated inside component */}
             <Route path="approval/:id" element={
-              <RoleProtectedRoute requiredRole="manager">
+              <ProtectedRoute>
                 <ApprovalPage />
-              </RoleProtectedRoute>
+              </ProtectedRoute>
             } />
             <Route path="audit" element={
               <RoleProtectedRoute requiredRole="manager">

@@ -10,7 +10,7 @@ export default defineConfig({
     allowedHosts: ['getasew'],
     proxy: {
       '/api': {
-        target: 'http://Getasew:6000',
+        target: 'http://ISDIG-S390:6000',
         changeOrigin: true
       }
     }

@@ -293,17 +293,15 @@ const Results = () => {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 flex space-x-3">
-          {hasRole('manager') && (
-            <button
-              onClick={() => navigate(`/approval/${id}`)}
-              className="inline-flex items-center px-4 py-3 border 
-              border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#8E288D]
-              hover:bg-[#7A1E79]"
-            >
-              <FiCheck className="mr-2" />
-              {recordsStored ? 'View Approval Status' : 'Approve & Save to DB'}
-            </button>
-          )}
+          <button
+            onClick={() => navigate(`/approval/${id}`)}
+            className="inline-flex items-center px-4 py-3 border 
+            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#8E288D]
+            hover:bg-[#7A1E79]"
+          >
+            <FiCheck className="mr-2" />
+            {hasRole('manager') ? 'Review & Approve' : 'View Approval Status'}
+          </button>
           <button
             onClick={handleDownload}
             className="inline-flex items-center px-4 py-3 border 
@@ -327,7 +325,7 @@ const Results = () => {
                   `Total: ${filteredRecordsLength} records`
                 ) : (
                   <span className="text-yellow-600 font-medium">
-                    Records not yet stored in database
+                    Processing records…
                   </span>
                 )}
               </div>
@@ -378,15 +376,6 @@ const Results = () => {
               </div>
             </div>
           </div>
-          
-          {/* Info message if records not stored */}
-          {!recordsStored && (
-            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Records are being loaded from the processed file. After approval by a Manager, they will be stored in the database.
-              </p>
-            </div>
-          )}
           
           {/* Category Filter */}
           {recordsStored && (

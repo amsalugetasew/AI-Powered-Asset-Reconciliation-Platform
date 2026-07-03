@@ -19,6 +19,58 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
 
+
+def _auto_save_records(reconciliation_id, report_path):
+    """
+    Parse the Excel report and save all records to DB with approval_status='pending'.
+    Clears existing records for this reconciliation first (idempotent).
+    """
+    if not report_path or not os.path.exists(report_path):
+        print(f"_auto_save_records: report not found at {report_path}")
+        return 0
+
+    # Delete existing records (re-run safe)
+    ReconciliationRecord.query.filter_by(reconciliation_id=reconciliation_id).delete()
+    db.session.flush()
+
+    sheet_mapping = {
+        'Exact_Matched_By_Tag': 'Exact Match',
+        'AI_Matched_Need_Manual_Review': 'AI Match',
+        'Matched_Need_Manual_Review': 'Manual Review',
+        'Customer_Unmatched': 'Customer Unmatched',
+        'Finance_Unmatched': 'Finance Unmatched',
+        'Customer_Duplicates': 'Duplicate',
+        'Finance_Duplicates': 'Duplicate'
+    }
+
+    excel_file = pd.ExcelFile(report_path)
+    records_to_insert = []
+
+    for sheet_name, match_type in sheet_mapping.items():
+        if sheet_name not in excel_file.sheet_names:
+            continue
+        df = pd.read_excel(excel_file, sheet_name=sheet_name)
+        if 'Message' in df.columns and len(df.columns) == 1:
+            continue
+
+        for _, row in df.iterrows():
+            row_dict = row.to_dict()
+            cleaned = {k: (None if pd.isna(v) else v) for k, v in row_dict.items()}
+
+            record = ReconciliationRecord(
+                reconciliation_id=reconciliation_id,
+                match_category=match_type,
+                full_record_json=cleaned,
+                approval_status='pending'
+            )
+            records_to_insert.append(record)
+
+    if records_to_insert:
+        db.session.bulk_save_objects(records_to_insert)
+    db.session.commit()
+    print(f"_auto_save_records: saved {len(records_to_insert)} records for reconciliation {reconciliation_id}")
+    return len(records_to_insert)
+
 @reconciliation_bp.route('/upload', methods=['POST'])
 @jwt_required()
 def upload_files():
@@ -134,6 +186,14 @@ def process_reconciliation(reconciliation_id):
         reconciliation.report_path = statistics['report_path']
         
         db.session.commit()
+
+        # Auto-save records to database immediately after processing
+        try:
+            _auto_save_records(reconciliation_id, statistics['report_path'])
+        except Exception as save_err:
+            import traceback
+            print(f"Warning: auto-save records failed: {save_err}")
+            traceback.print_exc()
         
         return jsonify({
             'message': 'Reconciliation completed successfully',
@@ -367,6 +427,72 @@ def approve_exception(reconciliation_id):
         return jsonify({'error': str(e)}), 500
 
 
+@reconciliation_bp.route('/records/approve-record', methods=['POST'])
+@jwt_required()
+@require_role('manager')
+def approve_record():
+    """
+    Approve or reject a single record by ID (Manager/Admin only).
+
+    Request body:
+    {
+        "record_id": 42,
+        "approval_decision": "reconciled" | "unreconciled" | "surplus_assets" | "exist_in_physical_not_erp" | "exist_in_erp_not_physical" | "pending"
+    }
+    """
+    VALID_DECISIONS = [
+        'pending', 'reconciled', 'unreconciled',
+        'surplus_assets', 'exist_in_physical_not_erp', 'exist_in_erp_not_physical'
+    ]
+    try:
+        data = request.get_json()
+        record_id = data.get('record_id')
+        approval_decision = data.get('approval_decision')
+
+        if not record_id or not approval_decision:
+            return jsonify({'error': 'Missing required fields: record_id, approval_decision'}), 400
+
+        if approval_decision not in VALID_DECISIONS:
+            return jsonify({
+                'error': 'Invalid approval_decision',
+                'allowed': VALID_DECISIONS
+            }), 400
+
+        record = ReconciliationRecord.query.get(record_id)
+        if not record:
+            return jsonify({'error': 'Record not found'}), 404
+
+        manager_user = get_user_from_token()
+
+        record.approval_status = approval_decision
+        record.approved_by = manager_user.id
+        record.approved_at = datetime.utcnow()
+        db.session.commit()
+
+        AuditService.log_operation(
+            user_id=manager_user.id,
+            operation_type='APPROVE_RECORD',
+            resource_type='reconciliation_records',
+            resource_id=record_id,
+            details={
+                'approval_decision': approval_decision,
+                'reconciliation_id': record.reconciliation_id,
+                'match_category': record.match_category
+            }
+        )
+
+        return jsonify({
+            'message': f'Record {record_id} marked as {approval_decision}',
+            'record_id': record_id,
+            'approval_status': approval_decision,
+            'approved_by': manager_user.username
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @reconciliation_bp.route('/records/approve-group', methods=['POST'])
 @jwt_required()
 @require_role('manager')
@@ -395,10 +521,14 @@ def approve_group():
                 'required': ['reconciliation_id', 'category', 'approval_decision']
             }), 400
         
-        if approval_decision not in ['reconciled', 'not_reconciled']:
+        VALID_DECISIONS = [
+            'reconciled', 'unreconciled', 'surplus_assets',
+            'exist_in_physical_not_erp', 'exist_in_erp_not_physical'
+        ]
+        if approval_decision not in VALID_DECISIONS:
             return jsonify({
                 'error': 'Invalid approval_decision',
-                'allowed': ['reconciled', 'not_reconciled']
+                'allowed': VALID_DECISIONS
             }), 400
         
         # Verify reconciliation exists
@@ -561,25 +691,32 @@ def get_approval_summary(reconciliation_id):
                     'total': 0,
                     'pending': 0,
                     'reconciled': 0,
-                    'not_reconciled': 0
+                    'unreconciled': 0,
+                    'not_reconciled': 0,  # legacy alias
+                    'surplus_assets': 0,
+                    'exist_in_physical_not_erp': 0,
+                    'exist_in_erp_not_physical': 0,
                 }
             summary[match_category]['total'] += count
-            summary[match_category][approval_status] += count
+            key = approval_status or 'pending'
+            if key in summary[match_category]:
+                summary[match_category][key] += count
+            else:
+                summary[match_category][key] = count
         
         # Group unmatched categories
         if 'Customer Unmatched' in summary or 'Finance Unmatched' in summary:
             unmatched_summary = {
-                'total': 0,
-                'pending': 0,
-                'reconciled': 0,
-                'not_reconciled': 0
+                'total': 0, 'pending': 0, 'reconciled': 0,
+                'unreconciled': 0, 'not_reconciled': 0,
+                'surplus_assets': 0,
+                'exist_in_physical_not_erp': 0,
+                'exist_in_erp_not_physical': 0,
             }
             for key in ['Customer Unmatched', 'Finance Unmatched']:
                 if key in summary:
-                    unmatched_summary['total'] += summary[key]['total']
-                    unmatched_summary['pending'] += summary[key]['pending']
-                    unmatched_summary['reconciled'] += summary[key]['reconciled']
-                    unmatched_summary['not_reconciled'] += summary[key]['not_reconciled']
+                    for field in unmatched_summary:
+                        unmatched_summary[field] += summary[key].get(field, 0)
             summary['Unmatched'] = unmatched_summary
         
         return jsonify({
@@ -781,10 +918,12 @@ def get_records(reconciliation_id):
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         category = request.args.get('category', 'all', type=str)
+        approval_status_filter = request.args.get('approval_status', 'all', type=str)
         
         print(f"\n=== DEBUG GET_RECORDS ===")
         print(f"Reconciliation ID: {reconciliation_id}")
         print(f"Category filter: '{category}'")
+        print(f"Approval status filter: '{approval_status_filter}'")
         print(f"Page: {page}, Per page: {per_page}")
         
         # Build query
@@ -810,6 +949,11 @@ def get_records(reconciliation_id):
             else:
                 query = query.filter_by(match_category=category)
                 print(f"Filtering for exact match: '{category}'")
+
+        # Filter by approval status if specified
+        if approval_status_filter != 'all':
+            query = query.filter_by(approval_status=approval_status_filter)
+            print(f"Filtering by approval_status: '{approval_status_filter}'")
         
         # Count before pagination
         total_count = query.count()
@@ -842,21 +986,129 @@ def get_records(reconciliation_id):
             # Get approval status (default to 'pending' if column doesn't exist yet)
             approval_status = getattr(record, 'approval_status', 'pending') or 'pending'
             approved_at = getattr(record, 'approved_at', None)
-            
+
+            # ── smart field extraction from full_record_json ──────────────────
+            # Matched sheets:  customer_* / internal_* prefixed keys
+            # Unmatched sheets: raw keys (old_tag_number, new_tag_number, description …)
+            def _v(keys):
+                """First non-empty value among candidate keys."""
+                for k in keys:
+                    v = json_data.get(k)
+                    if v is not None and str(v).strip() not in ('', 'nan', 'None'):
+                        return str(v).strip()
+                return None
+
+            is_unmatched = record.match_category in ('Customer Unmatched', 'Finance Unmatched')
+            is_internal_unmatched = record.match_category == 'Finance Unmatched'
+
+            # ── customer side ──────────────────────────────────────────────────
+            if is_unmatched and is_internal_unmatched:
+                # Finance Unmatched: raw cols are the internal side
+                c_old_tag    = None
+                c_new_tag    = None
+                c_year       = None
+                c_category   = None
+                c_desc       = None
+                c_serial     = None
+                c_department = None
+                c_district   = None
+                c_book_value = None
+                c_asset_no   = None
+            else:
+                c_old_tag    = _v(['customer_old_tag', 'old_tag_number'])
+                c_new_tag    = _v(['customer_new_tag', 'new_tag_number'])
+                c_year       = _v(['customer_year', 'year'])
+                c_category   = _v(['customer_category', 'category'])
+                c_desc       = _v(['customer_description', 'description'])
+                c_serial     = _v(['customer_serial_no', 'serial_no'])
+                c_department = _v(['customer_department', 'department'])
+                c_district   = _v(['customer_district', 'district'])
+                c_book_value = _v(['customer_book_value', 'book_value'])
+                c_asset_no   = _v(['customer_asset_number', 'asset_number'])
+
+            # ── internal side ──────────────────────────────────────────────────
+            if is_unmatched and not is_internal_unmatched:
+                # Customer Unmatched: no internal side
+                i_old_tag    = None
+                i_new_tag    = None
+                i_year       = None
+                i_category   = None
+                i_desc       = None
+                i_serial     = None
+                i_department = None
+                i_district   = None
+                i_book_value = None
+                i_asset_no   = None
+            elif is_unmatched and is_internal_unmatched:
+                # Finance Unmatched: raw cols ARE the internal side
+                i_old_tag    = _v(['old_tag_number', 'internal_old_tag'])
+                i_new_tag    = _v(['new_tag_number', 'internal_new_tag'])
+                i_year       = _v(['year', 'internal_year'])
+                i_category   = _v(['category', 'internal_category'])
+                i_desc       = _v(['description', 'internal_description'])
+                i_serial     = _v(['serial_no', 'internal_serial_no'])
+                i_department = _v(['department', 'internal_department'])
+                i_district   = _v(['district', 'internal_district'])
+                i_book_value = _v(['book_value', 'internal_book_value'])
+                i_asset_no   = _v(['asset_number', 'internal_asset_number'])
+            else:
+                # Matched sheets: both sides prefixed
+                i_old_tag    = _v(['internal_old_tag'])
+                i_new_tag    = _v(['internal_new_tag'])
+                i_year       = _v(['internal_year'])
+                i_category   = _v(['internal_category'])
+                i_desc       = _v(['internal_description'])
+                i_serial     = _v(['internal_serial_no'])
+                i_department = _v(['internal_department'])
+                i_district   = _v(['internal_district'])
+                i_book_value = _v(['internal_book_value'])
+                i_asset_no   = _v(['internal_asset_number'])
+
+            # ── match metadata ─────────────────────────────────────────────────
+            match_method = _v(['match_method', 'match_type']) or record.match_category
+            confidence_val = record.confidence_score or json_data.get('confidence_score')
+            try:
+                confidence_str = f"{float(confidence_val):.0%}" if confidence_val else '—'
+            except (ValueError, TypeError):
+                confidence_str = str(confidence_val) if confidence_val else '—'
+
             records.append({
                 'id': record.id,
                 'category': record.match_category,
-                'customer_tag': record.customer_new_tag or record.customer_old_tag or json_data.get('New Tag') or json_data.get('Old Tag') or '-',
-                'internal_tag': record.internal_new_tag or record.internal_old_tag or '-',
-                'description': record.customer_description or record.internal_description or json_data.get('Description') or '-',
-                'match_method': record.match_method or record.match_type or '-',
-                'confidence': f"{record.confidence_score:.0%}" if record.confidence_score else '-',
-                'status': 'Matched' if record.match_category in ['Exact Match', 'AI Match'] else 
-                         'Review Required' if record.match_category == 'Manual Review' else 'Unmatched',
+                # Customer columns
+                'customer_old_tag':    c_old_tag    or '—',
+                'customer_new_tag':    c_new_tag    or '—',
+                'customer_year':       c_year       or '—',
+                'customer_category':   c_category   or '—',
+                'customer_description':c_desc       or '—',
+                'customer_serial':     c_serial     or '—',
+                'customer_department': c_department or '—',
+                'customer_district':   c_district   or '—',
+                'customer_book_value': c_book_value or '—',
+                'customer_asset_no':   c_asset_no   or '—',
+                # Internal columns
+                'internal_old_tag':    i_old_tag    or '—',
+                'internal_new_tag':    i_new_tag    or '—',
+                'internal_year':       i_year       or '—',
+                'internal_category':   i_category   or '—',
+                'internal_description':i_desc       or '—',
+                'internal_serial':     i_serial     or '—',
+                'internal_department': i_department or '—',
+                'internal_district':   i_district   or '—',
+                'internal_book_value': i_book_value or '—',
+                'internal_asset_no':   i_asset_no   or '—',
+                # Match metadata
+                'match_method':  match_method,
+                'confidence':    confidence_str,
+                'status': (
+                    'Matched'         if record.match_category in ['Exact Match', 'AI Match'] else
+                    'Review Required' if record.match_category == 'Manual Review' else
+                    'Unmatched'
+                ),
                 'approval_status': approval_status,
-                'approved_by': approver_name,
-                'approved_at': approved_at.isoformat() if approved_at else None,
-                'full_data': json_data
+                'approved_by':     approver_name,
+                'approved_at':     approved_at.isoformat() if approved_at else None,
+                'full_data':       json_data
             })
         
         print(f"=== END DEBUG ===\n")
@@ -1024,3 +1276,32 @@ def record_results(reconciliation_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
+
+@reconciliation_bp.route('/records/debug-keys/<int:reconciliation_id>', methods=['GET'])
+@jwt_required()
+def debug_record_keys(reconciliation_id):
+    """
+    Debug: returns the JSON keys from the first record of each category.
+    Helps diagnose column name mapping issues.
+    """
+    try:
+        from sqlalchemy import func
+        categories = db.session.query(ReconciliationRecord.match_category).filter_by(
+            reconciliation_id=reconciliation_id
+        ).distinct().all()
+
+        result = {}
+        for (cat,) in categories:
+            rec = ReconciliationRecord.query.filter_by(
+                reconciliation_id=reconciliation_id,
+                match_category=cat
+            ).first()
+            if rec and rec.full_record_json:
+                result[cat] = list(rec.full_record_json.keys())
+            else:
+                result[cat] = []
+
+        return jsonify({'reconciliation_id': reconciliation_id, 'keys_by_category': result}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

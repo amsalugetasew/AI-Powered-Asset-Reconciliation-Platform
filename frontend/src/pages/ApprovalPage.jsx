@@ -1,277 +1,586 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { FiArrowLeft, FiCheckCircle, FiXCircle, FiClock, FiAlertCircle } from 'react-icons/fi'
-import { ManagerOnly } from '../components/RoleGuard'
+import {
+  FiArrowLeft, FiCheckCircle, FiXCircle, FiClock,
+  FiChevronLeft, FiChevronRight, FiAlertCircle, FiFilter, FiChevronDown
+} from 'react-icons/fi'
+import { useAuth } from '../context/AuthContext'
 
+// ── Status definitions ────────────────────────────────────────────────────────
+const STATUSES = [
+  { value: 'pending',                   label: 'Pending',                      color: 'gray'   },
+  { value: 'reconciled',               label: 'Reconciled',                   color: 'green'  },
+  { value: 'unreconciled',             label: 'Unreconciled',                 color: 'red'    },
+  { value: 'surplus_assets',           label: 'Surplus Assets',               color: 'orange' },
+  { value: 'exist_in_physical_not_erp',label: 'Exist in Physical not ERP',    color: 'blue'   },
+  { value: 'exist_in_erp_not_physical',label: 'Exist in ERP not Physical',    color: 'purple' },
+]
+
+const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.value, s]))
+
+const statusBadgeCls = {
+  pending:                   'bg-gray-100 text-gray-700 border-gray-300',
+  reconciled:               'bg-green-100 text-green-800 border-green-300',
+  unreconciled:             'bg-red-100 text-red-800 border-red-300',
+  surplus_assets:           'bg-orange-100 text-orange-800 border-orange-300',
+  exist_in_physical_not_erp:'bg-blue-100 text-blue-800 border-blue-300',
+  exist_in_erp_not_physical:'bg-purple-100 text-purple-800 border-purple-300',
+}
+
+// ── Category definitions ──────────────────────────────────────────────────────
+const CATEGORIES = [
+  { key: 'all',            label: 'All'           },
+  { key: 'Exact Match',   label: 'Exact Match'   },
+  { key: 'AI Match',      label: 'AI Match'      },
+  { key: 'Manual Review', label: 'Manual Review' },
+  { key: 'Unmatched',     label: 'Unmatched'     },
+]
+
+// Bulk action options per category type
+const BULK_OPTIONS_MATCHED = [
+  { value: 'reconciled',   label: 'Reconciled'   },
+  { value: 'unreconciled', label: 'Unreconciled'  },
+]
+const BULK_OPTIONS_UNMATCHED = [
+  { value: 'surplus_assets',            label: 'Surplus Assets'             },
+  { value: 'exist_in_physical_not_erp', label: 'Exist in Physical not ERP'  },
+  { value: 'exist_in_erp_not_physical', label: 'Exist in ERP not Physical'  },
+  { value: 'reconciled',                label: 'Reconciled'                 },
+  { value: 'unreconciled',              label: 'Unreconciled'               },
+]
+
+// ── Paired column definitions ─────────────────────────────────────────────────
+const COLUMN_PAIRS = [
+  { label: 'Old Tag',     cKey: 'customer_old_tag',     iKey: 'internal_old_tag'     },
+  { label: 'New Tag',     cKey: 'customer_new_tag',     iKey: 'internal_new_tag'     },
+  { label: 'Year',        cKey: 'customer_year',        iKey: 'internal_year'        },
+  { label: 'Category',    cKey: 'customer_category',    iKey: 'internal_category'    },
+  { label: 'Description', cKey: 'customer_description', iKey: 'internal_description' },
+  { label: 'Department',  cKey: 'customer_department',  iKey: 'internal_department'  },
+  { label: 'District',    cKey: 'customer_district',    iKey: 'internal_district'    },
+  { label: 'Book Value',  cKey: 'customer_book_value',  iKey: 'internal_book_value'  },
+  { label: 'Asset No.',   cKey: 'customer_asset_no',    iKey: 'internal_asset_no'    },
+  { label: 'Serial No.',  cKey: 'customer_serial',      iKey: 'internal_serial'      },
+]
+
+// ── Status Badge ─────────────────────────────────────────────────────────────
+const StatusBadge = ({ status }) => {
+  const s = STATUS_MAP[status] || STATUS_MAP.pending
+  const cls = statusBadgeCls[status] || statusBadgeCls.pending
+  const Icon = status === 'reconciled' ? FiCheckCircle
+             : status === 'pending'    ? FiClock
+             : FiXCircle
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap ${cls}`}>
+      <Icon className="w-3 h-3 flex-shrink-0" />{s.label}
+    </span>
+  )
+}
+
+// ── Per-record status dropdown ────────────────────────────────────────────────
+const StatusDropdown = ({ recordId, current, onSelect, loading }) => {
+  const [open, setOpen] = useState(false)
+  const currentStatus = STATUS_MAP[current] || STATUS_MAP.pending
+  const cls = statusBadgeCls[current] || statusBadgeCls.pending
+
+  if (loading) return <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#8E288D]" />
+
+  return (
+    <div className="relative inline-block text-left">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border cursor-pointer hover:opacity-80 ${cls}`}
+      >
+        {currentStatus.label}
+        <FiChevronDown className="w-3 h-3" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 mt-1 z-20 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[220px]">
+            {STATUSES.map(s => (
+              <button
+                key={s.value}
+                onClick={() => { setOpen(false); if (s.value !== current) onSelect(recordId, s.value) }}
+                className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${
+                  s.value === current ? 'font-semibold text-[#8E288D]' : 'text-gray-700'
+                }`}
+              >
+                <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[s.value].split(' ')[0]}`} />
+                {s.label}
+                {s.value === current && ' ✓'}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Bulk action dropdown ──────────────────────────────────────────────────────
+const BulkDropdown = ({ category, onSelect, loading }) => {
+  const [open, setOpen] = useState(false)
+  const isUnmatched = category === 'Unmatched'
+  const options = isUnmatched ? BULK_OPTIONS_UNMATCHED : BULK_OPTIONS_MATCHED
+  const loadingKey = loading && Object.keys(loading).find(k => k.startsWith(category) && loading[k])
+
+  return (
+    <div className="relative inline-block">
+      <button
+        onClick={() => setOpen(o => !o)}
+        disabled={!!loadingKey}
+        className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium text-white bg-[#8E288D] hover:bg-[#7A1E79] disabled:opacity-50"
+      >
+        {loadingKey ? <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" /> : null}
+        Bulk Approve <FiChevronDown className="w-3 h-3" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1 z-20 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[220px]">
+            {options.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => { setOpen(false); onSelect(category, opt.value) }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-700 flex items-center gap-2"
+              >
+                <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[opt.value]?.split(' ')[0] || 'bg-gray-300'}`} />
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 const ApprovalPage = () => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { hasRole } = useAuth()
+  const canApprove = hasRole('manager')
+
   const [reconciliation, setReconciliation] = useState(null)
-  const [summary, setSummary] = useState(null)
-  const [records, setRecords] = useState({})
-  const [loading, setLoading] = useState(true)
-  const [approving, setApproving] = useState(null)
+  const [records, setRecords]               = useState([])
+  const [summary, setSummary]               = useState({})
+  const [loading, setLoading]               = useState(true)
+  const [recordsLoading, setRecordsLoading] = useState(false)
+  const [actionLoading, setActionLoading]   = useState({}) // { [recordId]: true }
+  const [bulkLoading, setBulkLoading]       = useState({}) // { [category-decision]: true }
 
-  const categories = [
-    { key: 'Exact Match', label: 'Exact Match', color: 'green' },
-    { key: 'AI Match', label: 'AI Match', color: 'purple' },
-    { key: 'Manual Review', label: 'Manual Review', color: 'yellow' },
-    { key: 'Unmatched', label: 'Unmatched', color: 'red' }
-  ]
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [statusFilter, setStatusFilter]         = useState('all')
+  const [page, setPage]                         = useState(1)
+  const [totalPages, setTotalPages]             = useState(1)
+  const [totalRecords, setTotalRecords]         = useState(0)
+  const PER_PAGE = 10
 
+  // ── fetch header ───────────────────────────────────────────────────────────
   useEffect(() => {
-    fetchData()
+    axios.get(`/api/reconciliation/${id}`)
+      .then(r => setReconciliation(r.data.reconciliation))
+      .catch(() => { toast.error('Failed to load reconciliation'); navigate('/') })
+      .finally(() => setLoading(false))
   }, [id])
 
-  const fetchData = async () => {
+  // ── fetch summary ──────────────────────────────────────────────────────────
+  const fetchSummary = useCallback(async () => {
     try {
-      setLoading(true)
-      // Fetch reconciliation details
-      const reconResponse = await axios.get(`/api/reconciliation/${id}`)
-      setReconciliation(reconResponse.data.reconciliation)
+      const r = await axios.get(`/api/reconciliation/records/approval-summary/${id}`)
+      setSummary(r.data.summary || {})
+    } catch {}
+  }, [id])
 
-      // Fetch approval summary
-      const summaryResponse = await axios.get(`/api/reconciliation/records/approval-summary/${id}`)
-      setSummary(summaryResponse.data.summary)
+  useEffect(() => { fetchSummary() }, [fetchSummary])
 
-      // Fetch records for each category
-      const recordsData = {}
-      for (const category of categories) {
-        const response = await axios.get(`/api/reconciliation/records/${id}`, {
-          params: {
-            category: category.key,
-            per_page: 100 // Fetch more records for approval view
-          }
-        })
-        recordsData[category.key] = response.data.records
+  // ── fetch records ──────────────────────────────────────────────────────────
+  const fetchRecords = useCallback(async () => {
+    try {
+      setRecordsLoading(true)
+      const params = {
+        page, per_page: PER_PAGE,
+        category: selectedCategory === 'all' ? 'all' : selectedCategory,
+        ...(statusFilter !== 'all' && { approval_status: statusFilter }),
       }
-      setRecords(recordsData)
-    } catch (error) {
-      console.error('Error fetching data:', error)
-      toast.error('Failed to load approval data')
-    } finally {
-      setLoading(false)
-    }
-  }
+      const r = await axios.get(`/api/reconciliation/records/${id}`, { params })
+      setRecords(r.data.records || [])
+      setTotalRecords(r.data.pagination.total_records)
+      setTotalPages(r.data.pagination.total_pages)
+    } catch { toast.error('Failed to load records') }
+    finally { setRecordsLoading(false) }
+  }, [id, page, selectedCategory, statusFilter])
 
-  const handleApprove = async (category, decision) => {
+  useEffect(() => { fetchRecords() }, [fetchRecords])
+
+  // ── per-record decision ────────────────────────────────────────────────────
+  const handleRecordDecision = async (recordId, decision) => {
     try {
-      setApproving(`${category}-${decision}`)
-      
-      const response = await axios.post('/api/reconciliation/records/approve-group', {
-        reconciliation_id: parseInt(id),
-        category: category,
-        approval_decision: decision
+      setActionLoading(p => ({ ...p, [recordId]: true }))
+      await axios.post('/api/reconciliation/records/approve-record', {
+        record_id: recordId,
+        approval_decision: decision,
       })
-
-      toast.success(response.data.message)
-      
-      // Refresh data
-      await fetchData()
-    } catch (error) {
-      console.error('Error approving:', error)
-      toast.error(error.response?.data?.error || 'Failed to approve records')
+      toast.success(`Marked as "${STATUS_MAP[decision]?.label || decision}"`)
+      await fetchRecords()
+      await fetchSummary()
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Action failed')
     } finally {
-      setApproving(null)
+      setActionLoading(p => { const n = { ...p }; delete n[recordId]; return n })
     }
   }
 
-  const getApprovalStatusBadge = (status) => {
-    const badges = {
-      pending: { color: 'bg-gray-100 text-gray-800 border-gray-300', icon: FiClock, label: 'Pending' },
-      reconciled: { color: 'bg-green-100 text-green-800 border-green-300', icon: FiCheckCircle, label: 'Reconciled' },
-      not_reconciled: { color: 'bg-red-100 text-red-800 border-red-300', icon: FiXCircle, label: 'Not Reconciled' }
+  // ── bulk decision ──────────────────────────────────────────────────────────
+  const handleBulkDecision = async (category, decision) => {
+    const key = `${category}-${decision}`
+    try {
+      setBulkLoading(p => ({ ...p, [key]: true }))
+      await axios.post('/api/reconciliation/records/approve-group', {
+        reconciliation_id: parseInt(id),
+        category,
+        approval_decision: decision,
+      })
+      toast.success(`All "${category}" → "${STATUS_MAP[decision]?.label || decision}"`)
+      await fetchRecords()
+      await fetchSummary()
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Bulk action failed')
+    } finally {
+      setBulkLoading(p => { const n = { ...p }; delete n[key]; return n })
     }
-    const badge = badges[status] || badges.pending
-    const Icon = badge.icon
-    
-    return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold border ${badge.color}`}>
-        <Icon className="w-3 h-3 mr-1" />
-        {badge.label}
-      </span>
-    )
   }
 
-  const getCategoryColor = (color) => {
-    const colors = {
-      green: 'border-green-500 bg-green-50',
-      purple: 'border-purple-500 bg-purple-50',
-      yellow: 'border-yellow-500 bg-yellow-50',
-      red: 'border-red-500 bg-red-50'
+  // ── summary helpers ────────────────────────────────────────────────────────
+  const getSummary = (cat) => {
+    const empty = { total: 0, pending: 0, reconciled: 0, unreconciled: 0,
+                    surplus_assets: 0, exist_in_physical_not_erp: 0, exist_in_erp_not_physical: 0 }
+    if (cat === 'all') {
+      return Object.values(summary).reduce((a, s) => {
+        Object.keys(empty).forEach(k => { a[k] = (a[k] || 0) + (s[k] || 0) })
+        return a
+      }, { ...empty })
     }
-    return colors[color] || colors.green
+    if (cat === 'Unmatched') {
+      return ['Customer Unmatched', 'Finance Unmatched'].reduce((a, k) => {
+        const s = summary[k] || {}
+        Object.keys(empty).forEach(f => { a[f] = (a[f] || 0) + (s[f] || 0) })
+        return a
+      }, { ...empty })
+    }
+    return { ...empty, ...(summary[cat] || {}) }
   }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    )
+  const nonPendingCount = (s) =>
+    (s.reconciled || 0) + (s.unreconciled || 0) +
+    (s.surplus_assets || 0) + (s.exist_in_physical_not_erp || 0) + (s.exist_in_erp_not_physical || 0)
+
+  // ── tab styles ─────────────────────────────────────────────────────────────
+  const tabCls = (key) => {
+    const active   = { all: 'bg-gray-700 text-white', 'Exact Match': 'bg-green-600 text-white',
+                       'AI Match': 'bg-purple-600 text-white', 'Manual Review': 'bg-yellow-500 text-white',
+                       'Unmatched': 'bg-red-600 text-white' }
+    const inactive = { all: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+                       'Exact Match': 'bg-green-50 text-green-700 hover:bg-green-100',
+                       'AI Match': 'bg-purple-50 text-purple-700 hover:bg-purple-100',
+                       'Manual Review': 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100',
+                       'Unmatched': 'bg-red-50 text-red-700 hover:bg-red-100' }
+    return selectedCategory === key ? active[key] : inactive[key]
   }
 
-  if (!reconciliation) {
-    return <div>Reconciliation not found</div>
-  }
+  if (loading) return (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8E288D]" />
+    </div>
+  )
+
+  const overall = getSummary('all')
+  const overallDone = nonPendingCount(overall)
+  const pct = overall.total > 0 ? ((overallDone / overall.total) * 100).toFixed(0) : 0
 
   return (
-    <ManagerOnly>
-      <div className="px-4 sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <button
-            onClick={() => navigate('/')}
-            className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
-          >
-            <FiArrowLeft className="mr-2" />
-            Back to Dashboard
-          </button>
-        </div>
+    <div className="px-4 sm:px-6 lg:px-8 pb-12">
+      {/* Back */}
+      <div className="mb-4">
+        <button onClick={() => navigate(-1)} className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
+          <FiArrowLeft className="mr-2" /> Back
+        </button>
+      </div>
 
-        <div className="sm:flex sm:items-center sm:justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-semibold text-gray-900">
-              Approval Page - Reconciliation #{id}
-            </h1>
-            <p className="mt-2 text-sm text-gray-700">
-              Review and approve reconciliation records by category
-            </p>
+      {/* Title + progress */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            {canApprove ? 'Approval Review' : 'Approval Status'} — Reconciliation #{id}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {canApprove
+              ? 'Click the status badge on each record to change it, or use Bulk Approve for a whole category'
+              : 'View approval status for this reconciliation'}
+          </p>
+        </div>
+        <div className="bg-white border rounded-lg p-4 min-w-[260px] shadow-sm">
+          <p className="text-xs text-gray-500 mb-1">Overall Progress ({pct}%)</p>
+          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+            <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <span className="text-yellow-600 font-medium">{overall.pending} pending</span>
+            <span className="text-green-700 font-medium">{overall.reconciled} reconciled</span>
+            <span className="text-red-600 font-medium">{overall.unreconciled} unreconciled</span>
+            <span className="text-orange-600 font-medium">{overall.surplus_assets} surplus</span>
           </div>
         </div>
-
-        {/* Category Cards */}
-        <div className="space-y-6">
-          {categories.map(category => {
-            const categorySummary = summary?.[category.key] || { total: 0, pending: 0, reconciled: 0, not_reconciled: 0 }
-            const categoryRecords = records[category.key] || []
-            const allApproved = categorySummary.pending === 0 && categorySummary.total > 0
-
-            return (
-              <div key={category.key} className={`border-l-4 ${getCategoryColor(category.color)} rounded-lg shadow-lg overflow-hidden`}>
-                {/* Category Header */}
-                <div className="bg-white px-6 py-4 border-b border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">{category.label}</h2>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {categorySummary.total} total records
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-700">{categorySummary.pending}</div>
-                        <div className="text-xs text-gray-500">Pending</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">{categorySummary.reconciled}</div>
-                        <div className="text-xs text-gray-500">Reconciled</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">{categorySummary.not_reconciled}</div>
-                        <div className="text-xs text-gray-500">Not Reconciled</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Records Table */}
-                {categoryRecords.length > 0 ? (
-                  <div className="bg-white">
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Tag</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Internal Tag</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Match Method</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Approval Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {categoryRecords.slice(0, 5).map((record) => (
-                            <tr key={record.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.customer_tag}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.internal_tag}</td>
-                              <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{record.description}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{record.match_method}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                {getApprovalStatusBadge(record.approval_status)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {categoryRecords.length > 5 && (
-                      <div className="bg-gray-50 px-6 py-3 text-sm text-gray-600 text-center border-t">
-                        Showing 5 of {categoryRecords.length} records
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="bg-white px-6 py-8 text-center text-gray-500">
-                    <FiAlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-                    <p>No records in this category</p>
-                  </div>
-                )}
-
-                {/* Approval Actions */}
-                {categorySummary.total > 0 && (
-                  <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 border-t">
-                    {allApproved ? (
-                      <div className="text-green-600 font-medium flex items-center">
-                        <FiCheckCircle className="mr-2" />
-                        All records approved
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => handleApprove(category.key, 'reconciled')}
-                          disabled={approving === `${category.key}-reconciled`}
-                          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                        >
-                          {approving === `${category.key}-reconciled` ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                              Approving...
-                            </>
-                          ) : (
-                            <>
-                              <FiCheckCircle className="mr-2" />
-                              Mark as Reconciled
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleApprove(category.key, 'not_reconciled')}
-                          disabled={approving === `${category.key}-not_reconciled`}
-                          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                        >
-                          {approving === `${category.key}-not_reconciled` ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                              Approving...
-                            </>
-                          ) : (
-                            <>
-                              <FiXCircle className="mr-2" />
-                              Mark as Not Reconciled
-                            </>
-                          )}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
       </div>
-    </ManagerOnly>
+
+      {/* Category tabs */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {CATEGORIES.map(cat => {
+          const s = getSummary(cat.key)
+          return (
+            <button key={cat.key}
+              onClick={() => { setSelectedCategory(cat.key); setPage(1) }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${tabCls(cat.key)}`}>
+              {cat.label}
+              {cat.key !== 'all' && (
+                <span className="ml-1.5 text-xs opacity-80">
+                  ({s.pending} pending · {nonPendingCount(s)} done)
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Filter + bulk row */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        {/* Status filter pills */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <FiFilter className="text-gray-400 flex-shrink-0" />
+          {['all', ...STATUSES.map(s => s.value)].map(sf => (
+            <button key={sf}
+              onClick={() => { setStatusFilter(sf); setPage(1) }}
+              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+                statusFilter === sf
+                  ? 'bg-[#8E288D] text-white border-[#8E288D]'
+                  : 'bg-white text-gray-600 border-gray-300 hover:border-[#8E288D]'
+              }`}>
+              {sf === 'all' ? 'All' : (STATUS_MAP[sf]?.label || sf)}
+            </button>
+          ))}
+        </div>
+
+        {/* Bulk action (manager only, non-all category) */}
+        {canApprove && selectedCategory !== 'all' && (
+          <BulkDropdown
+            category={selectedCategory}
+            onSelect={handleBulkDecision}
+            loading={bulkLoading}
+          />
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm border-collapse">
+            <thead>
+              {/* Row 1 — group headers */}
+              <tr className="bg-gray-100 border-b border-gray-300">
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300 sticky left-0 bg-gray-100 z-10">
+                  Category
+                </th>
+                {COLUMN_PAIRS.map(p => (
+                  <th key={p.label} colSpan={2}
+                    className="px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 whitespace-nowrap">
+                    {p.label}
+                  </th>
+                ))}
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Match</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Conf.</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">
+                  Approval Status
+                </th>
+                {canApprove && (
+                  <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">
+                    Approved By
+                  </th>
+                )}
+              </tr>
+              {/* Row 2 — Customer / Finance sub-headers */}
+              <tr className="bg-gray-50 border-b-2 border-gray-300">
+                {COLUMN_PAIRS.map(p => (
+                  <React.Fragment key={p.label}>
+                    <th className="px-3 py-1 text-center text-xs font-medium text-purple-700 bg-purple-50 border-r border-gray-200 whitespace-nowrap">
+                      Customer
+                    </th>
+                    <th className="px-3 py-1 text-center text-xs font-medium text-teal-700 bg-teal-50 border-r border-gray-300 whitespace-nowrap">
+                      Finance
+                    </th>
+                  </React.Fragment>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-gray-100">
+              {recordsLoading ? (
+                <tr>
+                  <td colSpan={2 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
+                    className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center">
+                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#8E288D] mb-3" />
+                      <p className="text-gray-500">Loading records…</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : records.length === 0 ? (
+                <tr>
+                  <td colSpan={2 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
+                    className="px-4 py-12 text-center text-gray-400">
+                    <FiAlertCircle className="mx-auto h-10 w-10 mb-2" />
+                    <p>No records found for this filter</p>
+                  </td>
+                </tr>
+              ) : records.map((rec, idx) => (
+                <tr key={rec.id}
+                  className={`hover:bg-yellow-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+
+                  {/* Category badge */}
+                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-200">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
+                      rec.category === 'Exact Match'        ? 'bg-green-100 text-green-800'   :
+                      rec.category === 'AI Match'           ? 'bg-purple-100 text-purple-800' :
+                      rec.category === 'Manual Review'      ? 'bg-yellow-100 text-yellow-800' :
+                      rec.category === 'Customer Unmatched' ? 'bg-red-100 text-red-700'       :
+                      rec.category === 'Finance Unmatched'  ? 'bg-orange-100 text-orange-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {rec.category}
+                    </span>
+                  </td>
+
+                  {/* Paired data columns */}
+                  {COLUMN_PAIRS.map(p => (
+                    <React.Fragment key={p.label}>
+                      <td className="px-3 py-2 text-xs text-gray-800 bg-purple-50/30 border-r border-gray-100 max-w-[180px]">
+                        <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-800 bg-teal-50/30 border-r border-gray-200 max-w-[180px]">
+                        <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>
+                      </td>
+                    </React.Fragment>
+                  ))}
+
+                  {/* Match method */}
+                  <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap border-r border-gray-200">{rec.match_method}</td>
+                  {/* Confidence */}
+                  <td className="px-3 py-2 text-xs font-medium text-gray-800 whitespace-nowrap border-r border-gray-200">{rec.confidence}</td>
+
+                  {/* Approval status — clickable dropdown for managers, badge only for officers */}
+                  <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200">
+                    {canApprove ? (
+                      <StatusDropdown
+                        recordId={rec.id}
+                        current={rec.approval_status || 'pending'}
+                        onSelect={handleRecordDecision}
+                        loading={!!actionLoading[rec.id]}
+                      />
+                    ) : (
+                      <StatusBadge status={rec.approval_status || 'pending'} />
+                    )}
+                    {rec.approved_at && (
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {new Date(rec.approved_at).toLocaleDateString()}
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Approved by */}
+                  {canApprove && (
+                    <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                      {rec.approved_by || '—'}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 bg-white">
+            <p className="text-sm text-gray-600">
+              Page {page} of {totalPages} · {totalRecords} records
+            </p>
+            <div className="flex gap-1.5 items-center">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="p-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50">
+                <FiChevronLeft />
+              </button>
+              {[...Array(totalPages)].map((_, i) => {
+                const pn = i + 1
+                if (pn === 1 || pn === totalPages || (pn >= page - 1 && pn <= page + 1)) {
+                  return (
+                    <button key={pn} onClick={() => setPage(pn)}
+                      className={`px-3 py-1 rounded border text-sm font-medium ${
+                        page === pn ? 'bg-[#8E288D] text-white border-[#8E288D]'
+                                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                      {pn}
+                    </button>
+                  )
+                } else if (pn === page - 2 || pn === page + 2) {
+                  return <span key={pn} className="px-1 text-gray-400">…</span>
+                }
+                return null
+              })}
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="p-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50">
+                <FiChevronRight />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Summary cards */}
+      <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+        {CATEGORIES.filter(c => c.key !== 'all').map(cat => {
+          const s = getSummary(cat.key)
+          const done = nonPendingCount(s)
+          const p = s.total > 0 ? ((done / s.total) * 100).toFixed(0) : 0
+          const border = {
+            'Exact Match':   'border-green-400',
+            'AI Match':      'border-purple-400',
+            'Manual Review': 'border-yellow-400',
+            'Unmatched':     'border-red-400',
+          }
+          return (
+            <div key={cat.key} className={`bg-white rounded-lg shadow p-4 border-t-4 ${border[cat.key]}`}>
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">{cat.label}</h3>
+              <div className="text-2xl font-bold text-gray-800 mb-1">{s.total}</div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                <div className="bg-green-500 h-1.5 rounded-full" style={{ width: `${p}%` }} />
+              </div>
+              <div className="space-y-0.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-yellow-600">{s.pending} pending</span>
+                  <span className="text-green-700">{s.reconciled} reconciled</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-red-600">{s.unreconciled} unreconciled</span>
+                  <span className="text-orange-600">{s.surplus_assets} surplus</span>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
