@@ -2,12 +2,42 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { FiDownload, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiXCircle, FiDatabase, FiUsers, FiChevronLeft, FiChevronRight, FiSearch, FiEye, FiEyeOff, FiArrowUp, FiArrowDown, FiCheck } from 'react-icons/fi'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, 
-  Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { FiDownload, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiXCircle, FiDatabase, FiUsers, FiChevronLeft, FiChevronRight, FiCheck } from 'react-icons/fi'
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { logActivity } from '../services/activityService'
-import { ManagerOnly } from '../components/RoleGuard'
 import { useAuth } from '../context/AuthContext'
+
+// ── Paired column definitions (mirrored from ApprovalPage) ────────────────────
+const RESULT_COLUMN_PAIRS = [
+  { label: 'Old Tag',     cKey: 'customer_old_tag',     iKey: 'internal_old_tag'     },
+  { label: 'New Tag',     cKey: 'customer_new_tag',     iKey: 'internal_new_tag'     },
+  { label: 'Year',        cKey: 'customer_year',        iKey: 'internal_year'        },
+  { label: 'Category',    cKey: 'customer_category',    iKey: 'internal_category'    },
+  { label: 'Description', cKey: 'customer_description', iKey: 'internal_description' },
+  { label: 'Department',  cKey: 'customer_department',  iKey: 'internal_department'  },
+  { label: 'District',    cKey: 'customer_district',    iKey: 'internal_district'    },
+  { label: 'Book Value',  cKey: 'customer_book_value',  iKey: 'internal_book_value'  },
+  { label: 'Asset No.',   cKey: 'customer_asset_no',    iKey: 'internal_asset_no'    },
+  { label: 'Serial No.',  cKey: 'customer_serial',      iKey: 'internal_serial'      },
+]
+
+const APPROVAL_BADGE_CLS = {
+  pending:                    'bg-gray-100 text-gray-700 border-gray-300',
+  reconciled:                'bg-green-100 text-green-800 border-green-300',
+  unreconciled:              'bg-red-100 text-red-800 border-red-300',
+  surplus_assets:            'bg-orange-100 text-orange-800 border-orange-300',
+  exist_in_physical_not_erp: 'bg-blue-100 text-blue-800 border-blue-300',
+  exist_in_erp_not_physical: 'bg-purple-100 text-purple-800 border-purple-300',
+}
+
+const APPROVAL_LABEL = {
+  pending:                    'Pending',
+  reconciled:                'Reconciled',
+  unreconciled:              'Unreconciled',
+  surplus_assets:            'Surplus Assets',
+  exist_in_physical_not_erp: 'Exist in Physical not ERP',
+  exist_in_erp_not_physical: 'Exist in ERP not Physical',
+}
 
 const Results = () => {
   const { id } = useParams()
@@ -18,48 +48,21 @@ const Results = () => {
   const [loading, setLoading] = useState(true)
   const [recordsLoading, setRecordsLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [recordsPerPage] = useState(5)
+  const [recordsPerPage] = useState(10)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [totalRecords, setTotalRecords] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [recordsStored, setRecordsStored] = useState(false)
-  
-  // Column visibility
-  const [showColumnMenu, setShowColumnMenu] = useState(false)
-  const [visibleColumns, setVisibleColumns] = useState({
-    id: true,
-    category: true,
-    customer_tag: true,
-    internal_tag: true,
-    description: true,
-    match_method: true,
-    confidence: true,
-    status: true,
-    approval_status: true
-  })
-
-  // All available columns
-  const allColumns = [
-    { key: 'id', label: 'ID' },
-    { key: 'category', label: 'Category' },
-    { key: 'customer_tag', label: 'Customer Tag' },
-    { key: 'internal_tag', label: 'Internal Tag' },
-    { key: 'description', label: 'Description' },
-    { key: 'match_method', label: 'Match Method' },
-    { key: 'confidence', label: 'Confidence' },
-    { key: 'status', label: 'Status' },
-    { key: 'approval_status', label: 'Approval Status' }
-  ]
 
   useEffect(() => {
     fetchReconciliation()
   }, [id])
 
   useEffect(() => {
-    if (reconciliation && recordsStored) {
+    if (reconciliation) {
       fetchRecords()
     }
-  }, [currentPage, selectedCategory, recordsStored])
+  }, [currentPage, selectedCategory, reconciliation])
 
   const fetchReconciliation = async () => {
     try {
@@ -91,33 +94,18 @@ const Results = () => {
   const fetchRecords = async () => {
     try {
       setRecordsLoading(true)
-      console.log(`Fetching records: page=${currentPage}, category=${selectedCategory}, stored=${recordsStored}`)
-      
-      // Use different endpoint based on whether records are stored
-      const endpoint = recordsStored 
-        ? `/api/reconciliation/records/${id}`
-        : `/api/reconciliation/records-from-file/${id}`
-      
-      const response = await axios.get(endpoint, {
+      const response = await axios.get(`/api/reconciliation/records/${id}`, {
         params: {
           page: currentPage,
           per_page: recordsPerPage,
           category: selectedCategory === 'all' ? 'all' : selectedCategory
         }
       })
-      
-      console.log('Response:', response.data)
-      console.log(`Received ${response.data.records.length} records`)
-      console.log(`Total records: ${response.data.pagination.total_records}`)
-      
       setRecords(response.data.records)
       setTotalRecords(response.data.pagination.total_records)
       setTotalPages(response.data.pagination.total_pages)
+      if (response.data.pagination.total_records > 0) setRecordsStored(true)
     } catch (error) {
-      console.error('Error fetching records:', error)
-      if (error.response) {
-        console.error('Error response:', error.response.data)
-      }
       toast.error('Failed to fetch records')
       setRecords([])
     } finally {
@@ -146,24 +134,6 @@ const Results = () => {
     }
   }
 
-  const handleRecord = async () => {
-    try {
-      logActivity(window.location.pathname, `RECORD_RESULTS_ID_${id}`)
-      toast.info('Recording results to database...')
-      const response = await axios.post(`/api/reconciliation/record/${id}`)
-      toast.success(response.data.message || 'Results recorded successfully')
-      // Mark that records are now stored and trigger fetch
-      setRecordsStored(true)
-      setCurrentPage(1) // Reset to first page
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to record results')
-    }
-  }
-
-  // Remove the mock data generation function - we now fetch from database
-  const currentRecords = records
-  const filteredRecordsLength = totalRecords
-
   const handlePageChange = (pageNumber) => {
     setCurrentPage(pageNumber)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -171,40 +141,7 @@ const Results = () => {
 
   const handleCategoryChange = (category) => {
     setSelectedCategory(category)
-    setCurrentPage(1) // Reset to first page when category changes
-  }
-
-  const toggleColumnVisibility = (column) => {
-    setVisibleColumns({
-      ...visibleColumns,
-      [column]: !visibleColumns[column]
-    })
-  }
-
-  const toggleAllColumns = (visible) => {
-    const newVisibility = {}
-    allColumns.forEach(col => {
-      newVisibility[col.key] = visible
-    })
-    setVisibleColumns(newVisibility)
-  }
-
-  // Use records directly from API
-  const displayRecords = records
-
-  const getCategoryBadgeColor = (category) => {
-    switch (category) {
-      case 'Exact Match':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'AI Match':
-        return 'bg-purple-100 text-purple-800 border-purple-200'
-      case 'Manual Review':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'Unmatched':
-        return 'bg-red-100 text-red-800 border-red-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
+    setCurrentPage(1)
   }
 
   if (loading) {
@@ -314,366 +251,148 @@ const Results = () => {
         </div>
       </div>
 
-      {/* Processed Records Table with Pagination */}
-      <div className="mt-8 bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex justify-between items-center mb-4">
+      {/* Processed Records Table */}
+      <div className="mt-8 bg-white shadow rounded-xl overflow-hidden">
+        {/* Header + category tabs */}
+        <div className="p-5 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-gray-900">Processed Records</h2>
-            <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-600">
-                {recordsStored ? (
-                  `Total: ${filteredRecordsLength} records`
-                ) : (
-                  <span className="text-yellow-600 font-medium">
-                    Processing records…
-                  </span>
-                )}
-              </div>
-              {/* Column Visibility Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowColumnMenu(!showColumnMenu)}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  <FiEye className="mr-2" />
-                  Columns
-                </button>
-                {showColumnMenu && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                    <div className="p-3">
-                      <div className="flex justify-between items-center mb-2 pb-2 border-b">
-                        <span className="font-medium text-sm">Show/Hide Columns</span>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => toggleAllColumns(true)}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            All
-                          </button>
-                          <span className="text-gray-400">|</span>
-                          <button
-                            onClick={() => toggleAllColumns(false)}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            None
-                          </button>
-                        </div>
-                      </div>
-                      {allColumns.map(col => (
-                        <label key={col.key} className="flex items-center py-1 hover:bg-gray-50 px-2 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={visibleColumns[col.key]}
-                            onChange={() => toggleColumnVisibility(col.key)}
-                            className="mr-2"
-                          />
-                          <span className="text-sm">{col.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <span className="text-sm text-gray-500">Total: {totalRecords} records</span>
           </div>
-          
-          {/* Category Filter */}
-          {recordsStored && (
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => handleCategoryChange('all')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedCategory === 'all'
-                    ? 'bg-[#8E288D] text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                All
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'all',            label: 'All',                           cls: 'bg-gray-100 text-gray-700',       active: 'bg-gray-700 text-white'      },
+              { key: 'Exact Match',   label: `Exact Match (${stats.rule_matched})`,  cls: 'bg-green-100 text-green-700',  active: 'bg-green-600 text-white'     },
+              { key: 'AI Match',      label: `AI Match (${stats.ai_matched})`,       cls: 'bg-purple-100 text-purple-700',active: 'bg-purple-600 text-white'    },
+              { key: 'Manual Review', label: `Manual Review (${stats.manual_review})`,cls:'bg-yellow-100 text-yellow-700',active: 'bg-yellow-500 text-white'    },
+              { key: 'Unmatched',     label: `Unmatched (${stats.customer_unmatched})`,cls:'bg-red-100 text-red-700',   active: 'bg-red-600 text-white'       },
+            ].map(tab => (
+              <button key={tab.key}
+                onClick={() => handleCategoryChange(tab.key)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  selectedCategory === tab.key ? tab.active : tab.cls + ' hover:opacity-80'
+                }`}>
+                {tab.label}
               </button>
-              <button
-                onClick={() => handleCategoryChange('Exact Match')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedCategory === 'Exact Match'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-green-100 text-green-700 hover:bg-green-200'
-                }`}
-              >
-                Exact Match ({stats.rule_matched})
-              </button>
-              <button
-                onClick={() => handleCategoryChange('AI Match')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedCategory === 'AI Match'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                }`}
-              >
-                AI Match ({stats.ai_matched})
-              </button>
-              <button
-                onClick={() => handleCategoryChange('Manual Review')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedCategory === 'Manual Review'
-                    ? 'bg-yellow-600 text-white'
-                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                }`}
-              >
-                Manual Review ({stats.manual_review})
-              </button>
-              <button
-                onClick={() => handleCategoryChange('Unmatched')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedCategory === 'Unmatched'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-red-100 text-red-700 hover:bg-red-200'
-                }`}
-              >
-                Unmatched ({stats.customer_unmatched})
-              </button>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
 
-        {/* Records Table - Scroll only the table, not the whole page */}
-        <div className="border border-gray-200 rounded-lg" style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'auto' }}>
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                {visibleColumns.id && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50">
-                    ID
+        {/* Paired-column table */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm border-collapse">
+            <thead>
+              {/* Row 1 — group headers */}
+              <tr className="bg-gray-100 border-b border-gray-300">
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300 sticky left-0 bg-gray-100 z-10">
+                  Category
+                </th>
+                {RESULT_COLUMN_PAIRS.map(p => (
+                  <th key={p.label} colSpan={2}
+                    className="px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 whitespace-nowrap">
+                    {p.label}
                   </th>
-                )}
-                {visibleColumns.category && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50">
-                    Category
-                  </th>
-                )}
-                {visibleColumns.customer_tag && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50">
-                    Customer Tag
-                  </th>
-                )}
-                {visibleColumns.internal_tag && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50">
-                    Internal Tag
-                  </th>
-                )}
-                {visibleColumns.description && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50">
-                    Description
-                  </th>
-                )}
-                {visibleColumns.match_method && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50">
-                    Match Method
-                  </th>
-                )}
-                {visibleColumns.confidence && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50">
-                    Confidence
-                  </th>
-                )}
-                {visibleColumns.status && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50">
-                    Status
-                  </th>
-                )}
+                ))}
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Match</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Conf.</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">Approval</th>
+              </tr>
+              {/* Row 2 — Customer / Finance */}
+              <tr className="bg-gray-50 border-b-2 border-gray-300">
+                {RESULT_COLUMN_PAIRS.map(p => (
+                  <React.Fragment key={p.label}>
+                    <th className="px-3 py-1 text-center text-xs font-medium text-purple-700 bg-purple-50 border-r border-gray-200 whitespace-nowrap">Physical</th>
+                    <th className="px-3 py-1 text-center text-xs font-medium text-teal-700 bg-teal-50 border-r border-gray-300 whitespace-nowrap">ERP</th>
+                  </React.Fragment>
+                ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {recordsLoading ? (
                 <tr>
-                  <td colSpan={Object.values(visibleColumns).filter(Boolean).length} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8E288D] mb-3"></div>
-                      <p className="text-gray-500">Loading records...</p>
-                    </div>
+                  <td colSpan={2 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#8E288D] mx-auto mb-3" />
+                    <p className="text-gray-500">Loading records…</p>
                   </td>
                 </tr>
-              ) : displayRecords.length > 0 ? (
-                displayRecords.map((record, index) => (
-                  <tr key={record.id} className="hover:bg-gray-50 transition-colors">
-                    {visibleColumns.id && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {record.id}
-                      </td>
-                    )}
-                    {visibleColumns.category && (
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getCategoryBadgeColor(record.category)}`}>
-                          {record.category}
-                        </span>
-                      </td>
-                    )}
-                    {visibleColumns.customer_tag && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {record.customer_tag}
-                      </td>
-                    )}
-                    {visibleColumns.internal_tag && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {record.internal_tag}
-                      </td>
-                    )}
-                    {visibleColumns.description && (
-                      <td className="px-6 py-4 text-sm text-gray-900" style={{ minWidth: '200px', maxWidth: '400px' }}>
-                        <div className="truncate" title={record.description}>
-                          {record.description}
-                        </div>
-                      </td>
-                    )}
-                    {visibleColumns.match_method && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {record.match_method}
-                      </td>
-                    )}
-                    {visibleColumns.confidence && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {record.confidence}
-                      </td>
-                    )}
-                    {visibleColumns.status && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`inline-flex items-center ${
-                          record.status === 'Matched' ? 'text-green-600' :
-                          record.status === 'Review Required' ? 'text-yellow-600' :
-                          'text-red-600'
-                        }`}>
-                          {record.status === 'Matched' && <FiCheckCircle className="mr-1" />}
-                          {record.status === 'Review Required' && <FiAlertCircle className="mr-1" />}
-                          {record.status === 'Unmatched' && <FiXCircle className="mr-1" />}
-                          {record.status}
-                        </span>
-                      </td>
-                    )}
-                  </tr>
-                ))
-              ) : (
+              ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={Object.values(visibleColumns).filter(Boolean).length} className="px-6 py-12 text-center text-gray-500">
-                    <div className="flex flex-col items-center">
-                      <FiDatabase className="h-12 w-12 text-gray-400 mb-3" />
-                      {recordsStored ? (
-                        <>
-                          <p className="text-lg font-medium">No records found</p>
-                          <p className="text-sm mt-1">Try selecting a different category</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-lg font-medium">Records not stored yet</p>
-                          <p className="text-sm mt-1">Click "Record to DB" button to store records</p>
-                        </>
-                      )}
-                    </div>
+                  <td colSpan={2 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center text-gray-400">
+                    <FiDatabase className="mx-auto h-10 w-10 mb-2" />
+                    <p>No records found</p>
                   </td>
                 </tr>
-              )}
+              ) : records.map((rec, idx) => (
+                <tr key={rec.id} className={`hover:bg-yellow-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                  {/* Category */}
+                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-200">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
+                      rec.category === 'Exact Match'        ? 'bg-green-100 text-green-800' :
+                      rec.category === 'AI Match'           ? 'bg-purple-100 text-purple-800' :
+                      rec.category === 'Manual Review'      ? 'bg-yellow-100 text-yellow-800' :
+                      rec.category === 'Customer Unmatched' ? 'bg-red-100 text-red-700' :
+                      rec.category === 'Finance Unmatched'  ? 'bg-orange-100 text-orange-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>{rec.category}</span>
+                  </td>
+                  {/* Paired columns */}
+                  {RESULT_COLUMN_PAIRS.map(p => (
+                    <React.Fragment key={p.label}>
+                      <td className="px-3 py-2 text-xs text-gray-800 bg-purple-50/30 border-r border-gray-100 max-w-[180px]">
+                        <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-gray-800 bg-teal-50/30 border-r border-gray-200 max-w-[180px]">
+                        <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>
+                      </td>
+                    </React.Fragment>
+                  ))}
+                  {/* Match */}
+                  <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap border-r border-gray-200">{rec.match_method}</td>
+                  {/* Confidence */}
+                  <td className="px-3 py-2 text-xs font-medium text-gray-800 whitespace-nowrap border-r border-gray-200">{rec.confidence}</td>
+                  {/* Approval status badge */}
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${APPROVAL_BADGE_CLS[rec.approval_status] || APPROVAL_BADGE_CLS.pending}`}>
+                      {APPROVAL_LABEL[rec.approval_status] || 'Pending'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
-        {recordsStored && totalPages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                  currentPage === 1
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Previous
+        {totalPages > 1 && (
+          <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 bg-white">
+            <p className="text-sm text-gray-600">
+              Showing {((currentPage-1)*recordsPerPage)+1}–{Math.min(currentPage*recordsPerPage, totalRecords)} of {totalRecords}
+            </p>
+            <div className="flex gap-1.5 items-center">
+              <button onClick={() => handlePageChange(currentPage-1)} disabled={currentPage===1}
+                className="p-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50">
+                <FiChevronLeft className="h-4 w-4" />
               </button>
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                  currentPage === totalPages
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Next
+              {[...Array(totalPages)].map((_, i) => {
+                const pn = i + 1
+                if (pn===1 || pn===totalPages || (pn>=currentPage-1 && pn<=currentPage+1)) {
+                  return (
+                    <button key={pn} onClick={() => handlePageChange(pn)}
+                      className={`px-3 py-1 rounded border text-sm font-medium ${
+                        currentPage===pn ? 'bg-[#8E288D] text-white border-[#8E288D]'
+                                         : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+                      {pn}
+                    </button>
+                  )
+                } else if (pn===currentPage-2 || pn===currentPage+2) {
+                  return <span key={pn} className="px-1 text-gray-400">…</span>
+                }
+                return null
+              })}
+              <button onClick={() => handlePageChange(currentPage+1)} disabled={currentPage===totalPages}
+                className="p-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50">
+                <FiChevronRight className="h-4 w-4" />
               </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{((currentPage - 1) * recordsPerPage) + 1}</span> to{' '}
-                  <span className="font-medium">
-                    {Math.min(currentPage * recordsPerPage, filteredRecordsLength)}
-                  </span>{' '}
-                  of <span className="font-medium">{filteredRecordsLength}</span> results
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 text-sm font-medium ${
-                      currentPage === 1
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-white text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    <FiChevronLeft className="h-5 w-5" />
-                  </button>
-                  
-                  {[...Array(totalPages)].map((_, index) => {
-                    const pageNumber = index + 1
-                    // Show first, last, current, and pages around current
-                    if (
-                      pageNumber === 1 ||
-                      pageNumber === totalPages ||
-                      (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1)
-                    ) {
-                      return (
-                        <button
-                          key={pageNumber}
-                          onClick={() => handlePageChange(pageNumber)}
-                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                            currentPage === pageNumber
-                              ? 'z-10 bg-[#8E288D] border-[#8E288D] text-white'
-                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          {pageNumber}
-                        </button>
-                      )
-                    } else if (
-                      pageNumber === currentPage - 2 ||
-                      pageNumber === currentPage + 2
-                    ) {
-                      return (
-                        <span
-                          key={pageNumber}
-                          className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
-                        >
-                          ...
-                        </span>
-                      )
-                    }
-                    return null
-                  })}
-                  
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 text-sm font-medium ${
-                      currentPage === totalPages
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-white text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    <FiChevronRight className="h-5 w-5" />
-                  </button>
-                </nav>
-              </div>
             </div>
           </div>
         )}

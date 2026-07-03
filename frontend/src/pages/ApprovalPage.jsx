@@ -416,10 +416,10 @@ const ApprovalPage = () => {
                 {COLUMN_PAIRS.map(p => (
                   <React.Fragment key={p.label}>
                     <th className="px-3 py-1 text-center text-xs font-medium text-purple-700 bg-purple-50 border-r border-gray-200 whitespace-nowrap">
-                      Customer
+                      Physical
                     </th>
                     <th className="px-3 py-1 text-center text-xs font-medium text-teal-700 bg-teal-50 border-r border-gray-300 whitespace-nowrap">
-                      Finance
+                      ERP
                     </th>
                   </React.Fragment>
                 ))}
