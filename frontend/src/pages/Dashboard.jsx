@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { logActivity } from '../services/activityService'
+import { useAuth } from '../context/AuthContext'
+import { ManagerOnly } from '../components/RoleGuard'
 import { 
   FiUpload, 
   FiDownload, 
@@ -10,12 +12,12 @@ import {
   FiCheckCircle, 
   FiXCircle, 
   FiLoader,
-  FiTrendingUp,
-  FiAlertCircle,
   FiFileText,
   FiFilter,
   FiSearch,
-  FiDatabase
+  FiDatabase,
+  FiCheck,
+  FiFlag
 } from 'react-icons/fi'
 
 const Dashboard = () => {
@@ -30,6 +32,7 @@ const Dashboard = () => {
     pending: 0
   })
   const navigate = useNavigate()
+  const { hasRole } = useAuth()
 
   useEffect(() => {
     fetchReconciliations()
@@ -111,6 +114,28 @@ const Dashboard = () => {
       toast.success(response.data.message || 'Results recorded successfully')
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to record results')
+    }
+  }
+
+  const handleApprove = async (id) => {
+    try {
+      logActivity(window.location.pathname, `APPROVE_EXCEPTION_ID_${id}`)
+      toast.info('Approving exception...')
+      const response = await axios.post(`/api/reconciliation/${id}/approve`)
+      toast.success(response.data.message || 'Exception approved successfully')
+    } catch (error) {
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Failed to approve exception')
+    }
+  }
+
+  const handleFinalize = async (id) => {
+    try {
+      logActivity(window.location.pathname, `FINALIZE_RECONCILIATION_ID_${id}`)
+      toast.info('Finalizing reconciliation...')
+      const response = await axios.post(`/api/reconciliation/${id}/finalize`)
+      toast.success(response.data.message || 'Reconciliation finalized successfully')
+    } catch (error) {
+      toast.error(error.response?.data?.error || error.response?.data?.message || 'Failed to finalize reconciliation')
     }
   }
 
@@ -313,6 +338,26 @@ const Dashboard = () => {
                         <FiDatabase className="mr-2 h-4 w-4" />
                         Record
                       </button>
+                      
+                      {/* Manager-Only Actions */}
+                      <ManagerOnly>
+                        <div className="pt-2 border-t border-gray-200">
+                          <button
+                            onClick={() => handleApprove(recon.id)}
+                            className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center justify-center mb-2"
+                          >
+                            <FiCheck className="mr-2 h-4 w-4" />
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleFinalize(recon.id)}
+                            className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium flex items-center justify-center"
+                          >
+                            <FiFlag className="mr-2 h-4 w-4" />
+                            Finalize
+                          </button>
+                        </div>
+                      </ManagerOnly>
                     </div>
                   )}
                 </div>

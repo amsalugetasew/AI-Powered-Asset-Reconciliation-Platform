@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { RoleBadge } from './RoleGuard'
 import iconImage from '../assets/AR.png'
 import { 
   FiHome, 
@@ -13,11 +14,13 @@ import {
   FiSettings,
   FiSearch,
   FiBell,
-  FiChevronDown
+  FiChevronDown,
+  FiUsers,
+  FiFileText
 } from 'react-icons/fi'
 
 const Layout = () => {
-  const { user, logout } = useAuth()
+  const { user, logout, userRole, hasRole } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -33,11 +36,40 @@ const Layout = () => {
     return location.pathname === path
   }
 
-  const menuItems = [
-    { path: '/', icon: FiHome, label: 'Dashboard' },
-    { path: '/upload', icon: FiUpload, label: 'Reconciliation' },
-    { path: '/analytics', icon: FiBarChart2, label: 'Reports' },
-  ]
+  // Role-based menu items
+  const getMenuItems = () => {
+    const baseItems = [
+      { path: '/', icon: FiHome, label: 'Dashboard', roles: ['officer', 'manager', 'admin'] },
+      { path: '/upload', icon: FiUpload, label: 'Reconciliation', roles: ['officer', 'manager', 'admin'] },
+      { path: '/analytics', icon: FiBarChart2, label: 'Reports', roles: ['officer', 'manager', 'admin'] },
+    ]
+
+    // Manager and Admin see audit trail
+    if (hasRole('manager')) {
+      baseItems.push({ 
+        path: '/audit', 
+        icon: FiFileText, 
+        label: 'Audit Trail', 
+        roles: ['manager', 'admin'] 
+      })
+    }
+
+    // Only Admin sees user management
+    if (hasRole('admin')) {
+      baseItems.push({ 
+        path: '/users', 
+        icon: FiUsers, 
+        label: 'User Management', 
+        roles: ['admin'] 
+      })
+    }
+
+    return baseItems.filter(item => 
+      !item.roles || item.roles.includes(userRole)
+    )
+  }
+
+  const menuItems = getMenuItems()
 
   const notifications = [
     { id: 1, message: 'Reconciliation #2 completed', time: '5 min ago', unread: true },
@@ -104,6 +136,11 @@ const Layout = () => {
               <div className="flex-1">
                 <p className="text-sm font-medium truncate text-[#8E288D]">{user?.username}</p>
                 <p className="text-xs text-[#008080] truncate">{user?.email}</p>
+                {userRole && (
+                  <div className="mt-1">
+                    <RoleBadge role={userRole} size="sm" />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -111,9 +148,9 @@ const Layout = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300`}>
-        {/* Top Navbar */}
-        <nav className="bg-white shadow-md sticky top-0 z-20">
+      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 flex flex-col h-screen`}>
+        {/* Top Navbar - Sticky */}
+        <nav className="bg-white shadow-md sticky top-0 z-20 flex-shrink-0">
           <div className="px-6 py-4">
             <div className="flex justify-between items-center">
               {/* Left side - Toggle and Title */}
@@ -212,6 +249,11 @@ const Layout = () => {
                       <div className="px-4 py-3 border-b border-gray-200">
                         <p className="font-semibold text-gray-800">{user?.username}</p>
                         <p className="text-sm text-gray-500">{user?.email}</p>
+                        {userRole && (
+                          <div className="mt-2">
+                            <RoleBadge role={userRole} size="sm" />
+                          </div>
+                        )}
                       </div>
                       <button className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center space-x-2">
                         <FiUser className="h-4 w-4" />
@@ -237,22 +279,25 @@ const Layout = () => {
           </div>
         </nav>
 
-        {/* Main Content */}
-        <main className="p-6 bg-gray-50 min-h-screen">
-          <div className="max-w-7xl mx-auto">
-            <Outlet />
-          </div>
-        </main>
-
-        {/* Footer */}
-        <footer className="bg-white border-t border-gray-200">
-          <div className="max-w-7xl mx-auto px-6 py-4">
-            <div className="flex justify-between items-center text-sm text-gray-600">
-              <p>© 2026 AssetReconcile AI. All rights reserved.</p>
-              <p>Version 1.0.0</p>
+        {/* Scrollable Content Area (Main + Footer) */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Main Content */}
+          <main className="p-6 bg-gray-50">
+            <div className="max-w-7xl mx-auto">
+              <Outlet />
             </div>
-          </div>
-        </footer>
+          </main>
+
+          {/* Footer */}
+          <footer className="bg-white border-t border-gray-200">
+            <div className="max-w-7xl mx-auto px-6 py-4">
+              <div className="flex justify-between items-center text-sm text-gray-600">
+                <p>© 2026 AssetReconcile AI. All rights reserved.</p>
+                <p>Version 1.0.0</p>
+              </div>
+            </div>
+          </footer>
+        </div>
       </div>
 
       {/* Click outside to close dropdowns */}

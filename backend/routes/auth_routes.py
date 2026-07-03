@@ -27,12 +27,17 @@ def register():
             email=data['email']
         )
         user.set_password(data['password'])
+        # Default role is 'officer' (set in model)
         
         db.session.add(user)
         db.session.commit()
         
-        # Generate access token with string identity
-        access_token = create_access_token(identity=str(user.id))
+        # Generate access token with string identity and role claim
+        additional_claims = {'role': user.role}
+        access_token = create_access_token(
+            identity=str(user.id),
+            additional_claims=additional_claims
+        )
         
         return jsonify({
             'message': 'User registered successfully',
@@ -60,8 +65,12 @@ def login():
         if not user or not user.check_password(data['password']):
             return jsonify({'error': 'Invalid username or password'}), 401
         
-        # Generate access token with string identity
-        access_token = create_access_token(identity=str(user.id))
+        # Generate access token with string identity and role claim
+        additional_claims = {'role': user.role}
+        access_token = create_access_token(
+            identity=str(user.id),
+            additional_claims=additional_claims
+        )
         
         return jsonify({
             'message': 'Login successful',

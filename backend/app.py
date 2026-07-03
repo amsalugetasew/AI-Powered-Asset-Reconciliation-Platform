@@ -66,10 +66,12 @@ def create_app(config_name='default'):
     from routes.auth_routes import auth_bp
     from routes.reconciliation_routes import reconciliation_bp
     from routes.activity_routes import activity_bp
+    from routes.admin_routes import admin_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(reconciliation_bp)
     app.register_blueprint(activity_bp)
+    app.register_blueprint(admin_bp)
     
     # Create database tables is handled by Flask-Migrate/Alembic now, but keeping for safety if tables don't exist
     with app.app_context():

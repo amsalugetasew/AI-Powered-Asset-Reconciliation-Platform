@@ -1,13 +1,15 @@
 from flask import Blueprint, request, jsonify, send_file
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
 import pandas as pd
 import json
 
-from models import db, Reconciliation, ReconciliationRecord
+from models import db, Reconciliation, ReconciliationRecord, User
 from services.reconciliation_service import ReconciliationService
+from services.audit_service import AuditService
+from utils.rbac import require_role, get_user_from_token, get_user_role
 from config import Config
 
 reconciliation_bp = Blueprint('reconciliation', __name__, url_prefix='/api/reconciliation')
@@ -154,15 +156,32 @@ def process_reconciliation(reconciliation_id):
 @reconciliation_bp.route('/list', methods=['GET'])
 @jwt_required()
 def list_reconciliations():
-    """List all reconciliations for current user"""
+    """
+    List reconciliations based on user role.
+    
+    Officers: See only their own reconciliations
+    Managers/Admins: See all reconciliations system-wide
+    """
     try:
         user_id = int(get_jwt_identity())  # Convert to int
+        user_role = get_user_role()
         
-        reconciliations = Reconciliation.query.filter_by(user_id=user_id)\
-            .order_by(Reconciliation.created_at.desc()).all()
+        # Role-based filtering
+        if user_role in ['manager', 'admin']:
+            # Managers and admins see all reconciliations
+            reconciliations = Reconciliation.query\
+                .order_by(Reconciliation.created_at.desc()).all()
+            scope = 'all'
+        else:
+            # Officers see only their own
+            reconciliations = Reconciliation.query.filter_by(user_id=user_id)\
+                .order_by(Reconciliation.created_at.desc()).all()
+            scope = 'own'
         
         return jsonify({
-            'reconciliations': [r.to_dict() for r in reconciliations]
+            'reconciliations': [r.to_dict() for r in reconciliations],
+            'scope': scope,
+            'role': user_role
         }), 200
         
     except Exception as e:
@@ -171,17 +190,27 @@ def list_reconciliations():
 @reconciliation_bp.route('/<int:reconciliation_id>', methods=['GET'])
 @jwt_required()
 def get_reconciliation(reconciliation_id):
-    """Get specific reconciliation details"""
+    """
+    Get specific reconciliation details.
+    
+    Officers: Can only view their own reconciliations
+    Managers/Admins: Can view any reconciliation
+    """
     try:
         user_id = int(get_jwt_identity())  # Convert to int
+        user_role = get_user_role()
         
-        reconciliation = Reconciliation.query.filter_by(
-            id=reconciliation_id,
-            user_id=user_id
-        ).first()
+        reconciliation = Reconciliation.query.get(reconciliation_id)
         
         if not reconciliation:
             return jsonify({'error': 'Reconciliation not found'}), 404
+        
+        # Role-based access control
+        if user_role == 'officer' and reconciliation.user_id != user_id:
+            return jsonify({
+                'error': 'Access denied',
+                'message': 'You can only view your own reconciliations.'
+            }), 403
         
         return jsonify({
             'reconciliation': reconciliation.to_dict()
@@ -193,17 +222,27 @@ def get_reconciliation(reconciliation_id):
 @reconciliation_bp.route('/download/<int:reconciliation_id>', methods=['GET'])
 @jwt_required()
 def download_report(reconciliation_id):
-    """Download reconciliation report"""
+    """
+    Download reconciliation report.
+    
+    Officers: Can only download their own reports
+    Managers/Admins: Can download any report
+    """
     try:
         user_id = int(get_jwt_identity())  # Convert to int
+        user_role = get_user_role()
         
-        reconciliation = Reconciliation.query.filter_by(
-            id=reconciliation_id,
-            user_id=user_id
-        ).first()
+        reconciliation = Reconciliation.query.get(reconciliation_id)
         
         if not reconciliation:
             return jsonify({'error': 'Reconciliation not found'}), 404
+        
+        # Role-based access control
+        if user_role == 'officer' and reconciliation.user_id != user_id:
+            return jsonify({
+                'error': 'Access denied',
+                'message': 'You can only download your own reports.'
+            }), 403
         
         if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
             return jsonify({'error': 'Report not found'}), 404
@@ -220,14 +259,28 @@ def download_report(reconciliation_id):
 @reconciliation_bp.route('/analytics', methods=['GET'])
 @jwt_required()
 def get_analytics():
-    """Get analytics for all user reconciliations"""
+    """
+    Get analytics based on user role.
+    
+    Officers: Analytics for their own reconciliations only
+    Managers/Admins: System-wide analytics
+    """
     try:
         user_id = int(get_jwt_identity())  # Convert to int
+        user_role = get_user_role()
         
-        reconciliations = Reconciliation.query.filter_by(
-            user_id=user_id,
-            status='completed'
-        ).all()
+        # Role-based filtering
+        if user_role in ['manager', 'admin']:
+            # Managers and admins see system-wide analytics
+            reconciliations = Reconciliation.query.filter_by(status='completed').all()
+            scope = 'all'
+        else:
+            # Officers see only their own
+            reconciliations = Reconciliation.query.filter_by(
+                user_id=user_id,
+                status='completed'
+            ).all()
+            scope = 'own'
         
         if not reconciliations:
             return jsonify({
@@ -235,8 +288,8 @@ def get_analytics():
                 'total_records_processed': 0,
                 'total_matches': 0,
                 'average_match_rate': 0,
-                'by_department': {},
-                'confidence_distribution': {}
+                'scope': scope,
+                'role': user_role
             }), 200
         
         # Calculate aggregate statistics
@@ -256,7 +309,9 @@ def get_analytics():
             'total_rule_matched': total_rule_matched,
             'total_ai_matched': total_ai_matched,
             'total_manual_review': total_manual,
-            'average_match_rate': round(avg_match_rate, 2)
+            'average_match_rate': round(avg_match_rate, 2),
+            'scope': scope,
+            'role': user_role
         }
         
         return jsonify(analytics), 200
@@ -264,20 +319,586 @@ def get_analytics():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@reconciliation_bp.route('/<int:reconciliation_id>/approve', methods=['POST'])
+@jwt_required()
+@require_role('manager')
+def approve_exception(reconciliation_id):
+    """
+    Approve exception for a reconciliation (Manager+ only).
+    
+    DEPRECATED: Use /records/approve-group endpoint instead.
+    This is logged to the audit trail.
+    """
+    try:
+        # Verify reconciliation exists
+        reconciliation = Reconciliation.query.get(reconciliation_id)
+        
+        if not reconciliation:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+        
+        if reconciliation.status != 'completed':
+            return jsonify({
+                'error': 'Cannot approve exceptions',
+                'message': 'Only completed reconciliations can have exceptions approved.'
+            }), 400
+        
+        # Get manager user
+        manager_user = get_user_from_token()
+        
+        # Log the approval to audit trail
+        AuditService.log_operation(
+            user_id=manager_user.id,
+            operation_type='APPROVE_EXCEPTION',
+            resource_type='reconciliation',
+            resource_id=reconciliation_id,
+            details={
+                'reconciliation_user_id': reconciliation.user_id,
+                'total_records': reconciliation.total_customer_records
+            }
+        )
+        
+        return jsonify({
+            'message': 'Exception approved successfully',
+            'reconciliation_id': reconciliation_id,
+            'approved_by': manager_user.username
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@reconciliation_bp.route('/records/approve-group', methods=['POST'])
+@jwt_required()
+@require_role('manager')
+def approve_group():
+    """
+    Approve a group of records by category (Manager+ only).
+    This also saves records to database if not already saved.
+    
+    Request body:
+    {
+        "reconciliation_id": 123,
+        "category": "Exact Match",
+        "approval_decision": "reconciled" or "not_reconciled"
+    }
+    """
+    try:
+        data = request.get_json()
+        reconciliation_id = data.get('reconciliation_id')
+        category = data.get('category')
+        approval_decision = data.get('approval_decision')
+        
+        # Validation
+        if not all([reconciliation_id, category, approval_decision]):
+            return jsonify({
+                'error': 'Missing required fields',
+                'required': ['reconciliation_id', 'category', 'approval_decision']
+            }), 400
+        
+        if approval_decision not in ['reconciled', 'not_reconciled']:
+            return jsonify({
+                'error': 'Invalid approval_decision',
+                'allowed': ['reconciled', 'not_reconciled']
+            }), 400
+        
+        # Verify reconciliation exists
+        reconciliation = Reconciliation.query.get(reconciliation_id)
+        if not reconciliation:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+        
+        if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
+            return jsonify({'error': 'Report file not found'}), 404
+        
+        # Get manager user
+        manager_user = get_user_from_token()
+        
+        # Check if records already exist in database for this reconciliation
+        existing_count = ReconciliationRecord.query.filter_by(
+            reconciliation_id=reconciliation_id
+        ).count()
+        
+        records_created = 0
+        
+        # If no records exist, parse from Excel and save
+        if existing_count == 0:
+            print(f"No records in DB, parsing from Excel file...")
+            excel_file = pd.ExcelFile(reconciliation.report_path)
+            sheet_mapping = {
+                'Exact_Matched_By_Tag': 'Exact Match',
+                'AI_Matched_Need_Manual_Review': 'AI Match',
+                'Matched_Need_Manual_Review': 'Manual Review',
+                'Customer_Unmatched': 'Customer Unmatched',
+                'Finance_Unmatched': 'Finance Unmatched',
+                'Customer_Duplicates': 'Duplicate',
+                'Finance_Duplicates': 'Duplicate'
+            }
+            
+            for sheet_name, match_type in sheet_mapping.items():
+                if sheet_name in excel_file.sheet_names:
+                    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                    
+                    if 'Message' in df.columns and len(df.columns) == 1:
+                        continue
+                    
+                    for _, row in df.iterrows():
+                        row_dict = row.to_dict()
+                        cleaned_dict = {}
+                        for col, val in row_dict.items():
+                            if pd.isna(val):
+                                cleaned_dict[col] = None
+                            else:
+                                cleaned_dict[col] = val
+                        
+                        record = ReconciliationRecord(
+                            reconciliation_id=reconciliation_id,
+                            match_category=match_type,
+                            full_record_json=cleaned_dict,
+                            approval_status='pending'
+                        )
+                        db.session.add(record)
+                        records_created += 1
+            
+            db.session.flush()
+            print(f"Created {records_created} records in database")
+        
+        # Now update the specific category with approval
+        if category == 'Unmatched':
+            records = ReconciliationRecord.query.filter(
+                ReconciliationRecord.reconciliation_id == reconciliation_id,
+                db.or_(
+                    ReconciliationRecord.match_category == 'Customer Unmatched',
+                    ReconciliationRecord.match_category == 'Finance Unmatched'
+                )
+            ).all()
+        else:
+            records = ReconciliationRecord.query.filter_by(
+                reconciliation_id=reconciliation_id,
+                match_category=category
+            ).all()
+        
+        if not records:
+            return jsonify({
+                'error': 'No records found',
+                'message': f'No records found for category: {category}'
+            }), 404
+        
+        # Update all records in the group
+        updated_count = 0
+        for record in records:
+            record.approval_status = approval_decision
+            record.approved_by = manager_user.id
+            record.approved_at = datetime.utcnow()
+            updated_count += 1
+        
+        db.session.commit()
+        
+        # Log to audit trail
+        AuditService.log_operation(
+            user_id=manager_user.id,
+            operation_type='APPROVE_RECORD_GROUP',
+            resource_type='reconciliation_records',
+            resource_id=reconciliation_id,
+            details={
+                'category': category,
+                'approval_decision': approval_decision,
+                'records_count': updated_count,
+                'records_created': records_created,
+                'reconciliation_user_id': reconciliation.user_id
+            }
+        )
+        
+        message = f'Successfully approved {updated_count} records'
+        if records_created > 0:
+            message += f' and saved {records_created} total records to database'
+        
+        return jsonify({
+            'message': message,
+            'category': category,
+            'approval_decision': approval_decision,
+            'records_updated': updated_count,
+            'records_created': records_created,
+            'approved_by': manager_user.username
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@reconciliation_bp.route('/records/approval-summary/<int:reconciliation_id>', methods=['GET'])
+@jwt_required()
+def get_approval_summary(reconciliation_id):
+    """
+    Get approval summary for a reconciliation showing counts by category and status.
+    """
+    try:
+        # Verify reconciliation exists
+        reconciliation = Reconciliation.query.get(reconciliation_id)
+        if not reconciliation:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+        
+        # Get counts by category and approval status
+        from sqlalchemy import func
+        
+        results = db.session.query(
+            ReconciliationRecord.match_category,
+            ReconciliationRecord.approval_status,
+            func.count(ReconciliationRecord.id).label('count')
+        ).filter(
+            ReconciliationRecord.reconciliation_id == reconciliation_id
+        ).group_by(
+            ReconciliationRecord.match_category,
+            ReconciliationRecord.approval_status
+        ).all()
+        
+        # Organize data by category
+        summary = {}
+        for match_category, approval_status, count in results:
+            if match_category not in summary:
+                summary[match_category] = {
+                    'total': 0,
+                    'pending': 0,
+                    'reconciled': 0,
+                    'not_reconciled': 0
+                }
+            summary[match_category]['total'] += count
+            summary[match_category][approval_status] += count
+        
+        # Group unmatched categories
+        if 'Customer Unmatched' in summary or 'Finance Unmatched' in summary:
+            unmatched_summary = {
+                'total': 0,
+                'pending': 0,
+                'reconciled': 0,
+                'not_reconciled': 0
+            }
+            for key in ['Customer Unmatched', 'Finance Unmatched']:
+                if key in summary:
+                    unmatched_summary['total'] += summary[key]['total']
+                    unmatched_summary['pending'] += summary[key]['pending']
+                    unmatched_summary['reconciled'] += summary[key]['reconciled']
+                    unmatched_summary['not_reconciled'] += summary[key]['not_reconciled']
+            summary['Unmatched'] = unmatched_summary
+        
+        return jsonify({
+            'reconciliation_id': reconciliation_id,
+            'summary': summary
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@reconciliation_bp.route('/<int:reconciliation_id>/finalize', methods=['POST'])
+@jwt_required()
+@require_role('manager')
+def finalize_reconciliation(reconciliation_id):
+    """
+    Finalize a reconciliation (Manager+ only).
+    
+    Managers can mark reconciliations as finalized.
+    This is logged to the audit trail.
+    """
+    try:
+        # Verify reconciliation exists
+        reconciliation = Reconciliation.query.get(reconciliation_id)
+        
+        if not reconciliation:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+        
+        if reconciliation.status != 'completed':
+            return jsonify({
+                'error': 'Cannot finalize',
+                'message': 'Only completed reconciliations can be finalized.'
+            }), 400
+        
+        # Get manager user
+        manager_user = get_user_from_token()
+        
+        # Log finalization to audit trail
+        AuditService.log_operation(
+            user_id=manager_user.id,
+            operation_type='FINALIZE_RECONCILIATION',
+            resource_type='reconciliation',
+            resource_id=reconciliation_id,
+            details={
+                'reconciliation_user_id': reconciliation.user_id,
+                'total_records': reconciliation.total_customer_records,
+                'match_statistics': {
+                    'rule_matched': reconciliation.rule_matched,
+                    'ai_matched': reconciliation.ai_matched,
+                    'manual_review': reconciliation.manual_review
+                }
+            }
+        )
+        
+        return jsonify({
+            'message': 'Reconciliation finalized successfully',
+            'reconciliation_id': reconciliation_id,
+            'finalized_by': manager_user.username
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@reconciliation_bp.route('/records-from-file/<int:reconciliation_id>', methods=['GET'])
+@jwt_required()
+def get_records_from_file(reconciliation_id):
+    """Get records directly from Excel file without database storage"""
+    try:
+        user_id = int(get_jwt_identity())
+        user_role = get_user_role()
+        
+        # Get reconciliation and check access
+        reconciliation = Reconciliation.query.get(reconciliation_id)
+        
+        if not reconciliation:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+        
+        # Role-based access control
+        if user_role == 'officer' and reconciliation.user_id != user_id:
+            return jsonify({
+                'error': 'Access denied',
+                'message': 'You can only view your own reconciliation records.'
+            }), 403
+        
+        if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
+            return jsonify({'error': 'Report file not found'}), 404
+        
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        category = request.args.get('category', 'all', type=str)
+        
+        # Parse Excel file
+        excel_file = pd.ExcelFile(reconciliation.report_path)
+        sheet_mapping = {
+            'Exact_Matched_By_Tag': 'Exact Match',
+            'AI_Matched_Need_Manual_Review': 'AI Match',
+            'Matched_Need_Manual_Review': 'Manual Review',
+            'Customer_Unmatched': 'Customer Unmatched',
+            'Finance_Unmatched': 'Finance Unmatched',
+        }
+        
+        all_records = []
+        
+        for sheet_name, match_type in sheet_mapping.items():
+            # Skip if filtering by category and this isn't the category
+            if category != 'all':
+                if category == 'Unmatched' and match_type not in ['Customer Unmatched', 'Finance Unmatched']:
+                    continue
+                elif category != 'Unmatched' and category != match_type:
+                    continue
+            
+            if sheet_name in excel_file.sheet_names:
+                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                
+                # Check if this sheet is empty
+                if 'Message' in df.columns and len(df.columns) == 1:
+                    continue
+                
+                for idx, row in df.iterrows():
+                    row_dict = row.to_dict()
+                    
+                    # Extract key fields
+                    customer_tag = row_dict.get('New Tag') or row_dict.get('Old Tag') or '-'
+                    internal_tag = '-'
+                    description = row_dict.get('Description', '-')
+                    match_method = match_type
+                    confidence = '-'
+                    
+                    # Try to extract internal tag if available
+                    for key in row_dict.keys():
+                        if 'Internal' in str(key) and 'Tag' in str(key):
+                            internal_tag = row_dict[key] if pd.notna(row_dict[key]) else '-'
+                            break
+                    
+                    all_records.append({
+                        'id': f"{sheet_name}_{idx}",
+                        'category': match_type,
+                        'customer_tag': customer_tag if pd.notna(customer_tag) else '-',
+                        'internal_tag': internal_tag,
+                        'description': description if pd.notna(description) else '-',
+                        'match_method': match_method,
+                        'confidence': confidence,
+                        'status': 'Matched' if match_type in ['Exact Match', 'AI Match'] else 
+                                 'Review Required' if match_type == 'Manual Review' else 'Unmatched',
+                        'approval_status': 'pending',
+                        'approved_by': None,
+                        'approved_at': None
+                    })
+        
+        # Pagination
+        total_records = len(all_records)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_records = all_records[start_idx:end_idx]
+        
+        return jsonify({
+            'records': paginated_records,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total_records': total_records,
+                'total_pages': (total_records + per_page - 1) // per_page,
+                'has_next': end_idx < total_records,
+                'has_prev': page > 1
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@reconciliation_bp.route('/records/<int:reconciliation_id>', methods=['GET'])
+@jwt_required()
+def get_records(reconciliation_id):
+    """Get paginated records from database for a specific reconciliation"""
+    try:
+        user_id = int(get_jwt_identity())
+        user_role = get_user_role()
+        
+        # Get reconciliation and check access
+        reconciliation = Reconciliation.query.get(reconciliation_id)
+        
+        if not reconciliation:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+        
+        # Role-based access control
+        if user_role == 'officer' and reconciliation.user_id != user_id:
+            return jsonify({
+                'error': 'Access denied',
+                'message': 'You can only view your own reconciliation records.'
+            }), 403
+        
+        # Get pagination parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        category = request.args.get('category', 'all', type=str)
+        
+        print(f"\n=== DEBUG GET_RECORDS ===")
+        print(f"Reconciliation ID: {reconciliation_id}")
+        print(f"Category filter: '{category}'")
+        print(f"Page: {page}, Per page: {per_page}")
+        
+        # Build query
+        query = ReconciliationRecord.query.filter_by(reconciliation_id=reconciliation_id)
+        
+        # Get all unique categories first (for debugging)
+        all_categories = db.session.query(ReconciliationRecord.match_category).filter_by(
+            reconciliation_id=reconciliation_id
+        ).distinct().all()
+        print(f"Available categories in DB: {[c[0] for c in all_categories]}")
+        
+        # Filter by category if specified
+        if category != 'all':
+            if category == 'Unmatched':
+                # Handle both Customer and Finance unmatched
+                query = query.filter(
+                    db.or_(
+                        ReconciliationRecord.match_category == 'Customer Unmatched',
+                        ReconciliationRecord.match_category == 'Finance Unmatched'
+                    )
+                )
+                print(f"Filtering for: Customer Unmatched OR Finance Unmatched")
+            else:
+                query = query.filter_by(match_category=category)
+                print(f"Filtering for exact match: '{category}'")
+        
+        # Count before pagination
+        total_count = query.count()
+        print(f"Total records matching filter: {total_count}")
+        
+        # Get paginated results
+        pagination = query.order_by(ReconciliationRecord.id).paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+        
+        print(f"Returning {len(pagination.items)} records")
+        
+        records = []
+        for record in pagination.items:
+            # Extract relevant fields from full_record_json
+            json_data = record.full_record_json or {}
+            
+            # Get approver info if approved (handle None gracefully)
+            approver_name = None
+            try:
+                if hasattr(record, 'approved_by') and record.approved_by:
+                    approver = db.session.query(User.username).filter_by(id=record.approved_by).first()
+                    if approver:
+                        approver_name = approver[0]
+            except Exception as e:
+                print(f"Warning: Could not fetch approver name: {e}")
+            
+            # Get approval status (default to 'pending' if column doesn't exist yet)
+            approval_status = getattr(record, 'approval_status', 'pending') or 'pending'
+            approved_at = getattr(record, 'approved_at', None)
+            
+            records.append({
+                'id': record.id,
+                'category': record.match_category,
+                'customer_tag': record.customer_new_tag or record.customer_old_tag or json_data.get('New Tag') or json_data.get('Old Tag') or '-',
+                'internal_tag': record.internal_new_tag or record.internal_old_tag or '-',
+                'description': record.customer_description or record.internal_description or json_data.get('Description') or '-',
+                'match_method': record.match_method or record.match_type or '-',
+                'confidence': f"{record.confidence_score:.0%}" if record.confidence_score else '-',
+                'status': 'Matched' if record.match_category in ['Exact Match', 'AI Match'] else 
+                         'Review Required' if record.match_category == 'Manual Review' else 'Unmatched',
+                'approval_status': approval_status,
+                'approved_by': approver_name,
+                'approved_at': approved_at.isoformat() if approved_at else None,
+                'full_data': json_data
+            })
+        
+        print(f"=== END DEBUG ===\n")
+        
+        return jsonify({
+            'records': records,
+            'pagination': {
+                'page': pagination.page,
+                'per_page': pagination.per_page,
+                'total_records': pagination.total,
+                'total_pages': pagination.pages,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @reconciliation_bp.route('/record/<int:reconciliation_id>', methods=['POST'])
 @jwt_required()
 def record_results(reconciliation_id):
     """Parse the Excel report and save records to the database"""
     try:
         user_id = int(get_jwt_identity())
+        user_role = get_user_role()
         
-        reconciliation = Reconciliation.query.filter_by(
-            id=reconciliation_id,
-            user_id=user_id
-        ).first()
+        # Get reconciliation and check access
+        reconciliation = Reconciliation.query.get(reconciliation_id)
         
         if not reconciliation:
             return jsonify({'error': 'Reconciliation not found'}), 404
+        
+        # Role-based access control
+        if user_role == 'officer' and reconciliation.user_id != user_id:
+            return jsonify({
+                'error': 'Access denied',
+                'message': 'You can only record your own reconciliation results.'
+            }), 403
             
         if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
             return jsonify({'error': 'Report not found or not yet generated'}), 404

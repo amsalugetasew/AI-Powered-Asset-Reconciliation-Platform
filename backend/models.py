@@ -12,9 +12,13 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.Enum('officer', 'manager', 'admin', name='user_role'), 
+                     default='officer', nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Relationships
     reconciliations = db.relationship('Reconciliation', backref='user', lazy=True, cascade='all, delete-orphan')
+    audit_logs = db.relationship('AuditLog', backref='user', lazy=True)
     
     def set_password(self, password):
         """Hash and set password"""
@@ -30,6 +34,7 @@ class User(db.Model):
             'id': self.id,
             'username': self.username,
             'email': self.email,
+            'role': self.role,
             'created_at': self.created_at.isoformat()
         }
 
@@ -110,6 +115,12 @@ class ReconciliationRecord(db.Model):
     reconciliation_id = db.Column(db.Integer, db.ForeignKey('reconciliations.id', ondelete='CASCADE'), nullable=False)
     match_category = db.Column(db.String(100), nullable=False)
     
+    # Approval status (with defaults for backward compatibility)
+    approval_status = db.Column(db.String(50), default='pending', nullable=True)
+    # Values: 'pending', 'reconciled', 'not_reconciled'
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    
     # Unified JSON
     full_record_json = db.Column(db.JSON, nullable=True)
     
@@ -143,14 +154,18 @@ class ReconciliationRecord(db.Model):
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Relationship back to Reconciliation
+    # Relationships
     reconciliation = db.relationship('Reconciliation', backref=db.backref('records', cascade='all, delete-orphan'))
+    approver = db.relationship('User', foreign_keys=[approved_by])
     
     def to_dict(self):
         return {
             'id': self.id,
             'reconciliation_id': self.reconciliation_id,
             'match_category': self.match_category,
+            'approval_status': self.approval_status or 'pending',
+            'approved_by': self.approved_by,
+            'approved_at': self.approved_at.isoformat() if self.approved_at else None,
             'full_record_json': self.full_record_json,
             'internal_old_tag': self.internal_old_tag,
             'internal_new_tag': self.internal_new_tag,
@@ -160,3 +175,38 @@ class ReconciliationRecord(db.Model):
             'confidence_score': self.confidence_score,
             'created_at': self.created_at.isoformat()
         }
+
+
+class AuditLog(db.Model):
+    """Audit log model for tracking privileged operations"""
+    __tablename__ = 'audit_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    operation_type = db.Column(db.String(50), nullable=False)
+    # Operation types: CREATE_USER, UPDATE_ROLE, DELETE_USER, 
+    # APPROVE_EXCEPTION, FINALIZE_RECONCILIATION, UPDATE_CONFIG
+    resource_type = db.Column(db.String(50), nullable=False)
+    # Resource types: user, reconciliation, configuration, system
+    resource_id = db.Column(db.Integer, nullable=True)
+    details = db.Column(db.JSON, nullable=True)
+    # Additional context: old_value, new_value, affected_username, etc.
+    ip_address = db.Column(db.String(45), nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    def to_dict(self):
+        """Convert to dictionary"""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.user.username if self.user else None,
+            'operation_type': self.operation_type,
+            'resource_type': self.resource_type,
+            'resource_id': self.resource_id,
+            'details': self.details,
+            'ip_address': self.ip_address,
+            'timestamp': self.timestamp.isoformat()
+        }
+    
+    def __repr__(self):
+        return f'<AuditLog {self.id}: {self.operation_type} by user {self.user_id}>'
