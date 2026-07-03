@@ -1,4 +1,4 @@
-# AssetSync AI - Intelligent Asset Reconciliation Platform
+# Asset Sync AI - Intelligent Asset Reconciliation Platform
 
 A full-stack web application for intelligent asset reconciliation using rule-based matching, fuzzy matching, and AI-powered reasoning.
 
