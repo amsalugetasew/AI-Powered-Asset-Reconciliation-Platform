@@ -10,12 +10,13 @@ import { useAuth } from '../context/AuthContext'
 
 // ── Status definitions ────────────────────────────────────────────────────────
 const STATUSES = [
-  { value: 'pending',                   label: 'Pending',                      color: 'gray'   },
-  { value: 'reconciled',               label: 'Reconciled',                   color: 'green'  },
-  { value: 'unreconciled',             label: 'Unreconciled',                 color: 'red'    },
-  { value: 'surplus_assets',           label: 'Surplus Assets',               color: 'orange' },
-  { value: 'exist_in_physical_not_erp',label: 'Exist in Physical not ERP',    color: 'blue'   },
-  { value: 'exist_in_erp_not_physical',label: 'Exist in ERP not Physical',    color: 'purple' },
+  { value: 'pending',                   label: 'Pending',              color: 'gray'   },
+  { value: 'reconciled',               label: 'Reconciled',           color: 'green'  },
+  { value: 'unreconciled',             label: 'Unreconciled',         color: 'red'    },
+  { value: 'surplus_assets',           label: 'Surplus Assets',       color: 'orange' },
+  { value: 'exist_in_erp_not_physical',label: 'Exist in ERP not Physical', color: 'purple' },
+  { value: 'duplicated',               label: 'Duplicated',           color: 'pink'   },
+  { value: 'unique',                   label: 'Unique',               color: 'teal'   },
 ]
 
 const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.value, s]))
@@ -25,8 +26,9 @@ const statusBadgeCls = {
   reconciled:               'bg-green-100 text-green-800 border-green-300',
   unreconciled:             'bg-red-100 text-red-800 border-red-300',
   surplus_assets:           'bg-orange-100 text-orange-800 border-orange-300',
-  exist_in_physical_not_erp:'bg-blue-100 text-blue-800 border-blue-300',
   exist_in_erp_not_physical:'bg-purple-100 text-purple-800 border-purple-300',
+  duplicated:               'bg-pink-100 text-pink-800 border-pink-300',
+  unique:                   'bg-teal-100 text-teal-800 border-teal-300',
 }
 
 // ── Category definitions ──────────────────────────────────────────────────────
@@ -36,6 +38,7 @@ const CATEGORIES = [
   { key: 'AI Match',      label: 'AI Match'      },
   { key: 'Manual Review', label: 'Manual Review' },
   { key: 'Unmatched',     label: 'Unmatched'     },
+  { key: 'Duplicate',     label: 'Duplicate'     },
 ]
 
 // Bulk action options per category type
@@ -45,10 +48,13 @@ const BULK_OPTIONS_MATCHED = [
 ]
 const BULK_OPTIONS_UNMATCHED = [
   { value: 'surplus_assets',            label: 'Surplus Assets'             },
-  { value: 'exist_in_physical_not_erp', label: 'Exist in Physical not ERP'  },
   { value: 'exist_in_erp_not_physical', label: 'Exist in ERP not Physical'  },
   { value: 'reconciled',                label: 'Reconciled'                 },
   { value: 'unreconciled',              label: 'Unreconciled'               },
+]
+const BULK_OPTIONS_DUPLICATE = [
+  { value: 'duplicated', label: 'Duplicated' },
+  { value: 'unique',     label: 'Unique'     },
 ]
 
 // ── Paired column definitions ─────────────────────────────────────────────────
@@ -123,8 +129,11 @@ const StatusDropdown = ({ recordId, current, onSelect, loading }) => {
 // ── Bulk action dropdown ──────────────────────────────────────────────────────
 const BulkDropdown = ({ category, onSelect, loading }) => {
   const [open, setOpen] = useState(false)
+  const isDuplicate = category === 'Duplicate'
   const isUnmatched = category === 'Unmatched'
-  const options = isUnmatched ? BULK_OPTIONS_UNMATCHED : BULK_OPTIONS_MATCHED
+  const options = isDuplicate ? BULK_OPTIONS_DUPLICATE
+                : isUnmatched ? BULK_OPTIONS_UNMATCHED
+                : BULK_OPTIONS_MATCHED
   const loadingKey = loading && Object.keys(loading).find(k => k.startsWith(category) && loading[k])
 
   return (
@@ -262,7 +271,8 @@ const ApprovalPage = () => {
   // ── summary helpers ────────────────────────────────────────────────────────
   const getSummary = (cat) => {
     const empty = { total: 0, pending: 0, reconciled: 0, unreconciled: 0,
-                    surplus_assets: 0, exist_in_physical_not_erp: 0, exist_in_erp_not_physical: 0 }
+                    surplus_assets: 0, exist_in_erp_not_physical: 0,
+                    duplicated: 0, unique: 0 }
     if (cat === 'all') {
       return Object.values(summary).reduce((a, s) => {
         Object.keys(empty).forEach(k => { a[k] = (a[k] || 0) + (s[k] || 0) })
@@ -281,7 +291,8 @@ const ApprovalPage = () => {
 
   const nonPendingCount = (s) =>
     (s.reconciled || 0) + (s.unreconciled || 0) +
-    (s.surplus_assets || 0) + (s.exist_in_physical_not_erp || 0) + (s.exist_in_erp_not_physical || 0)
+    (s.surplus_assets || 0) + (s.exist_in_erp_not_physical || 0) +
+    (s.duplicated || 0) + (s.unique || 0)
 
   // ── tab styles ─────────────────────────────────────────────────────────────
   const tabCls = (key) => {
@@ -391,7 +402,7 @@ const ApprovalPage = () => {
       {/* Table */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm border-collapse">
+          <table className="min-w-full text-2xl border-collapse">
             <thead>
               {/* Row 1 — group headers */}
               <tr className="bg-gray-100 border-b border-gray-300">
@@ -589,16 +600,17 @@ const ApprovalPage = () => {
       </div>
 
       {/* Summary cards */}
-      <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
         {CATEGORIES.filter(c => c.key !== 'all').map(cat => {
           const s = getSummary(cat.key)
           const done = nonPendingCount(s)
           const p = s.total > 0 ? ((done / s.total) * 100).toFixed(0) : 0
           const border = {
-            'Exact Match':   'border-green-400',
-            'AI Match':      'border-purple-400',
-            'Manual Review': 'border-yellow-400',
+            'Exact Match':   'border-[#8E288D]',
+            'AI Match':      'border-[#7A1E79]',
+            'Manual Review': 'border-[#CFB53B]',
             'Unmatched':     'border-red-400',
+            'Duplicate':     'border-red-700',
           }
           return (
             <div key={cat.key} className={`bg-white rounded-lg shadow p-4 border-t-4 ${border[cat.key]}`}>

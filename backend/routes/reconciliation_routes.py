@@ -345,7 +345,6 @@ def download_enriched_report(reconciliation_id):
             'reconciled':                'Reconciled',
             'unreconciled':              'Unreconciled',
             'surplus_assets':            'Surplus Assets',
-            'exist_in_physical_not_erp': 'Exist in Physical not ERP',
             'exist_in_erp_not_physical': 'Exist in ERP not Physical',
         }
 
@@ -505,7 +504,7 @@ def get_analytics():
 
         approval_counts = {s: 0 for s in [
             'pending','reconciled','unreconciled','surplus_assets',
-            'exist_in_physical_not_erp','exist_in_erp_not_physical'
+            'exist_in_erp_not_physical','duplicated','unique'
         ]}
         for status, cnt in STATUS_COUNTS:
             key = status or 'pending'
@@ -523,8 +522,9 @@ def get_analytics():
             'reconciliation_rate':  recon_rate,
             'unreconciled':         approval_counts['unreconciled'],
             'surplus_assets':       approval_counts['surplus_assets'],
-            'exist_physical_not_erp': approval_counts['exist_in_physical_not_erp'],
             'exist_erp_not_physical': approval_counts['exist_in_erp_not_physical'],
+            'duplicated':           approval_counts['duplicated'],
+            'unique':               approval_counts['unique'],
             'pending':              approval_counts['pending'],
         }
 
@@ -709,12 +709,13 @@ def approve_record():
     Request body:
     {
         "record_id": 42,
-        "approval_decision": "reconciled" | "unreconciled" | "surplus_assets" | "exist_in_physical_not_erp" | "exist_in_erp_not_physical" | "pending"
+        "approval_decision": "reconciled" | "unreconciled" | "surplus_assets" | "exist_in_erp_not_physical" | "pending"
     }
     """
     VALID_DECISIONS = [
         'pending', 'reconciled', 'unreconciled',
-        'surplus_assets', 'exist_in_physical_not_erp', 'exist_in_erp_not_physical'
+        'surplus_assets', 'exist_in_erp_not_physical',
+        'duplicated', 'unique'
     ]
     try:
         data = request.get_json()
@@ -795,7 +796,7 @@ def approve_group():
         
         VALID_DECISIONS = [
             'reconciled', 'unreconciled', 'surplus_assets',
-            'exist_in_physical_not_erp', 'exist_in_erp_not_physical'
+            'exist_in_erp_not_physical', 'duplicated', 'unique'
         ]
         if approval_decision not in VALID_DECISIONS:
             return jsonify({
@@ -966,7 +967,6 @@ def get_approval_summary(reconciliation_id):
                     'unreconciled': 0,
                     'not_reconciled': 0,  # legacy alias
                     'surplus_assets': 0,
-                    'exist_in_physical_not_erp': 0,
                     'exist_in_erp_not_physical': 0,
                 }
             summary[match_category]['total'] += count
@@ -982,8 +982,8 @@ def get_approval_summary(reconciliation_id):
                 'total': 0, 'pending': 0, 'reconciled': 0,
                 'unreconciled': 0, 'not_reconciled': 0,
                 'surplus_assets': 0,
-                'exist_in_physical_not_erp': 0,
                 'exist_in_erp_not_physical': 0,
+                'duplicated': 0, 'unique': 0,
             }
             for key in ['Customer Unmatched', 'Finance Unmatched']:
                 if key in summary:
@@ -1610,4 +1610,220 @@ def debug_record_keys(reconciliation_id):
 
         return jsonify({'reconciliation_id': reconciliation_id, 'keys_by_category': result}), 200
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Per-reconciliation analytics ─────────────────────────────────────────────
+@reconciliation_bp.route('/analytics/single/<int:reconciliation_id>', methods=['GET'])
+@jwt_required()
+def get_reconciliation_analytics(reconciliation_id):
+    """
+    Single-reconciliation analytics derived from approved ReconciliationRecord rows.
+    Returns KPIs, approval breakdown, category/dept/district performance, and aging stub.
+    """
+    try:
+        from sqlalchemy import func
+        user_id   = int(get_jwt_identity())
+        user_role = get_user_role()
+
+        recon = Reconciliation.query.get(reconciliation_id)
+        if not recon:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+
+        if user_role == 'officer' and recon.user_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+
+        # ── approval status counts ─────────────────────────────────────────
+        STATUS_LIST = [
+            'pending','reconciled','unreconciled','surplus_assets',
+            'exist_in_erp_not_physical','duplicated','unique'
+        ]
+        status_rows = db.session.query(
+            ReconciliationRecord.approval_status,
+            func.count(ReconciliationRecord.id)
+        ).filter_by(reconciliation_id=reconciliation_id).group_by(
+            ReconciliationRecord.approval_status
+        ).all()
+
+        approval_counts = {s: 0 for s in STATUS_LIST}
+        for status, cnt in status_rows:
+            k = status or 'pending'
+            approval_counts[k] = approval_counts.get(k, 0) + cnt
+
+        total_db = sum(approval_counts.values())
+        recon_rate = round(
+            approval_counts['reconciled'] / total_db * 100, 2
+        ) if total_db else 0
+
+        kpis = {
+            'total_erp_assets':           recon.total_internal_records,
+            'physical_count':             recon.total_customer_records,
+            'reconciled':                 approval_counts['reconciled'],
+            'reconciliation_rate':        recon_rate,
+            'unreconciled':               approval_counts['unreconciled'],
+            'surplus_assets':             approval_counts['surplus_assets'],
+            'exist_erp_not_physical':     approval_counts['exist_in_erp_not_physical'],
+            'duplicated':                 approval_counts['duplicated'],
+            'unique':                     approval_counts['unique'],
+            'pending':                    approval_counts['pending'],
+            'exact_matched':              recon.rule_matched,
+            'ai_matched':                 recon.ai_matched,
+            'near_match':                 recon.manual_review,
+            'customer_unmatched':         recon.customer_unmatched,
+            'internal_unmatched':         recon.internal_unmatched,
+            'customer_duplicates':        recon.customer_duplicates or 0,
+            'internal_duplicates':        recon.internal_duplicates or 0,
+        }
+
+        # ── donut data ─────────────────────────────────────────────────────
+        donut = [
+            {'name': 'Reconciled',           'value': approval_counts['reconciled'],                  'color': '#10b981'},
+            {'name': 'Unreconciled',     'value': approval_counts['unreconciled'],              'color': '#ef4444'},
+            {'name': 'Surplus Assets',   'value': approval_counts['surplus_assets'],              'color': '#f97316'},
+            {'name': 'ERP not Physical', 'value': approval_counts['exist_in_erp_not_physical'],   'color': '#8b5cf6'},
+            {'name': 'Duplicated',       'value': approval_counts['duplicated'],                  'color': '#ec4899'},
+            {'name': 'Unique',           'value': approval_counts['unique'],                      'color': '#14b8a6'},
+            {'name': 'Pending',          'value': approval_counts['pending'],                     'color': '#9ca3af'},
+        ]
+
+        # ── helper ─────────────────────────────────────────────────────────
+        def _pick(j, *keys):
+            for k in keys:
+                v = j.get(k)
+                if v and str(v).strip() not in ('', 'nan', 'None'):
+                    return str(v).strip()
+            return None
+
+        all_records = ReconciliationRecord.query.filter_by(
+            reconciliation_id=reconciliation_id
+        ).all()
+
+        # ── category breakdown ─────────────────────────────────────────────
+        cat_stats = {}
+        for rec in all_records:
+            j = rec.full_record_json or {}
+            cat = (_pick(j, 'customer_category', 'internal_category', 'category')
+                   or rec.match_category or 'Unknown')
+            if cat not in cat_stats:
+                cat_stats[cat] = {s: 0 for s in STATUS_LIST}
+                cat_stats[cat]['total'] = 0
+            cat_stats[cat]['total'] += 1
+            cat_stats[cat][rec.approval_status or 'pending'] += 1
+
+        category_breakdown = sorted([
+            {
+                'name':        k,
+                'total':       v['total'],
+                'reconciled':  v['reconciled'],
+                'unreconciled':v['unreconciled'],
+                'surplus':     v['surplus_assets'],
+                'pending':     v['pending'],
+                'rate':        round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+            }
+            for k, v in cat_stats.items() if k != 'Unknown'
+        ], key=lambda x: -x['rate'])[:15]
+
+        # ── department breakdown ───────────────────────────────────────────
+        dept_stats = {}
+        for rec in all_records:
+            j = rec.full_record_json or {}
+            dept = _pick(j, 'customer_department', 'internal_department', 'department') or 'Unknown'
+            if dept == 'Unknown': continue
+            if dept not in dept_stats:
+                dept_stats[dept] = {'total': 0, 'reconciled': 0, 'unreconciled': 0, 'pending': 0}
+            dept_stats[dept]['total'] += 1
+            dept_stats[dept][rec.approval_status or 'pending'] = \
+                dept_stats[dept].get(rec.approval_status or 'pending', 0) + 1
+
+        department_breakdown = sorted([
+            {
+                'name':        k,
+                'total':       v['total'],
+                'reconciled':  v['reconciled'],
+                'unreconciled':v.get('unreconciled', 0),
+                'pending':     v.get('pending', 0),
+                'rate':        round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+            }
+            for k, v in dept_stats.items()
+        ], key=lambda x: -x['rate'])[:15]
+
+        # ── district breakdown ─────────────────────────────────────────────
+        dist_stats = {}
+        for rec in all_records:
+            j = rec.full_record_json or {}
+            dist = _pick(j, 'customer_district', 'internal_district', 'district') or 'Unknown'
+            if dist == 'Unknown': continue
+            if dist not in dist_stats:
+                dist_stats[dist] = {'total': 0, 'reconciled': 0, 'unreconciled': 0, 'pending': 0}
+            dist_stats[dist]['total'] += 1
+            dist_stats[dist][rec.approval_status or 'pending'] = \
+                dist_stats[dist].get(rec.approval_status or 'pending', 0) + 1
+
+        district_breakdown = sorted([
+            {
+                'name':        k,
+                'total':       v['total'],
+                'reconciled':  v['reconciled'],
+                'unreconciled':v.get('unreconciled', 0),
+                'pending':     v.get('pending', 0),
+                'rate':        round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+            }
+            for k, v in dist_stats.items()
+        ], key=lambda x: -x['rate'])[:15]
+
+        # ── dept_reconcile summary ─────────────────────────────────────────
+        def _norm_dept(v):
+            if v and str(v).strip() not in ('', 'nan', 'None'):
+                return str(v).strip().upper()
+            return None
+
+        dept_rec_counts = {'Same': 0, 'Same Dept, Diff District': 0,
+                           'Diff Dept, Same District': 0, 'Different': 0, 'N/A': 0}
+        for rec in all_records:
+            j   = rec.full_record_json or {}
+            c_d = _pick(j, 'customer_department', 'department')
+            i_d = _pick(j, 'internal_department')
+            c_s = _pick(j, 'customer_district',   'district')
+            i_s = _pick(j, 'internal_district')
+
+            cd, id_, cs, is_ = _norm_dept(c_d), _norm_dept(i_d), _norm_dept(c_s), _norm_dept(i_s)
+            dept_same = bool(cd and id_ and cd == id_)
+            dist_same = bool(cs and is_ and cs == is_)
+            da, sa    = bool(cd and id_), bool(cs and is_)
+
+            if not da and not sa:
+                dept_key = 'N/A'
+            elif da and sa:
+                if dept_same and dist_same:   dept_key = 'Same'
+                elif dept_same:               dept_key = 'Same Dept, Diff District'
+                elif dist_same:               dept_key = 'Diff Dept, Same District'
+                else:                         dept_key = 'Different'
+            elif da:
+                dept_key = 'Same' if dept_same else 'Different'
+            else:
+                dept_key = 'Same' if dist_same else 'Different'
+
+            dept_rec_counts[dept_key] = dept_rec_counts.get(dept_key, 0) + 1
+
+        dept_rec_chart = [
+            {'name': k, 'value': v, 'color': {
+                'Same': '#10b981', 'Same Dept, Diff District': '#3b82f6',
+                'Diff Dept, Same District': '#f97316', 'Different': '#ef4444', 'N/A': '#9ca3af'
+            }.get(k, '#9ca3af')}
+            for k, v in dept_rec_counts.items() if v > 0
+        ]
+
+        return jsonify({
+            'reconciliation': recon.to_dict(),
+            'kpis':                kpis,
+            'donut':               donut,
+            'category_breakdown':  category_breakdown,
+            'department_breakdown':department_breakdown,
+            'district_breakdown':  district_breakdown,
+            'dept_rec_chart':      dept_rec_chart,
+            'total_records_in_db': total_db,
+        }), 200
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500

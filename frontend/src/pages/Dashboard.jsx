@@ -14,7 +14,8 @@ import {
   FiFileText,
   FiFilter,
   FiSearch,
-  FiCheck
+  FiCheck,
+  FiCopy
 } from 'react-icons/fi'
 
 const Dashboard = () => {
@@ -51,11 +52,14 @@ const Dashboard = () => {
   }
 
   const calculateStats = () => {
+    const completed = reconciliations.filter(r => r.status === 'completed')
     setStats({
-      total: reconciliations.length,
-      completed: reconciliations.filter(r => r.status === 'completed').length,
-      processing: reconciliations.filter(r => r.status === 'processing').length,
-      pending: reconciliations.filter(r => r.status === 'pending').length
+      total:        reconciliations.length,
+      completed:    completed.length,
+      processing:   reconciliations.filter(r => r.status === 'processing').length,
+      pending:      reconciliations.filter(r => r.status === 'pending').length,
+      nearMatch:    completed.reduce((s, r) => s + (r.statistics?.manual_review || 0), 0),
+      duplicates:   completed.reduce((s, r) => s + (r.statistics?.customer_duplicates || 0) + (r.statistics?.internal_duplicates || 0), 0),
     })
   }
 
@@ -119,52 +123,77 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-[#8E288D] to-[#7A1E79] rounded-xl shadow-lg p-6
-         text-white transform hover:scale-105 transition-transform">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="bg-gradient-to-br from-[#8E288D] to-[#7A1E79] rounded-xl shadow-lg p-5 text-white transform hover:scale-105 transition-transform">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-100 text-sm font-medium">Total Jobs</p>
-              <p className="text-3xl font-bold mt-2">{stats.total}</p>
+              <p className="text-purple-100 text-xs font-medium">Total Jobs</p>
+              <p className="text-3xl font-bold mt-1">{stats.total}</p>
             </div>
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-              <FiFileText className="h-8 w-8" />
+            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+              <FiFileText className="h-6 w-6" />
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-5 text-white transform hover:scale-105 transition-transform">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-100 text-sm font-medium">Completed</p>
-              <p className="text-3xl font-bold mt-2">{stats.completed}</p>
+              <p className="text-green-100 text-xs font-medium">Completed</p>
+              <p className="text-3xl font-bold mt-1">{stats.completed}</p>
             </div>
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-              <FiCheckCircle className="h-8 w-8" />
+            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+              <FiCheckCircle className="h-6 w-6" />
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-5 text-white transform hover:scale-105 transition-transform">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white text-sm font-medium">Processing</p>
-              <p className="text-3xl font-bold mt-2">{stats.processing}</p>
+              <p className="text-yellow-100 text-xs font-medium">Processing</p>
+              <p className="text-3xl font-bold mt-1">{stats.processing}</p>
             </div>
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-              <FiLoader className="h-8 w-8" />
+            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+              <FiLoader className="h-6 w-6" />
             </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-5 text-white transform hover:scale-105 transition-transform">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-purple-100 text-sm font-medium">Pending</p>
-              <p className="text-3xl font-bold mt-2">{stats.pending}</p>
+              <p className="text-purple-100 text-xs font-medium">Pending</p>
+              <p className="text-3xl font-bold mt-1">{stats.pending}</p>
             </div>
-            <div className="bg-white bg-opacity-20 p-3 rounded-lg">
-              <FiClock className="h-8 w-8" />
+            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+              <FiClock className="h-6 w-6" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-5 text-white transform hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-100 text-xs font-medium">Near Match</p>
+              <p className="text-3xl font-bold mt-1">{(stats.nearMatch || 0).toLocaleString()}</p>
+              <p className="text-xs text-blue-200 mt-0.5">Fuzzy / review</p>
+            </div>
+            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+              <FiSearch className="h-6 w-6" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-pink-500 to-pink-600 rounded-xl shadow-lg p-5 text-white transform hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-pink-100 text-xs font-medium">Duplicates</p>
+              <p className="text-3xl font-bold mt-1">{(stats.duplicates || 0).toLocaleString()}</p>
+              <p className="text-xs text-pink-200 mt-0.5">Cust. + Finance</p>
+            </div>
+            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+              <FiCopy className="h-6 w-6" />
             </div>
           </div>
         </div>
@@ -287,6 +316,12 @@ const Dashboard = () => {
                         View Results
                       </button>
                       <button
+                        onClick={() => navigate(`/report/${recon.id}`)}
+                        className="px-4 py-2 bg-[#008080] text-white rounded-lg hover:bg-[#006666] transition-colors text-sm font-medium flex items-center justify-center"
+                      >
+                        📊 Dashboard
+                      </button>
+                      <button
                         onClick={() => {
                           logActivity(window.location.pathname, `VIEW_APPROVAL_ID_${recon.id}`)
                           navigate(`/approval/${recon.id}`)
@@ -309,25 +344,33 @@ const Dashboard = () => {
 
                 {recon.status === 'completed' && (
                   <div className="mt-6 pt-6 border-t border-gray-200">
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-[#008080]">{recon.statistics.rule_matched}</p>
-                        <p className="text-xs text-gray-600 mt-1">Exact Matched</p>
+                        <p className="text-xl font-bold text-[#008080]">{recon.statistics.rule_matched}</p>
+                        <p className="text-xs text-gray-600 mt-1">Exact Match</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-[#8E288D]">{recon.statistics.ai_matched}</p>
-                        <p className="text-xs text-gray-600 mt-1">AI Matched</p>
+                        <p className="text-xl font-bold text-[#8E288D]">{recon.statistics.ai_matched}</p>
+                        <p className="text-xs text-gray-600 mt-1">AI Match</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-yellow-600">{recon.statistics.manual_review}</p>
-                        <p className="text-xs text-gray-600 mt-1">Need Manual Review</p>
+                        <p className="text-xl font-bold text-blue-500">{recon.statistics.manual_review}</p>
+                        <p className="text-xs text-gray-600 mt-1">Near Match</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-pink-600">{recon.statistics.customer_unmatched}</p>
+                        <p className="text-xl font-bold text-pink-600">{recon.statistics.customer_unmatched}</p>
                         <p className="text-xs text-gray-600 mt-1">Unmatched</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-2xl font-bold text-[#008080]">
+                        <p className="text-xl font-bold text-orange-500">{recon.statistics.customer_duplicates || 0}</p>
+                        <p className="text-xs text-gray-600 mt-1">Cust. Dupl.</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xl font-bold text-orange-700">{recon.statistics.internal_duplicates || 0}</p>
+                        <p className="text-xs text-gray-600 mt-1">Finance Dupl.</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xl font-bold text-[#008080]">
                           {((recon.statistics.rule_matched + recon.statistics.ai_matched) / recon.statistics.total_customer_records * 100).toFixed(1)}%
                         </p>
                         <p className="text-xs text-gray-600 mt-1">Match Rate</p>

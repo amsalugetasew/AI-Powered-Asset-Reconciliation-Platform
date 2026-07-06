@@ -26,8 +26,9 @@ const APPROVAL_BADGE_CLS = {
   reconciled:                'bg-green-100 text-green-800 border-green-300',
   unreconciled:              'bg-red-100 text-red-800 border-red-300',
   surplus_assets:            'bg-orange-100 text-orange-800 border-orange-300',
-  exist_in_physical_not_erp: 'bg-blue-100 text-blue-800 border-blue-300',
   exist_in_erp_not_physical: 'bg-purple-100 text-purple-800 border-purple-300',
+  duplicated:                'bg-pink-100 text-pink-800 border-pink-300',
+  unique:                    'bg-teal-100 text-teal-800 border-teal-300',
 }
 
 const APPROVAL_LABEL = {
@@ -35,8 +36,9 @@ const APPROVAL_LABEL = {
   reconciled:                'Reconciled',
   unreconciled:              'Unreconciled',
   surplus_assets:            'Surplus Assets',
-  exist_in_physical_not_erp: 'Exist in Physical not ERP',
   exist_in_erp_not_physical: 'Exist in ERP not Physical',
+  duplicated:                'Duplicated',
+  unique:                    'Unique',
 }
 
 const Results = () => {
@@ -233,6 +235,12 @@ const Results = () => {
         </div>
         <div className="mt-4 sm:mt-0 flex space-x-3">
           <button
+            onClick={() => navigate(`/report/${id}`)}
+            className="inline-flex items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#008080] hover:bg-[#006666]"
+          >
+            📊 Dashboard Report
+          </button>
+          <button
             onClick={() => navigate(`/approval/${id}`)}
             className="inline-flex items-center px-4 py-3 border 
             border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#8E288D]
@@ -244,11 +252,11 @@ const Results = () => {
           <button
             onClick={handleDownload}
             className="inline-flex items-center px-4 py-3 border 
-            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#008080]
-            hover:bg-[#7A1E79]"
+            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600
+            hover:bg-indigo-700"
           >
             <FiDownload className="mr-2" />
-            Download Report
+            Download
           </button>
         </div>
       </div>
@@ -282,17 +290,17 @@ const Results = () => {
 
         {/* Paired-column table */}
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm border-collapse">
+          <table className="min-w-full text-xl border-collapse">
             <thead>
               {/* Row 1 — group headers */}
-              <tr className="bg-gray-100 border-b border-gray-300">
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300 sticky left-0 bg-gray-100 z-10">
+              <tr className="bg-gray-100 border-b border-gray-500">
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-500 sticky left-0 bg-gray-100 z-10">
                   Category
                 </th>
                 {RESULT_COLUMN_PAIRS.map(p => (
                   <th key={p.label} colSpan={2}
                     onClick={p.expandable ? () => toggleCol(p.label) : undefined}
-                    className={`px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 whitespace-nowrap
+                    className={`px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r border-gray-500 whitespace-nowrap
                       ${p.expandable ? 'cursor-pointer select-none hover:bg-yellow-100' : ''}
                       ${expandedCols[p.label] ? 'bg-yellow-50' : ''}`}
                     title={p.expandable ? (expandedCols[p.label] ? 'Click to collapse' : 'Click to expand') : undefined}>
@@ -304,17 +312,17 @@ const Results = () => {
                     )}
                   </th>
                 ))}
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Match</th>
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Conf.</th>
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-amber-700 uppercase whitespace-nowrap border-r border-gray-300 bg-amber-50">Dept. Reconcile</th>
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">Approval</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-500">Match</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-500">Conf.</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-amber-700 uppercase whitespace-nowrap border-r border-gray-500 bg-amber-50">Dept. Reconcile</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-500">Approval</th>
               </tr>
               {/* Row 2 — Customer / Finance */}
-              <tr className="bg-gray-50 border-b-2 border-gray-300">
+              <tr className="bg-gray-50 border-b-2 border-gray-400">
                 {RESULT_COLUMN_PAIRS.map(p => (
                   <React.Fragment key={p.label}>
-                    <th className="px-3 py-1 text-center text-xs font-medium text-purple-700 bg-purple-50 border-r border-gray-200 whitespace-nowrap">Physical</th>
-                    <th className="px-3 py-1 text-center text-xs font-medium text-teal-700 bg-teal-50 border-r border-gray-300 whitespace-nowrap">ERP</th>
+                    <th className="px-3 py-1 text-center text-xs font-medium text-purple-700 bg-purple-50 border-r border-gray-400 whitespace-nowrap">Physical</th>
+                    <th className="px-3 py-1 text-center text-xs font-medium text-teal-700 bg-teal-50 border-r border-gray-400 whitespace-nowrap">ERP</th>
                   </React.Fragment>
                 ))}
               </tr>
@@ -337,7 +345,7 @@ const Results = () => {
               ) : records.map((rec, idx) => (
                 <tr key={rec.id} className={`hover:bg-yellow-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                   {/* Category */}
-                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-200">
+                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-400">
                     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
                       rec.category === 'Exact Match'        ? 'bg-green-100 text-green-800' :
                       rec.category === 'AI Match'           ? 'bg-purple-100 text-purple-800' :
@@ -351,8 +359,8 @@ const Results = () => {
                   {RESULT_COLUMN_PAIRS.map(p => {
                     const isExpanded = expandedCols[p.label]
                     const cellCls = isExpanded
-                      ? 'px-3 py-2 text-xs text-gray-800 border-r border-gray-100 min-w-[200px] max-w-[400px] whitespace-normal break-words'
-                      : 'px-3 py-2 text-xs text-gray-800 border-r border-gray-100 max-w-[140px] whitespace-nowrap overflow-hidden'
+                      ? 'px-3 py-2 text-xs text-gray-800 border-r border-gray-300 min-w-[200px] max-w-[400px] whitespace-normal break-words'
+                      : 'px-3 py-2 text-xs text-gray-800 border-r border-gray-300 max-w-[140px] whitespace-nowrap overflow-hidden'
                     return (
                       <React.Fragment key={p.label}>
                         <td className={`${cellCls} bg-purple-50/30`}>
@@ -371,11 +379,11 @@ const Results = () => {
                     )
                   })}
                   {/* Match */}
-                  <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap border-r border-gray-200">{rec.match_method}</td>
+                  <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap border-r border-gray-300">{rec.match_method}</td>
                   {/* Confidence */}
-                  <td className="px-3 py-2 text-xs font-medium text-gray-800 whitespace-nowrap border-r border-gray-200">{rec.confidence}</td>
+                  <td className="px-3 py-2 text-xs font-medium text-gray-800 whitespace-nowrap border-r border-gray-300">{rec.confidence}</td>
                   {/* Dept Reconcile */}
-                  <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200 bg-amber-50/40">
+                  <td className="px-3 py-2 whitespace-nowrap border-r border-gray-400 bg-amber-50/40">
                     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
                       rec.dept_reconcile === 'Same'                     ? 'bg-green-100 text-green-800'   :
                       rec.dept_reconcile === 'Same Dept, Diff District' ? 'bg-blue-100 text-blue-800'     :
@@ -400,7 +408,7 @@ const Results = () => {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 bg-white">
+          <div className="px-4 py-3 flex items-center justify-between border-t border-gray-300 bg-white">
             <p className="text-sm text-gray-600">
               Showing {((currentPage-1)*recordsPerPage)+1}–{Math.min(currentPage*recordsPerPage, totalRecords)} of {totalRecords}
             </p>

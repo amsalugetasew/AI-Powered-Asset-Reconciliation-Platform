@@ -1,335 +1,360 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { FiTrendingUp, FiCheckCircle, FiAlertCircle, FiFileText, FiBarChart2 } from 'react-icons/fi'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
+import {
+  FiDatabase, FiCheckCircle, FiXCircle, FiAlertCircle,
+  FiTrendingUp, FiBarChart2, FiLoader, FiPercent, FiLayers, FiMapPin
+} from 'react-icons/fi'
+import {
+  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  LineChart, Line
+} from 'recharts'
 
+// ── colour palette ────────────────────────────────────────────────────────────
+const COLORS = {
+  reconciled:               '#10b981',
+  unreconciled:             '#ef4444',
+  surplus_assets:           '#f97316',
+  exist_erp_not_physical:   '#8b5cf6',
+  pending:                  '#9ca3af',
+  matched:                  '#008080',
+  ai_matched:               '#8E288D',
+  manual:                   '#f59e0b',
+}
+
+const fmt = (n) => n == null ? '—' : Number(n).toLocaleString()
+const pct = (n) => n == null ? '—' : `${Number(n).toFixed(2)}%`
+
+// ── KPI Card ──────────────────────────────────────────────────────────────────
+const KpiCard = ({ label, value, sub, icon: Icon, gradient, textColor = 'text-white' }) => (
+  <div className={`rounded-xl shadow-lg p-5 ${gradient} text-white transform hover:scale-105 transition-transform`}>
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-sm font-medium opacity-80">{label}</p>
+        <p className={`text-3xl font-bold mt-1 ${textColor}`}>{value}</p>
+        {sub && <p className="text-xs mt-1 opacity-70">{sub}</p>}
+      </div>
+      {Icon && (
+        <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+          <Icon className="h-7 w-7" />
+        </div>
+      )}
+    </div>
+  </div>
+)
+
+// ── Horizontal bar row ────────────────────────────────────────────────────────
+const HBar = ({ name, rate, reconciled, total, color }) => (
+  <div className="mb-3">
+    <div className="flex justify-between items-center mb-1">
+      <span className="text-sm font-medium text-gray-700 truncate max-w-[55%]" title={name}>{name}</span>
+      <span className="text-sm font-bold" style={{ color }}>{rate}%
+        <span className="text-xs text-gray-400 font-normal ml-1">({fmt(reconciled)}/{fmt(total)})</span>
+      </span>
+    </div>
+    <div className="w-full bg-gray-200 rounded-full h-3">
+      <div className="h-3 rounded-full transition-all duration-700"
+        style={{ width: `${Math.min(rate, 100)}%`, backgroundColor: color }} />
+    </div>
+  </div>
+)
+
+// ── Custom tooltip ────────────────────────────────────────────────────────────
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm">
+      <p className="font-semibold text-gray-800 mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color }} className="text-xs">
+          {p.name}: {typeof p.value === 'number' ? p.value.toLocaleString() : p.value}
+          {p.name === 'Rate' ? '%' : ''}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 const Analytics = () => {
-  const [analytics, setAnalytics] = useState(null)
+  const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('overview') // overview | category | branch | division | monthly
 
   useEffect(() => {
-    fetchAnalytics()
+    axios.get('/api/reconciliation/analytics')
+      .then(r => setData(r.data))
+      .catch(() => toast.error('Failed to fetch analytics'))
+      .finally(() => setLoading(false))
   }, [])
 
-  const fetchAnalytics = async () => {
-    try {
-      const response = await axios.get('/api/reconciliation/analytics')
-      setAnalytics(response.data)
-    } catch (error) {
-      toast.error('Failed to fetch analytics')
-    } finally {
-      setLoading(false)
-    }
-  }
+  if (loading) return (
+    <div className="flex justify-center items-center h-64">
+      <FiLoader className="animate-spin h-12 w-12 text-[#8E288D]" />
+    </div>
+  )
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    )
-  }
+  if (!data || data.total_reconciliations === 0) return (
+    <div className="px-4 py-16 text-center">
+      <FiBarChart2 className="mx-auto h-14 w-14 text-gray-300 mb-4" />
+      <h3 className="text-lg font-medium text-gray-700">No analytics data yet</h3>
+      <p className="text-sm text-gray-400 mt-1">Complete and approve reconciliations to see insights here.</p>
+    </div>
+  )
 
-  if (!analytics || analytics.total_reconciliations === 0) {
-    return (
-      <div className="px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-8">Analytics</h1>
-        <div className="text-center py-12">
-          <FiBarChart2 className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No data available</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Complete some reconciliations to see analytics.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const kpi = data.approval_kpis || {}
 
-  const chartData = [
-    {
-      name: 'Matches',
-      'Rule-Based': analytics.total_rule_matched,
-      'AI-Assisted': analytics.total_ai_matched,
-      'Manual Review': analytics.total_manual_review
-    }
+  // ── Donut data ────────────────────────────────────────────────────────────
+  const donutData = [
+    { name: 'Reconciled',           value: kpi.reconciled || 0,             color: COLORS.reconciled },
+    { name: 'Unreconciled',         value: kpi.unreconciled || 0,           color: COLORS.unreconciled },
+    { name: 'Surplus Assets',       value: kpi.surplus_assets || 0,         color: COLORS.surplus_assets },
+    { name: 'ERP not Physical',     value: kpi.exist_erp_not_physical || 0, color: COLORS.exist_erp_not_physical },
+    { name: 'Duplicated',           value: kpi.duplicated || 0,             color: '#ec4899' },
+    { name: 'Unique',               value: kpi.unique || 0,                 color: '#14b8a6' },
+    { name: 'Pending',              value: kpi.pending || 0,                color: COLORS.pending },
+  ].filter(d => d.value > 0)
+
+  const tabs = [
+    { key: 'overview',  label: 'Overview'   },
+    { key: 'category',  label: 'Category'   },
+    { key: 'branch',    label: 'Branch'     },
+    { key: 'division',  label: 'Division'   },
+    { key: 'monthly',   label: 'Monthly'    },
   ]
-
-  const pieData = [
-    { name: 'Rule-Based', value: analytics.total_rule_matched, color: '#008080' },
-    { name: 'AI-Assisted', value: analytics.total_ai_matched, color: '#CFB53B' },
-    { name: 'Manual Review', value: analytics.total_manual_review, color: '#f59e0b' }
-  ]
-
-  const totalMatched = analytics.total_rule_matched + analytics.total_ai_matched
-  const totalRecords = analytics.total_customer_records
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-semibold text-gray-900 mb-8">Analytics Dashboard</h1>
+    <div className="px-4 sm:px-6 lg:px-8 pb-12">
+      <div className="mb-6">
+        <h1 className="text-3xl font-semibold text-gray-900">Analytics Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          {data.scope === 'all' ? 'System-wide · all reconciliations' : 'Your reconciliations only'}
+        </p>
+      </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FiFileText className="h-6 w-6 text-[#8E288D]" />
-              </div>
-              <div className="ml-5 w-10 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Reconciliations
-                  </dt>
-                  <dd className="text-lg font-semibold text-gray-900">
-                    {analytics.total_reconciliations}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
+      {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <KpiCard label="Total ERP Assets"      value={fmt(kpi.total_erp_assets)}   icon={FiDatabase}    gradient="bg-gradient-to-br from-[#8E288D] to-[#7A1E79]" />
+        <KpiCard label="Physical Count"        value={fmt(kpi.physical_count)}     icon={FiLayers}      gradient="bg-gradient-to-br from-blue-600 to-blue-700" />
+        <KpiCard label="Reconciled"            value={fmt(kpi.reconciled)}         icon={FiCheckCircle} gradient="bg-gradient-to-br from-green-500 to-green-600" />
+        <KpiCard label="Reconciliation Rate"   value={pct(kpi.reconciliation_rate)} icon={FiPercent}    gradient="bg-gradient-to-br from-teal-500 to-teal-600" />
+        <KpiCard label="Unreconciled"          value={fmt(kpi.unreconciled)}       icon={FiXCircle}     gradient="bg-gradient-to-br from-red-500 to-red-600" />
+        <KpiCard label="Surplus Assets"        value={fmt(kpi.surplus_assets)}     icon={FiAlertCircle} gradient="bg-gradient-to-br from-orange-500 to-orange-600" />
+      </div>
+
+      {/* secondary KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-400">
+          <p className="text-xs text-gray-500">Exist in ERP not Physical</p>
+          <p className="text-2xl font-bold text-purple-600">{fmt(kpi.exist_erp_not_physical)}</p>
         </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FiTrendingUp className="h-6 w-6 text-[#008080]" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Average Match Rate
-                  </dt>
-                  <dd className="text-lg font-semibold text-gray-900">
-                    {analytics.average_match_rate}%
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
+        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-gray-400">
+          <p className="text-xs text-gray-500">Pending Approval</p>
+          <p className="text-2xl font-bold text-gray-600">{fmt(kpi.pending)}</p>
         </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FiCheckCircle className="h-6 w-6 text-[#008080]" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Records Processed
-                  </dt>
-                  <dd className="text-lg font-semibold text-gray-900">
-                    {analytics.total_customer_records}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FiAlertCircle className="h-6 w-6 text-yellow-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Manual Reviews
-                  </dt>
-                  <dd className="text-lg font-semibold text-gray-900">
-                    {analytics.total_manual_review}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
+        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-[#008080]">
+          <p className="text-xs text-gray-500">Avg. Match Rate</p>
+          <p className="text-2xl font-bold text-teal-600">{pct(data.average_match_rate)}</p>
         </div>
       </div>
 
-      {/* Charts */}
-      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"> */}
-      <div className='mt-0 bg-white shadow rounded-lg p-6'>
-        {/* <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">Match Type Distribution</h3>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" style={{ fontSize: '14px', fontWeight: '500' }} />
-              <YAxis style={{ fontSize: '14px' }} />
-              <Tooltip 
-                contentStyle={{ fontSize: '14px', fontWeight: '500' }}
-                labelStyle={{ fontSize: '15px', fontWeight: '600' }}
-              />
-              <Legend wrapperStyle={{ fontSize: '14px', fontWeight: '500' }} />
-              <Bar dataKey="Rule-Based" fill="#8E288D" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="AI-Assisted" fill="#CFB53B" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="Manual Review" fill="#f59e0b" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div> */}
+      {/* ── Tabs ─────────────────────────────────────────────────────────── */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {tabs.map(t => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === t.key
+                ? 'bg-[#8E288D] text-white shadow'
+                : 'bg-white text-gray-600 border border-gray-200 hover:border-[#8E288D]'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Match Type Pie Chart */}
-        <div className="mt-0 bg-white shadow rounded-lg p-2">
-          <h5 className="text-xl text-center font-semibold text-gray-900 mb-0">
-            Match Type Breakdown
-          </h5>
-          <ResponsiveContainer width="100%" height={420}>
-            <PieChart margin={{ top: 0, right: 20, bottom: 60, left: 20 }}>
+      {/* ── Overview Tab ─────────────────────────────────────────────────── */}
+      {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Donut chart */}
+          <div className="bg-white rounded-xl shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Overall Reconciliation Status</h3>
+            <ResponsiveContainer width="100%" height={320}>
+              <PieChart>
+                <Pie data={donutData} cx="50%" cy="50%"
+                  innerRadius={70} outerRadius={120}
+                  paddingAngle={3} dataKey="value"
+                  label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}
+                  labelLine={true}>
+                  {donutData.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => v.toLocaleString()} />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
 
-              <Pie
-                data={pieData}
-                cx="40%"
-                cy="50%"
-                outerRadius={120}
-                dataKey="value"
-                labelLine={false}
-                label={({ name, value, percent }) =>
-                  `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
-                }
-              >
-                {pieData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.color}
-                  />
+          {/* Match type breakdown */}
+          <div className="bg-white rounded-xl shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Match Type Breakdown</h3>
+            <div className="space-y-4 mt-6">
+              {[
+                { label: 'Exact Matches',    value: data.total_rule_matched, color: COLORS.matched },
+                { label: 'AI-Assisted',      value: data.total_ai_matched,   color: COLORS.ai_matched },
+                { label: 'Near Match',       value: data.total_manual_review,color: '#3b82f6' },
+              ].map(item => {
+                const total = data.total_customer_records || 1
+                const rate  = ((item.value / total) * 100).toFixed(1)
+                return (
+                  <div key={item.label}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium text-gray-700">{item.label}</span>
+                      <span className="font-bold" style={{ color: item.color }}>
+                        {fmt(item.value)} ({rate}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div className="h-3 rounded-full transition-all duration-500"
+                        style={{ width: `${rate}%`, backgroundColor: item.color }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3">
+              <div className="bg-green-50 rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-500">Total Reconciliations</p>
+                <p className="text-xl font-bold text-green-600">{data.total_reconciliations}</p>
+              </div>
+              <div className="bg-teal-50 rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-500">Records Processed</p>
+                <p className="text-xl font-bold text-teal-600">{fmt(data.total_customer_records)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Category Tab ─────────────────────────────────────────────────── */}
+      {activeTab === 'category' && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+            <FiLayers className="text-[#8E288D]" /> Asset Reconciliation by Category
+          </h3>
+          {data.category_breakdown?.length ? (
+            <>
+              <div className="mb-6">
+                {data.category_breakdown.map(c => (
+                  <HBar key={c.name} name={c.name} rate={c.rate}
+                    reconciled={c.reconciled} total={c.total} color={COLORS.matched} />
                 ))}
-              </Pie>
-
-              <Tooltip
-                contentStyle={{
-                  fontSize: "10px",
-                  fontWeight: "100",
-                }}
-              />
-
-              <Legend
-                layout="horizontal"
-                verticalAlign="bottom"
-                align="center"
-                wrapperStyle={{
-                  fontSize: "15px",
-                  paddingLeft: "18px",
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={data.category_breakdown} layout="vertical"
+                  margin={{ left: 120, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={115} />
+                  <Tooltip content={<CustomTooltip />} formatter={(v) => [`${v}%`, 'Rate']} />
+                  <Bar dataKey="rate" name="Rate" fill={COLORS.matched} radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
+          ) : <p className="text-gray-400 text-center py-8">No category data — approve records first</p>}
         </div>
-      </div>
+      )}
 
-      {/* Detailed Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Progress Bars */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h5 className="text-xl font-semibold text-gray-900 mb-6">Detailed Breakdown</h5>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="font-medium text-gray-700">Exact Matches</span>
-                <span className="font-bold text-green-600">{analytics.total_rule_matched} ({totalRecords > 0 ? ((analytics.total_rule_matched / totalRecords) * 100).toFixed(1) : 0}%)</span>
+      {/* ── Branch/District Tab ───────────────────────────────────────────── */}
+      {activeTab === 'branch' && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+            <FiMapPin className="text-[#8E288D]" /> Branch / District Performance
+          </h3>
+          {data.district_breakdown?.length ? (
+            <>
+              <div className="mb-6">
+                {data.district_breakdown.map(d => (
+                  <HBar key={d.name} name={d.name} rate={d.rate}
+                    reconciled={d.reconciled} total={d.total} color="#3b82f6" />
+                ))}
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-green-500 h-3 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${(analytics.total_rule_matched / totalRecords) * 100}%`
-                  }}
-                ></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="font-medium text-gray-700">AI-Assisted Matches</span>
-                <span className="font-bold text-blue-600">{analytics.total_ai_matched} ({totalRecords > 0 ? ((analytics.total_ai_matched / totalRecords) * 100).toFixed(1) : 0}%)</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-blue-500 h-3 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${(analytics.total_ai_matched / totalRecords) * 100}%`
-                  }}
-                ></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="font-medium text-gray-700">Manual Review Required</span>
-                <span className="font-bold text-yellow-600">{analytics.total_manual_review} ({totalRecords > 0 ? ((analytics.total_manual_review / totalRecords) * 100).toFixed(1) : 0}%)</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-yellow-500 h-3 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${(analytics.total_manual_review / totalRecords) * 100}%`
-                  }}
-                ></div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-gray-200">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="font-semibold text-gray-800">Total Matched</span>
-                <span className="font-bold text-purple-600">{totalMatched} ({totalRecords > 0 ? ((totalMatched / totalRecords) * 100).toFixed(1) : 0}%)</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-purple-600 h-3 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${(totalMatched / totalRecords) * 100}%`
-                  }}
-                ></div>
-              </div>
-            </div>
-          </div>
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={data.district_breakdown} layout="vertical"
+                  margin={{ left: 130, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={125} />
+                  <Tooltip content={<CustomTooltip />} formatter={(v) => [`${v}%`, 'Rate']} />
+                  <Bar dataKey="rate" name="Rate" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
+          ) : <p className="text-gray-400 text-center py-8">No district/branch data — approve records first</p>}
         </div>
+      )}
 
-        {/* Statistics Summary */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h5 className="text-xl font-semibold text-gray-900 mb-6">Statistics Summary</h5>
-          <div className="space-y-4">
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Total Reconciliations</span>
-                <span className="text-2xl font-bold text-purple-600">{analytics.total_reconciliations}</span>
+      {/* ── Division/Department Tab ───────────────────────────────────────── */}
+      {activeTab === 'division' && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+            <FiBarChart2 className="text-[#8E288D]" /> Division / Department Performance
+          </h3>
+          {data.department_breakdown?.length ? (
+            <>
+              <div className="mb-6">
+                {data.department_breakdown.map(d => (
+                  <HBar key={d.name} name={d.name} rate={d.rate}
+                    reconciled={d.reconciled} total={d.total} color={COLORS.ai_matched} />
+                ))}
               </div>
-            </div>
-            
-            <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Average Match Rate</span>
-                <span className="text-2xl font-bold text-green-600">{analytics.average_match_rate}%</span>
-              </div>
-            </div>
-            
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Total Records Processed</span>
-                <span className="text-2xl font-bold text-blue-600">{analytics.total_customer_records}</span>
-              </div>
-            </div>
-            
-            <div className="p-4 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Total Internal Records</span>
-                <span className="text-2xl font-bold text-teal-600">{analytics.total_internal_records}</span>
-              </div>
-            </div>
-            
-            <div className="p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Manual Reviews Needed</span>
-                <span className="text-2xl font-bold text-yellow-600">{analytics.total_manual_review}</span>
-              </div>
-            </div>
-          </div>
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={data.department_breakdown}
+                  margin={{ top: 10, right: 30, left: 20, bottom: 80 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-35}
+                    textAnchor="end" interval={0} />
+                  <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 11 }} />
+                  <Tooltip content={<CustomTooltip />} formatter={(v) => [`${v}%`, 'Rate']} />
+                  <Bar dataKey="rate" name="Rate" fill={COLORS.ai_matched} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
+          ) : <p className="text-gray-400 text-center py-8">No department data — approve records first</p>}
         </div>
-      </div>
+      )}
+
+      {/* ── Monthly Tab ───────────────────────────────────────────────────── */}
+      {activeTab === 'monthly' && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+            <FiTrendingUp className="text-[#8E288D]" /> Monthly Reconciliation Progress
+          </h3>
+          {data.monthly_trend?.length ? (
+            <ResponsiveContainer width="100%" height={360}>
+              <LineChart data={data.monthly_trend}
+                margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis yAxisId="left"  tick={{ fontSize: 11 }} />
+                <YAxis yAxisId="right" orientation="right" domain={[0, 100]}
+                  unit="%" tick={{ fontSize: 11 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend wrapperStyle={{ fontSize: '13px' }} />
+                <Line yAxisId="left"  type="monotone" dataKey="total"
+                  name="Total Records" stroke="#9ca3af" strokeWidth={2} dot={true} />
+                <Line yAxisId="left"  type="monotone" dataKey="matched"
+                  name="Matched" stroke={COLORS.matched} strokeWidth={2} dot={true} />
+                <Line yAxisId="right" type="monotone" dataKey="rate"
+                  name="Rate (%)" stroke={COLORS.ai_matched} strokeWidth={2}
+                  strokeDasharray="5 5" dot={true} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : <p className="text-gray-400 text-center py-8">No monthly data available yet</p>}
+        </div>
+      )}
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-toastify'
 import { FiActivity } from 'react-icons/fi'
-import iconImage from '../assets/AR.png'
+import iconImage from '../assets/AR.PNG'
 const Register = () => {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')

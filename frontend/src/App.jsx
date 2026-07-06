@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard'
 import Upload from './pages/Upload'
 import Results from './pages/Results'
 import Analytics from './pages/Analytics'
+import ReconciliationReport from './pages/ReconciliationReport'
 import UserManagement from './pages/UserManagement'
 import AuditTrail from './pages/AuditTrail'
 import ApprovalPage from './pages/ApprovalPage'
@@ -81,6 +82,7 @@ function App() {
             <Route path="upload" element={<Upload />} />
             <Route path="results/:id" element={<Results />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="report/:id" element={<ReconciliationReport />} />
             
             {/* Approval — all logged-in users can view; approval actions gated inside component */}
             <Route path="approval/:id" element={
