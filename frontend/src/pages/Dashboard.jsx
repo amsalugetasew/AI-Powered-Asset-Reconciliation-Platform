@@ -85,18 +85,16 @@ const Dashboard = () => {
   const handleDownload = async (id) => {
     try {
       logActivity(window.location.pathname, `DOWNLOAD_REPORT_ID_${id}`)
-      const response = await axios.get(`/api/reconciliation/download/${id}`, {
+      const response = await axios.get(`/api/reconciliation/download-enriched/${id}`, {
         responseType: 'blob'
       })
-      
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
       link.href = url
-      link.setAttribute('download', `reconciliation_report_${id}.xlsx`)
+      link.setAttribute('download', `reconciliation_enriched_${id}.xlsx`)
       document.body.appendChild(link)
       link.click()
       link.remove()
-      
       toast.success('Report downloaded successfully')
     } catch (error) {
       toast.error('Failed to download report')

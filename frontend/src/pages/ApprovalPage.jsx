@@ -53,16 +53,16 @@ const BULK_OPTIONS_UNMATCHED = [
 
 // ── Paired column definitions ─────────────────────────────────────────────────
 const COLUMN_PAIRS = [
-  { label: 'Old Tag',     cKey: 'customer_old_tag',     iKey: 'internal_old_tag'     },
-  { label: 'New Tag',     cKey: 'customer_new_tag',     iKey: 'internal_new_tag'     },
-  { label: 'Year',        cKey: 'customer_year',        iKey: 'internal_year'        },
-  { label: 'Category',    cKey: 'customer_category',    iKey: 'internal_category'    },
-  { label: 'Description', cKey: 'customer_description', iKey: 'internal_description' },
-  { label: 'Department',  cKey: 'customer_department',  iKey: 'internal_department'  },
-  { label: 'District',    cKey: 'customer_district',    iKey: 'internal_district'    },
-  { label: 'Book Value',  cKey: 'customer_book_value',  iKey: 'internal_book_value'  },
-  { label: 'Asset No.',   cKey: 'customer_asset_no',    iKey: 'internal_asset_no'    },
-  { label: 'Serial No.',  cKey: 'customer_serial',      iKey: 'internal_serial'      },
+  { label: 'Old Tag',     cKey: 'customer_old_tag',     iKey: 'internal_old_tag',     expandable: false },
+  { label: 'New Tag',     cKey: 'customer_new_tag',     iKey: 'internal_new_tag',     expandable: false },
+  { label: 'Year',        cKey: 'customer_year',        iKey: 'internal_year',        expandable: false },
+  { label: 'Category',    cKey: 'customer_category',    iKey: 'internal_category',    expandable: true  },
+  { label: 'Description', cKey: 'customer_description', iKey: 'internal_description', expandable: true  },
+  { label: 'Department',  cKey: 'customer_department',  iKey: 'internal_department',  expandable: true  },
+  { label: 'District',    cKey: 'customer_district',    iKey: 'internal_district',    expandable: true  },
+  { label: 'Book Value',  cKey: 'customer_book_value',  iKey: 'internal_book_value',  expandable: false },
+  { label: 'Asset No.',   cKey: 'customer_asset_no',    iKey: 'internal_asset_no',    expandable: false },
+  { label: 'Serial No.',  cKey: 'customer_serial',      iKey: 'internal_serial',      expandable: false },
 ]
 
 // ── Status Badge ─────────────────────────────────────────────────────────────
@@ -178,7 +178,11 @@ const ApprovalPage = () => {
   const [page, setPage]                         = useState(1)
   const [totalPages, setTotalPages]             = useState(1)
   const [totalRecords, setTotalRecords]         = useState(0)
+  const [expandedCols, setExpandedCols]         = useState({}) // { [colLabel]: true }
   const PER_PAGE = 10
+
+  const toggleCol = (label) =>
+    setExpandedCols(prev => ({ ...prev, [label]: !prev[label] }))
 
   // ── fetch header ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -396,12 +400,24 @@ const ApprovalPage = () => {
                 </th>
                 {COLUMN_PAIRS.map(p => (
                   <th key={p.label} colSpan={2}
-                    className="px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 whitespace-nowrap">
+                    onClick={p.expandable ? () => toggleCol(p.label) : undefined}
+                    className={`px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 whitespace-nowrap
+                      ${p.expandable ? 'cursor-pointer select-none hover:bg-yellow-100' : ''}
+                      ${expandedCols[p.label] ? 'bg-yellow-50' : ''}`}
+                    title={p.expandable ? (expandedCols[p.label] ? 'Click to collapse' : 'Click to expand') : undefined}>
                     {p.label}
+                    {p.expandable && (
+                      <span className="ml-1 text-gray-400 text-xs">
+                        {expandedCols[p.label] ? '⇤' : '⇥'}
+                      </span>
+                    )}
                   </th>
                 ))}
                 <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Match</th>
                 <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Conf.</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300 bg-amber-50 text-amber-700">
+                  Dept. Reconcile
+                </th>
                 <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">
                   Approval Status
                 </th>
@@ -429,7 +445,7 @@ const ApprovalPage = () => {
             <tbody className="divide-y divide-gray-100">
               {recordsLoading ? (
                 <tr>
-                  <td colSpan={2 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
+                  <td colSpan={3 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
                     className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center">
                       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#8E288D] mb-3" />
@@ -439,7 +455,7 @@ const ApprovalPage = () => {
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={2 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
+                  <td colSpan={3 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
                     className="px-4 py-12 text-center text-gray-400">
                     <FiAlertCircle className="mx-auto h-10 w-10 mb-2" />
                     <p>No records found for this filter</p>
@@ -464,23 +480,48 @@ const ApprovalPage = () => {
                   </td>
 
                   {/* Paired data columns */}
-                  {COLUMN_PAIRS.map(p => (
-                    <React.Fragment key={p.label}>
-                      <td className="px-3 py-2 text-xs text-gray-800 bg-purple-50/30 border-r border-gray-100 max-w-[180px]">
-                        <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-gray-800 bg-teal-50/30 border-r border-gray-200 max-w-[180px]">
-                        <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>
-                      </td>
-                    </React.Fragment>
-                  ))}
+                  {COLUMN_PAIRS.map(p => {
+                    const isExpanded = expandedCols[p.label]
+                    const cellCls = isExpanded
+                      ? 'px-3 py-2 text-xs text-gray-800 border-r border-gray-200 min-w-[200px] max-w-[400px] whitespace-normal break-words'
+                      : 'px-3 py-2 text-xs text-gray-800 border-r border-gray-100 max-w-[140px] whitespace-nowrap overflow-hidden'
+                    return (
+                      <React.Fragment key={p.label}>
+                        <td className={`${cellCls} bg-purple-50/30`}>
+                          {isExpanded
+                            ? <span>{rec[p.cKey]}</span>
+                            : <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>
+                          }
+                        </td>
+                        <td className={`${cellCls} bg-teal-50/30 border-r border-gray-200`}>
+                          {isExpanded
+                            ? <span>{rec[p.iKey]}</span>
+                            : <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>
+                          }
+                        </td>
+                      </React.Fragment>
+                    )
+                  })}
 
                   {/* Match method */}
                   <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap border-r border-gray-200">{rec.match_method}</td>
                   {/* Confidence */}
                   <td className="px-3 py-2 text-xs font-medium text-gray-800 whitespace-nowrap border-r border-gray-200">{rec.confidence}</td>
 
-                  {/* Approval status — clickable dropdown for managers, badge only for officers */}
+                  {/* Dept Reconcile */}
+                  <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200 bg-amber-50/40">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
+                      rec.dept_reconcile === 'Same'                     ? 'bg-green-100 text-green-800'   :
+                      rec.dept_reconcile === 'Same Dept, Diff District' ? 'bg-blue-100 text-blue-800'     :
+                      rec.dept_reconcile === 'Diff Dept, Same District' ? 'bg-orange-100 text-orange-800' :
+                      rec.dept_reconcile === 'Different'                ? 'bg-red-100 text-red-700'       :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {rec.dept_reconcile || 'N/A'}
+                    </span>
+                  </td>
+
+                  {/* Approval status */}
                   <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200">
                     {canApprove ? (
                       <StatusDropdown

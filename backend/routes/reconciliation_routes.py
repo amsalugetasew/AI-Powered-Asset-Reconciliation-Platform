@@ -316,67 +316,339 @@ def download_report(reconciliation_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@reconciliation_bp.route('/download-enriched/<int:reconciliation_id>', methods=['GET'])
+@jwt_required()
+def download_enriched_report(reconciliation_id):
+    """
+    Download enriched reconciliation report with Approval Status and Dept. Reconcile columns.
+    Reads records from DB (which have approval_status), rebuilds the Excel with extra columns.
+    """
+    import io
+    try:
+        user_id = int(get_jwt_identity())
+        user_role = get_user_role()
+
+        reconciliation = Reconciliation.query.get(reconciliation_id)
+        if not reconciliation:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+
+        if user_role == 'officer' and reconciliation.user_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+
+        if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
+            return jsonify({'error': 'Original report not found'}), 404
+
+        # ── Approval label map ────────────────────────────────────────────────
+        APPROVAL_LABELS = {
+            'pending':                    'Pending',
+            'reconciled':                'Reconciled',
+            'unreconciled':              'Unreconciled',
+            'surplus_assets':            'Surplus Assets',
+            'exist_in_physical_not_erp': 'Exist in Physical not ERP',
+            'exist_in_erp_not_physical': 'Exist in ERP not Physical',
+        }
+
+        # ── Dept Reconcile helper ─────────────────────────────────────────────
+        def _norm(val):
+            if not val or str(val).strip() in ('', 'nan', 'None'):
+                return None
+            return str(val).strip().upper()
+
+        def _dept_reconcile(c_dept, i_dept, c_dist, i_dist):
+            dept_same  = bool(_norm(c_dept) and _norm(i_dept) and _norm(c_dept) == _norm(i_dept))
+            dist_same  = bool(_norm(c_dist) and _norm(i_dist) and _norm(c_dist) == _norm(i_dist))
+            dept_avail = bool(_norm(c_dept) and _norm(i_dept))
+            dist_avail = bool(_norm(c_dist) and _norm(i_dist))
+            if not dept_avail and not dist_avail:
+                return 'N/A'
+            if dept_avail and dist_avail:
+                if dept_same and dist_same:       return 'Same'
+                if dept_same and not dist_same:   return 'Same Dept, Diff District'
+                if not dept_same and dist_same:   return 'Diff Dept, Same District'
+                return 'Different'
+            if dept_avail:
+                return 'Same' if dept_same else 'Different'
+            return 'Same' if dist_same else 'Different'
+
+        # ── Build approval lookup from DB ─────────────────────────────────────
+        db_records = ReconciliationRecord.query.filter_by(
+            reconciliation_id=reconciliation_id
+        ).all()
+
+        # key: (match_category, row_index_in_category)
+        # We'll map by sequential index per category sheet
+        approval_by_category = {}   # { match_category: [rec, rec, ...] ordered by id }
+        for rec in sorted(db_records, key=lambda r: r.id):
+            approval_by_category.setdefault(rec.match_category, []).append(rec)
+
+        # ── Read original Excel and add columns sheet by sheet ────────────────
+        sheet_to_category = {
+            'Exact_Matched_By_Tag':          'Exact Match',
+            'AI_Matched_Need_Manual_Review':  'AI Match',
+            'Matched_Need_Manual_Review':     'Manual Review',
+            'Customer_Unmatched':            'Customer Unmatched',
+            'Finance_Unmatched':             'Finance Unmatched',
+            'Customer_Duplicates':           'Duplicate',
+            'Finance_Duplicates':            'Duplicate',
+        }
+
+        excel_file = pd.ExcelFile(reconciliation.report_path)
+        output_buf = io.BytesIO()
+
+        with pd.ExcelWriter(output_buf, engine='openpyxl') as writer:
+            for sheet_name in excel_file.sheet_names:
+                df = pd.read_excel(excel_file, sheet_name=sheet_name)
+
+                category = sheet_to_category.get(sheet_name)
+                if category and not (len(df.columns) == 1 and 'Message' in df.columns):
+                    recs = approval_by_category.get(category, [])
+
+                    approval_col    = []
+                    dept_rec_col    = []
+
+                    for i, row in df.iterrows():
+                        db_rec = recs[i] if i < len(recs) else None
+                        json_data = db_rec.full_record_json or {} if db_rec else {}
+
+                        # Approval label
+                        status = db_rec.approval_status if db_rec else 'pending'
+                        approval_col.append(APPROVAL_LABELS.get(status or 'pending', 'Pending'))
+
+                        # Dept reconcile — pick fields from json or df columns
+                        def _pick(keys):
+                            for k in keys:
+                                v = json_data.get(k) or (row.get(k) if k in df.columns else None)
+                                if v and str(v).strip() not in ('', 'nan', 'None'):
+                                    return str(v).strip()
+                            return None
+
+                        c_dept = _pick(['customer_department', 'department'])
+                        i_dept = _pick(['internal_department'])
+                        c_dist = _pick(['customer_district', 'district'])
+                        i_dist = _pick(['internal_district'])
+
+                        dept_rec_col.append(_dept_reconcile(c_dept, i_dept, c_dist, i_dist))
+
+                    df.insert(len(df.columns), 'Approval Status', approval_col)
+                    df.insert(len(df.columns), 'Dept. Reconcile',  dept_rec_col)
+
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+        output_buf.seek(0)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename  = f'reconciliation_enriched_{reconciliation_id}_{timestamp}.xlsx'
+
+        return send_file(
+            output_buf,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @reconciliation_bp.route('/analytics', methods=['GET'])
 @jwt_required()
 def get_analytics():
     """
-    Get analytics based on user role.
-    
-    Officers: Analytics for their own reconciliations only
-    Managers/Admins: System-wide analytics
+    Enriched analytics: KPIs, approval breakdown, category/branch/division/monthly trends.
+    Derived from ReconciliationRecord approval_status + full_record_json fields.
     """
     try:
-        user_id = int(get_jwt_identity())  # Convert to int
+        from sqlalchemy import func, extract
+        user_id   = int(get_jwt_identity())
         user_role = get_user_role()
-        
-        # Role-based filtering
+
+        # ── scope filter ───────────────────────────────────────────────────────
         if user_role in ['manager', 'admin']:
-            # Managers and admins see system-wide analytics
             reconciliations = Reconciliation.query.filter_by(status='completed').all()
+            recon_ids = [r.id for r in reconciliations]
             scope = 'all'
         else:
-            # Officers see only their own
             reconciliations = Reconciliation.query.filter_by(
-                user_id=user_id,
-                status='completed'
-            ).all()
+                user_id=user_id, status='completed').all()
+            recon_ids = [r.id for r in reconciliations]
             scope = 'own'
-        
+
         if not reconciliations:
             return jsonify({
                 'total_reconciliations': 0,
-                'total_records_processed': 0,
-                'total_matches': 0,
-                'average_match_rate': 0,
-                'scope': scope,
-                'role': user_role
+                'total_customer_records': 0, 'total_internal_records': 0,
+                'total_rule_matched': 0, 'total_ai_matched': 0,
+                'total_manual_review': 0, 'average_match_rate': 0,
+                'approval_kpis': {}, 'category_breakdown': [],
+                'department_breakdown': [], 'district_breakdown': [],
+                'monthly_trend': [], 'scope': scope, 'role': user_role
             }), 200
-        
-        # Calculate aggregate statistics
-        total_customer = sum(r.total_customer_records for r in reconciliations)
-        total_internal = sum(r.total_internal_records for r in reconciliations)
-        total_rule_matched = sum(r.rule_matched for r in reconciliations)
-        total_ai_matched = sum(r.ai_matched for r in reconciliations)
-        total_manual = sum(r.manual_review for r in reconciliations)
-        
-        total_matches = total_rule_matched + total_ai_matched
-        avg_match_rate = (total_matches / total_customer * 100) if total_customer > 0 else 0
-        
-        analytics = {
-            'total_reconciliations': len(reconciliations),
+
+        # ── base job stats ─────────────────────────────────────────────────────
+        total_customer    = sum(r.total_customer_records for r in reconciliations)
+        total_internal    = sum(r.total_internal_records  for r in reconciliations)
+        total_rule        = sum(r.rule_matched    for r in reconciliations)
+        total_ai          = sum(r.ai_matched      for r in reconciliations)
+        total_manual      = sum(r.manual_review   for r in reconciliations)
+        total_unmatched   = sum(r.customer_unmatched for r in reconciliations)
+        total_matched     = total_rule + total_ai
+        avg_rate          = round(total_matched / total_customer * 100, 2) if total_customer else 0
+
+        # ── approval KPIs from ReconciliationRecord ────────────────────────────
+        STATUS_COUNTS = db.session.query(
+            ReconciliationRecord.approval_status,
+            func.count(ReconciliationRecord.id)
+        ).filter(
+            ReconciliationRecord.reconciliation_id.in_(recon_ids)
+        ).group_by(ReconciliationRecord.approval_status).all()
+
+        approval_counts = {s: 0 for s in [
+            'pending','reconciled','unreconciled','surplus_assets',
+            'exist_in_physical_not_erp','exist_in_erp_not_physical'
+        ]}
+        for status, cnt in STATUS_COUNTS:
+            key = status or 'pending'
+            approval_counts[key] = approval_counts.get(key, 0) + cnt
+
+        total_records_in_db = sum(approval_counts.values())
+        recon_rate = round(
+            approval_counts['reconciled'] / total_records_in_db * 100, 2
+        ) if total_records_in_db else 0
+
+        approval_kpis = {
+            'total_erp_assets':     total_internal,
+            'physical_count':       total_customer,
+            'reconciled':           approval_counts['reconciled'],
+            'reconciliation_rate':  recon_rate,
+            'unreconciled':         approval_counts['unreconciled'],
+            'surplus_assets':       approval_counts['surplus_assets'],
+            'exist_physical_not_erp': approval_counts['exist_in_physical_not_erp'],
+            'exist_erp_not_physical': approval_counts['exist_in_erp_not_physical'],
+            'pending':              approval_counts['pending'],
+        }
+
+        # ── helpers to extract field from json ─────────────────────────────────
+        def _pick(json_data, *keys):
+            for k in keys:
+                v = json_data.get(k)
+                if v and str(v).strip() not in ('', 'nan', 'None'):
+                    return str(v).strip()
+            return None
+
+        # ── load all records for breakdown analyses ────────────────────────────
+        all_records = ReconciliationRecord.query.filter(
+            ReconciliationRecord.reconciliation_id.in_(recon_ids)
+        ).all()
+
+        # ── category breakdown ─────────────────────────────────────────────────
+        cat_stats = {}
+        for rec in all_records:
+            j = rec.full_record_json or {}
+            cat = (_pick(j, 'customer_category', 'internal_category', 'category') or
+                   rec.match_category or 'Unknown')
+            if cat not in cat_stats:
+                cat_stats[cat] = {'total': 0, 'reconciled': 0}
+            cat_stats[cat]['total'] += 1
+            if rec.approval_status == 'reconciled':
+                cat_stats[cat]['reconciled'] += 1
+
+        category_breakdown = sorted([
+            {
+                'name':        k,
+                'total':       v['total'],
+                'reconciled':  v['reconciled'],
+                'rate':        round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+            }
+            for k, v in cat_stats.items() if k not in ('Unknown',)
+        ], key=lambda x: -x['rate'])[:15]
+
+        # ── department breakdown ───────────────────────────────────────────────
+        dept_stats = {}
+        for rec in all_records:
+            j = rec.full_record_json or {}
+            dept = _pick(j, 'customer_department', 'internal_department', 'department') or 'Unknown'
+            if dept == 'Unknown': continue
+            if dept not in dept_stats:
+                dept_stats[dept] = {'total': 0, 'reconciled': 0}
+            dept_stats[dept]['total'] += 1
+            if rec.approval_status == 'reconciled':
+                dept_stats[dept]['reconciled'] += 1
+
+        department_breakdown = sorted([
+            {
+                'name':       k,
+                'total':      v['total'],
+                'reconciled': v['reconciled'],
+                'rate':       round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+            }
+            for k, v in dept_stats.items()
+        ], key=lambda x: -x['rate'])[:15]
+
+        # ── district/branch breakdown ──────────────────────────────────────────
+        dist_stats = {}
+        for rec in all_records:
+            j = rec.full_record_json or {}
+            dist = _pick(j, 'customer_district', 'internal_district', 'district') or 'Unknown'
+            if dist == 'Unknown': continue
+            if dist not in dist_stats:
+                dist_stats[dist] = {'total': 0, 'reconciled': 0}
+            dist_stats[dist]['total'] += 1
+            if rec.approval_status == 'reconciled':
+                dist_stats[dist]['reconciled'] += 1
+
+        district_breakdown = sorted([
+            {
+                'name':       k,
+                'total':      v['total'],
+                'reconciled': v['reconciled'],
+                'rate':       round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+            }
+            for k, v in dist_stats.items()
+        ], key=lambda x: -x['rate'])[:15]
+
+        # ── monthly trend (by reconciliation completion date) ──────────────────
+        monthly = {}
+        for r in reconciliations:
+            if not r.completed_at:
+                continue
+            key = r.completed_at.strftime('%Y-%m')
+            if key not in monthly:
+                monthly[key] = {
+                    'month': r.completed_at.strftime('%b %Y'),
+                    'total': 0, 'matched': 0
+                }
+            monthly[key]['total']   += r.total_customer_records
+            monthly[key]['matched'] += r.rule_matched + r.ai_matched
+
+        monthly_trend = sorted([
+            {
+                'month':   v['month'],
+                'total':   v['total'],
+                'matched': v['matched'],
+                'rate':    round(v['matched'] / v['total'] * 100, 1) if v['total'] else 0
+            }
+            for v in monthly.values()
+        ], key=lambda x: x['month'])[-12:]
+
+        return jsonify({
+            'total_reconciliations':  len(reconciliations),
             'total_customer_records': total_customer,
             'total_internal_records': total_internal,
-            'total_rule_matched': total_rule_matched,
-            'total_ai_matched': total_ai_matched,
-            'total_manual_review': total_manual,
-            'average_match_rate': round(avg_match_rate, 2),
-            'scope': scope,
-            'role': user_role
-        }
-        
-        return jsonify(analytics), 200
-        
+            'total_rule_matched':     total_rule,
+            'total_ai_matched':       total_ai,
+            'total_manual_review':    total_manual,
+            'average_match_rate':     avg_rate,
+            'approval_kpis':          approval_kpis,
+            'category_breakdown':     category_breakdown,
+            'department_breakdown':   department_breakdown,
+            'district_breakdown':     district_breakdown,
+            'monthly_trend':          monthly_trend,
+            'scope': scope, 'role': user_role
+        }), 200
+
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @reconciliation_bp.route('/<int:reconciliation_id>/approve', methods=['POST'])
@@ -1072,6 +1344,38 @@ def get_records(reconciliation_id):
             except (ValueError, TypeError):
                 confidence_str = str(confidence_val) if confidence_val else '—'
 
+            # ── department + district reconciliation flag ──────────────────────
+            def _normalize(val):
+                if not val or str(val).strip() in ('', '—', 'nan', 'None'):
+                    return None
+                return str(val).strip().upper()
+
+            c_dept_norm = _normalize(c_department)
+            i_dept_norm = _normalize(i_department)
+            c_dist_norm = _normalize(c_district)
+            i_dist_norm = _normalize(i_district)
+
+            dept_same = (c_dept_norm and i_dept_norm and c_dept_norm == i_dept_norm)
+            dist_same = (c_dist_norm and i_dist_norm and c_dist_norm == i_dist_norm)
+            dept_avail = bool(c_dept_norm and i_dept_norm)
+            dist_avail = bool(c_dist_norm and i_dist_norm)
+
+            if not dept_avail and not dist_avail:
+                dept_reconcile = 'N/A'
+            elif dept_avail and dist_avail:
+                if dept_same and dist_same:
+                    dept_reconcile = 'Same'
+                elif dept_same and not dist_same:
+                    dept_reconcile = 'Same Dept, Diff District'
+                elif not dept_same and dist_same:
+                    dept_reconcile = 'Diff Dept, Same District'
+                else:
+                    dept_reconcile = 'Different'
+            elif dept_avail:
+                dept_reconcile = 'Same' if dept_same else 'Different'
+            else:
+                dept_reconcile = 'Same' if dist_same else 'Different'
+
             records.append({
                 'id': record.id,
                 'category': record.match_category,
@@ -1097,6 +1401,8 @@ def get_records(reconciliation_id):
                 'internal_district':   i_district   or '—',
                 'internal_book_value': i_book_value or '—',
                 'internal_asset_no':   i_asset_no   or '—',
+                # Dept reconcile flag
+                'dept_reconcile': dept_reconcile,
                 # Match metadata
                 'match_method':  match_method,
                 'confidence':    confidence_str,

@@ -9,16 +9,16 @@ import { useAuth } from '../context/AuthContext'
 
 // ── Paired column definitions (mirrored from ApprovalPage) ────────────────────
 const RESULT_COLUMN_PAIRS = [
-  { label: 'Old Tag',     cKey: 'customer_old_tag',     iKey: 'internal_old_tag'     },
-  { label: 'New Tag',     cKey: 'customer_new_tag',     iKey: 'internal_new_tag'     },
-  { label: 'Year',        cKey: 'customer_year',        iKey: 'internal_year'        },
-  { label: 'Category',    cKey: 'customer_category',    iKey: 'internal_category'    },
-  { label: 'Description', cKey: 'customer_description', iKey: 'internal_description' },
-  { label: 'Department',  cKey: 'customer_department',  iKey: 'internal_department'  },
-  { label: 'District',    cKey: 'customer_district',    iKey: 'internal_district'    },
-  { label: 'Book Value',  cKey: 'customer_book_value',  iKey: 'internal_book_value'  },
-  { label: 'Asset No.',   cKey: 'customer_asset_no',    iKey: 'internal_asset_no'    },
-  { label: 'Serial No.',  cKey: 'customer_serial',      iKey: 'internal_serial'      },
+  { label: 'Old Tag',     cKey: 'customer_old_tag',     iKey: 'internal_old_tag',     expandable: false },
+  { label: 'New Tag',     cKey: 'customer_new_tag',     iKey: 'internal_new_tag',     expandable: false },
+  { label: 'Year',        cKey: 'customer_year',        iKey: 'internal_year',        expandable: false },
+  { label: 'Category',    cKey: 'customer_category',    iKey: 'internal_category',    expandable: true  },
+  { label: 'Description', cKey: 'customer_description', iKey: 'internal_description', expandable: true  },
+  { label: 'Department',  cKey: 'customer_department',  iKey: 'internal_department',  expandable: true  },
+  { label: 'District',    cKey: 'customer_district',    iKey: 'internal_district',    expandable: true  },
+  { label: 'Book Value',  cKey: 'customer_book_value',  iKey: 'internal_book_value',  expandable: false },
+  { label: 'Asset No.',   cKey: 'customer_asset_no',    iKey: 'internal_asset_no',    expandable: false },
+  { label: 'Serial No.',  cKey: 'customer_serial',      iKey: 'internal_serial',      expandable: false },
 ]
 
 const APPROVAL_BADGE_CLS = {
@@ -53,6 +53,10 @@ const Results = () => {
   const [totalRecords, setTotalRecords] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [recordsStored, setRecordsStored] = useState(false)
+  const [expandedCols, setExpandedCols] = useState({})
+
+  const toggleCol = (label) =>
+    setExpandedCols(prev => ({ ...prev, [label]: !prev[label] }))
 
   useEffect(() => {
     fetchReconciliation()
@@ -116,19 +120,17 @@ const Results = () => {
   const handleDownload = async () => {
     try {
       logActivity(window.location.pathname, `DOWNLOAD_REPORT_ID_${id}`)
-      const response = await axios.get(`/api/reconciliation/download/${id}`, {
+      const response = await axios.get(`/api/reconciliation/download-enriched/${id}`, {
         responseType: 'blob'
       })
-      
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
       link.href = url
-      link.setAttribute('download', `reconciliation_report_${id}.xlsx`)
+      link.setAttribute('download', `reconciliation_enriched_${id}.xlsx`)
       document.body.appendChild(link)
       link.click()
       link.remove()
-      
-      toast.success('Report downloaded successfully')
+      toast.success('Enriched report downloaded successfully')
     } catch (error) {
       toast.error('Failed to download report')
     }
@@ -289,12 +291,22 @@ const Results = () => {
                 </th>
                 {RESULT_COLUMN_PAIRS.map(p => (
                   <th key={p.label} colSpan={2}
-                    className="px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 whitespace-nowrap">
+                    onClick={p.expandable ? () => toggleCol(p.label) : undefined}
+                    className={`px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 whitespace-nowrap
+                      ${p.expandable ? 'cursor-pointer select-none hover:bg-yellow-100' : ''}
+                      ${expandedCols[p.label] ? 'bg-yellow-50' : ''}`}
+                    title={p.expandable ? (expandedCols[p.label] ? 'Click to collapse' : 'Click to expand') : undefined}>
                     {p.label}
+                    {p.expandable && (
+                      <span className="ml-1 text-gray-400 text-xs">
+                        {expandedCols[p.label] ? '⇤' : '⇥'}
+                      </span>
+                    )}
                   </th>
                 ))}
                 <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Match</th>
                 <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Conf.</th>
+                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-amber-700 uppercase whitespace-nowrap border-r border-gray-300 bg-amber-50">Dept. Reconcile</th>
                 <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">Approval</th>
               </tr>
               {/* Row 2 — Customer / Finance */}
@@ -310,14 +322,14 @@ const Results = () => {
             <tbody className="divide-y divide-gray-100">
               {recordsLoading ? (
                 <tr>
-                  <td colSpan={2 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center">
+                  <td colSpan={3 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center">
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#8E288D] mx-auto mb-3" />
                     <p className="text-gray-500">Loading records…</p>
                   </td>
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={2 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center text-gray-400">
+                  <td colSpan={3 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center text-gray-400">
                     <FiDatabase className="mx-auto h-10 w-10 mb-2" />
                     <p>No records found</p>
                   </td>
@@ -336,20 +348,44 @@ const Results = () => {
                     }`}>{rec.category}</span>
                   </td>
                   {/* Paired columns */}
-                  {RESULT_COLUMN_PAIRS.map(p => (
-                    <React.Fragment key={p.label}>
-                      <td className="px-3 py-2 text-xs text-gray-800 bg-purple-50/30 border-r border-gray-100 max-w-[180px]">
-                        <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-gray-800 bg-teal-50/30 border-r border-gray-200 max-w-[180px]">
-                        <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>
-                      </td>
-                    </React.Fragment>
-                  ))}
+                  {RESULT_COLUMN_PAIRS.map(p => {
+                    const isExpanded = expandedCols[p.label]
+                    const cellCls = isExpanded
+                      ? 'px-3 py-2 text-xs text-gray-800 border-r border-gray-100 min-w-[200px] max-w-[400px] whitespace-normal break-words'
+                      : 'px-3 py-2 text-xs text-gray-800 border-r border-gray-100 max-w-[140px] whitespace-nowrap overflow-hidden'
+                    return (
+                      <React.Fragment key={p.label}>
+                        <td className={`${cellCls} bg-purple-50/30`}>
+                          {isExpanded
+                            ? <span>{rec[p.cKey]}</span>
+                            : <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>
+                          }
+                        </td>
+                        <td className={`${cellCls} bg-teal-50/30 border-r border-gray-200`}>
+                          {isExpanded
+                            ? <span>{rec[p.iKey]}</span>
+                            : <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>
+                          }
+                        </td>
+                      </React.Fragment>
+                    )
+                  })}
                   {/* Match */}
                   <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap border-r border-gray-200">{rec.match_method}</td>
                   {/* Confidence */}
                   <td className="px-3 py-2 text-xs font-medium text-gray-800 whitespace-nowrap border-r border-gray-200">{rec.confidence}</td>
+                  {/* Dept Reconcile */}
+                  <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200 bg-amber-50/40">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
+                      rec.dept_reconcile === 'Same'                     ? 'bg-green-100 text-green-800'   :
+                      rec.dept_reconcile === 'Same Dept, Diff District' ? 'bg-blue-100 text-blue-800'     :
+                      rec.dept_reconcile === 'Diff Dept, Same District' ? 'bg-orange-100 text-orange-800' :
+                      rec.dept_reconcile === 'Different'                ? 'bg-red-100 text-red-700'       :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {rec.dept_reconcile || 'N/A'}
+                    </span>
+                  </td>
                   {/* Approval status badge */}
                   <td className="px-3 py-2 whitespace-nowrap">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${APPROVAL_BADGE_CLS[rec.approval_status] || APPROVAL_BADGE_CLS.pending}`}>
