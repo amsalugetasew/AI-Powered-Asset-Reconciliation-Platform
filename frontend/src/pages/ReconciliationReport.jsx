@@ -16,7 +16,7 @@ const fmt  = (n) => n == null ? '—' : Number(n).toLocaleString()
 const pct  = (n) => n == null ? '—' : `${Number(n).toFixed(2)}%`
 
 const APPROVAL_COLORS = {
-  reconciled:               '#10b981',
+  reconciled:               '#8E288D',
   unreconciled:             '#ef4444',
   surplus_assets:           '#f97316',
   exist_in_erp_not_physical:'#8b5cf6',
@@ -132,13 +132,13 @@ const ReconciliationReport = () => {
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
-        <div>
+        <div className='flex'>
           <h1 className="text-2xl font-bold text-gray-900">
-            Reconciliation Report <span className="text-[#8E288D]">#{id}</span>
+            Reconciliation <span className="text-[#8E288D]">#{id}</span>
           </h1>
           <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
-            <span>📁 {recon.customer_file}</span>
-            <span>📁 {recon.internal_file}</span>
+            {/* <span>📁 {recon.customer_file}</span>
+            <span>📁 {recon.internal_file}</span> */}
             <span>🕒 Created: {createdAt}</span>
             {recon.completed_at && <span>✅ Completed: {completedAt}</span>}
           </div>
@@ -149,7 +149,7 @@ const ReconciliationReport = () => {
             View Records
           </button>
           <button onClick={() => navigate(`/approval/${id}`)}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-[#CFB53B] text-white hover:bg-[#CFB53C]">
             Approval
           </button>
         </div>
@@ -240,12 +240,12 @@ const ReconciliationReport = () => {
             <h3 className="text-base font-semibold text-gray-800 mb-4">Match Type Breakdown</h3>
             <div className="space-y-4">
               {[
-                { label: 'Exact Match',          value: kpis.exact_matched,                                           color: '#008080' },
-                { label: 'AI Match',             value: kpis.ai_matched,                                              color: '#8E288D' },
-                { label: 'Near Match',           value: kpis.near_match,                                              color: '#3b82f6' },
+                { label: 'Exact Match',          value: kpis.exact_matched,                                           color: '#8E288D' },
+                { label: 'AI Match',             value: kpis.ai_matched,                                              color: '#7A1E79' },
+                { label: 'Near Match',           value: kpis.near_match,                                              color: '#CFB53B' },
                 { label: 'Unmatched',            value: kpis.customer_unmatched,                                      color: '#ef4444' },
-                { label: 'Cust. Duplicates',     value: kpis.customer_duplicates || 0,                                color: '#ec4899' },
-                { label: 'Finance Duplicates',   value: kpis.internal_duplicates || 0,                                color: '#f97316' },
+                { label: 'Physical Duplicates',     value: kpis.customer_duplicates || 0,                                color: '#ec4899' },
+                { label: 'ERP Duplicates',   value: kpis.internal_duplicates || 0,                                color: '#f97316' },
               ].map(item => {
                 const total = kpis.physical_count || 1
                 const r = ((item.value / total) * 100).toFixed(1)
@@ -268,12 +268,12 @@ const ReconciliationReport = () => {
 
             <div className="mt-5 pt-4 border-t border-gray-100">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Total records in DB</span>
-                <span className="font-bold text-gray-800">{fmt(total_records_in_db)}</span>
+                <span className="text-gray-600">Total records in DB including Duplicats</span>
+                <span className="text-xl font-bold text-[#8E288D]">{fmt(total_records_in_db)}</span>
               </div>
               <div className="flex justify-between text-sm mt-1">
-                <span className="text-gray-600">Reconciliation rate</span>
-                <span className="font-bold text-green-600">{pct(kpis.reconciliation_rate)}</span>
+                <span className="text-[gray-600]">Reconciliation Rate</span>
+                <span className="text-lg font-bold text-[#8E288D]">{pct(kpis.reconciliation_rate)}</span>
               </div>
             </div>
           </div>
@@ -291,7 +291,7 @@ const ReconciliationReport = () => {
               <div className="mb-6">
                 {category_breakdown.map(c => (
                   <HBar key={c.name} name={c.name} rate={c.rate}
-                    reconciled={c.reconciled} total={c.total} color="#008080" />
+                    reconciled={c.reconciled} total={c.total} color="#8E288D" />
                 ))}
               </div>
               <ResponsiveContainer width="100%" height={280}>
@@ -303,7 +303,7 @@ const ReconciliationReport = () => {
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="Reconciled"   stackId="a" fill="#10b981" />
+                  <Bar dataKey="Reconciled"   stackId="a" fill="#8E288D" />
                   <Bar dataKey="Unreconciled" stackId="a" fill="#ef4444" />
                   <Bar dataKey="Surplus"      stackId="a" fill="#f97316" />
                   <Bar dataKey="Pending"      stackId="a" fill="#9ca3af" radius={[4,4,0,0]} />
@@ -341,7 +341,7 @@ const ReconciliationReport = () => {
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="reconciled"   name="Reconciled"   fill="#10b981" stackId="a" />
+                  <Bar dataKey="reconciled"   name="Reconciled"   fill="#8E288D" stackId="a" />
                   <Bar dataKey="unreconciled" name="Unreconciled" fill="#ef4444" stackId="a" />
                   <Bar dataKey="pending"      name="Pending"      fill="#9ca3af" stackId="a" radius={[4,4,0,0]} />
                 </BarChart>
@@ -362,7 +362,7 @@ const ReconciliationReport = () => {
               <div className="mb-6">
                 {district_breakdown.map(d => (
                   <HBar key={d.name} name={d.name} rate={d.rate}
-                    reconciled={d.reconciled} total={d.total} color="#3b82f6" />
+                    reconciled={d.reconciled} total={d.total} color="#8E288D" />
                 ))}
               </div>
               <ResponsiveContainer width="100%" height={300}>
@@ -378,7 +378,7 @@ const ReconciliationReport = () => {
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="reconciled"   name="Reconciled"   fill="#10b981" stackId="a" />
+                  <Bar dataKey="reconciled"   name="Reconciled"   fill="#8E288D" stackId="a" />
                   <Bar dataKey="unreconciled" name="Unreconciled" fill="#ef4444" stackId="a" />
                   <Bar dataKey="pending"      name="Pending"      fill="#9ca3af" stackId="a" radius={[4,4,0,0]} />
                 </BarChart>

@@ -225,7 +225,7 @@ const Results = () => {
       </div>
 
       <div className="sm:flex sm:items-center sm:justify-between">
-        <div>
+        <div className='flex'>
           <h1 className="text-3xl font-semibold  text-gray-900">
             Reconciliation Results #{id}
           </h1>
@@ -252,8 +252,8 @@ const Results = () => {
           <button
             onClick={handleDownload}
             className="inline-flex items-center px-4 py-3 border 
-            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600
-            hover:bg-indigo-700"
+            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#CFB53B]
+            hover:bg-[#CFB53C]"
           >
             <FiDownload className="mr-2" />
             Download

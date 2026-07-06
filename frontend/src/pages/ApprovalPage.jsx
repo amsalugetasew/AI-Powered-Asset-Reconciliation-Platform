@@ -135,7 +135,7 @@ const BulkDropdown = ({ category, onSelect, loading }) => {
 
   const UNMATCHED_SUBCATS = [
     { value: 'Unmatched',          label: 'All Unmatched'       },
-    { value: 'Customer Unmatched', label: 'Customer Unmatched'  },
+    { value: 'Customer Unmatched', label: 'Pysical Unmatched'  },
     { value: 'Finance Unmatched',  label: 'Finance Unmatched'   },
   ]
 
@@ -452,9 +452,9 @@ const ApprovalPage = () => {
             return (
               <div className="border-t border-gray-100 pt-2 grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-purple-50 rounded p-2">
-                  <p className="text-gray-500 font-medium text-center">Customer</p>
-                  <p className="text-xl font-bold text-purple-700 text-center">{custRecRate}%</p>
-                  <p className="text-gray-400 text-center">reconciled</p>
+                  <p className="text-gray-500 font-bold text-center">Physical</p>
+                  <p className="text-xl font-bold text-[#8E288D] text-center">{custRecRate}%</p>
+                  <p className="text-[#8E288D] font-bold text-center">Reconciled</p>
                   <div className="mt-1 space-y-0.5 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Total</span>
@@ -471,9 +471,9 @@ const ApprovalPage = () => {
                   </div>
                 </div>
                 <div className="bg-teal-50 rounded p-2">
-                  <p className="text-gray-500 font-medium text-center">Finance</p>
+                  <p className="text-gray-500 font-bold text-center">ERP</p>
                   <p className="text-xl font-bold text-teal-700 text-center">{finRecRate}%</p>
-                  <p className="text-gray-400 text-center">reconciled</p>
+                  <p className="text-teal-700 font-bold text-center">Reconciled</p>
                   <div className="mt-1 space-y-0.5 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Total</span>
@@ -585,10 +585,10 @@ const ApprovalPage = () => {
               <tr className="bg-gray-50 border-b-2 border-gray-300">
                 {COLUMN_PAIRS.map(p => (
                   <React.Fragment key={p.label}>
-                    <th className="px-3 py-1 text-center text-xs font-medium text-purple-700 bg-purple-50 border-r border-gray-200 whitespace-nowrap">
+                    <th className="px-3 py-1 text-center text-xs font-medium text-black bg-purple-50 border-r border-gray-200 whitespace-nowrap">
                       Physical
                     </th>
-                    <th className="px-3 py-1 text-center text-xs font-medium text-teal-700 bg-teal-50 border-r border-gray-300 whitespace-nowrap">
+                    <th className="px-3 py-1 text-center text-xs font-medium text-[#8E288D] bg-purple-50 border-r border-gray-300 whitespace-nowrap">
                       ERP
                     </th>
                   </React.Fragment>
@@ -750,7 +750,7 @@ const ApprovalPage = () => {
             ? (s.duplicated || 0) + (s.unique || 0)
             : nonPendingCount(s)
           const p = s.total > 0 ? ((done / s.total) * 100).toFixed(0) : 0
-          const barColor = cat.key === 'Duplicate' ? '#ec4899' : '#22c55e'
+          const barColor = cat.key === 'Duplicate' ? '#ec4899' : '#8E288D'
           const border = {
             'Exact Match':   'border-[#8E288D]',
             'AI Match':      'border-[#7A1E79]',
