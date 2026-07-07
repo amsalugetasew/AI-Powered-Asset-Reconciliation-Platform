@@ -142,7 +142,7 @@ const Upload = () => {
         <div className="text-center">
           <h1 className="text-3xl font-semibold text-gray-900">Upload Files</h1>
           <p className="mt-2 text-sm text-gray-700">
-            Upload customer and internal asset Excel files for reconciliation
+            Upload Physical and ERP asset Excel files for reconciliation
           </p>
         </div>
 
@@ -151,7 +151,7 @@ const Upload = () => {
             {/* Customer File Upload */}
             <div className="bg-white shadow rounded-lg p-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Customer Asset File
+                Physical Asset File
               </label>
               {!customerFile ? (
                 <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary-400 transition-colors">
@@ -187,7 +187,7 @@ const Upload = () => {
                   <button
                     type="button"
                     onClick={() => removeFile('customer')}
-                    className="text-red-600 hover:text-red-800"
+                    className="text-pink-500 hover:text-pink-600"
                   >
                     <FiX className="h-5 w-5" />
                   </button>
@@ -198,7 +198,7 @@ const Upload = () => {
             {/* Internal File Upload */}
             <div className="bg-white shadow rounded-lg p-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Finance Asset File
+                ERP Asset File
               </label>
               {!internalFile ? (
                 <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed 
@@ -236,7 +236,7 @@ const Upload = () => {
                   <button
                     type="button"
                     onClick={() => removeFile('internal')}
-                    className="text-red-600 hover:text-red-800"
+                    className="text-pink-500 hover:text-pink-600"
                   >
                     <FiX className="h-5 w-5" />
                   </button>
@@ -272,7 +272,8 @@ const Upload = () => {
               <h2 className="text-2xl font-semibold text-gray-900">File Preview</h2>
               <button
                 onClick={clearAll}
-                className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50"
+                className="inline-flex items-center px-4 py-2 border border-pink-300 rounded-md shadow-sm text-sm 
+                font-medium text-pink-700 bg-white hover:bg-pink-50"
               >
                 <FiRefreshCw className="mr-2" />
                 Clear All
@@ -285,7 +286,7 @@ const Upload = () => {
                 <div className="bg-white shadow rounded-lg p-6">
                   <div className="flex items-center mb-4">
                     <FiCheckCircle className="h-6 w-6 text-green-600 mr-2" />
-                    <h3 className="text-lg font-semibold text-gray-900">Customer File</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Physical File</h3>
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between p-2 bg-gray-50 rounded">
@@ -298,7 +299,7 @@ const Upload = () => {
                     </div>
                     <div className="flex justify-between p-2 bg-purple-50 rounded">
                       <span className="text-sm font-medium text-gray-600">Total Records:</span>
-                      <span className="text-sm font-bold text-purple-600">{customerPreview.totalRecords}</span>
+                      <span className="text-sm font-bold text-[#8E288D]">{customerPreview.totalRecords}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-gray-50 rounded">
                       <span className="text-sm font-medium text-gray-600">Columns:</span>
@@ -338,7 +339,7 @@ const Upload = () => {
                 <div className="bg-white shadow rounded-lg p-6">
                   <div className="flex items-center mb-4">
                     <FiCheckCircle className="h-6 w-6 text-teal-600 mr-2" />
-                    <h3 className="text-lg font-semibold text-gray-900">Finance File</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">ERP File</h3>
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between p-2 bg-gray-50 rounded">
@@ -351,7 +352,7 @@ const Upload = () => {
                     </div>
                     <div className="flex justify-between p-2 bg-teal-50 rounded">
                       <span className="text-sm font-medium text-gray-600">Total Records:</span>
-                      <span className="text-sm font-bold text-teal-600">{internalPreview.totalRecords}</span>
+                      <span className="text-sm font-bold text-[#CFB53B]">{internalPreview.totalRecords}</span>
                     </div>
                     <div className="flex justify-between p-2 bg-gray-50 rounded">
                       <span className="text-sm font-medium text-gray-600">Columns:</span>
@@ -389,18 +390,18 @@ const Upload = () => {
 
             {/* Quick Summary */}
             {customerPreview && internalPreview && (
-              <div className="mt-6 bg-gradient-to-r from-purple-50 to-teal-50 shadow rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Summary</h3>
+              <div className="mt-2 bg-gradient-to-r from-purple-50 to-teal-50 shadow rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Quick Summary</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <FiAlertCircle className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">Customer Records</p>
-                    <p className="text-2xl font-bold text-purple-600">{customerPreview.totalRecords}</p>
+                    <FiAlertCircle className="h-8 w-8 text-[#8E288D] mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">Physical Records</p>
+                    <p className="text-2xl font-bold text-[#8E288D]">{customerPreview.totalRecords}</p>
                   </div>
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <FiAlertCircle className="h-8 w-8 text-teal-600 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600">Finance Records</p>
-                    <p className="text-2xl font-bold text-teal-600">{internalPreview.totalRecords}</p>
+                    <FiAlertCircle className="h-8 w-8 text-[#CFB53B] mx-auto mb-2" />
+                    <p className="text-sm text-gray-600">ERP Records</p>
+                    <p className="text-2xl font-bold text-[#CFB53B]">{internalPreview.totalRecords}</p>
                   </div>
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                     <FiCheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />

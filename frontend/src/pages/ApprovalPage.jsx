@@ -14,7 +14,7 @@ const STATUSES = [
   { value: 'reconciled',               label: 'Reconciled',           color: '#8E288D'  },
   { value: 'unreconciled',             label: 'Unreconciled',         color: 'red'    },
   { value: 'surplus_assets',           label: 'Surplus Assets',       color: 'orange' },
-  { value: 'exist_in_erp_not_physical',label: 'Exist in ERP not Physical', color: 'purple' },
+  { value: 'exist_in_erp_not_physical',label: 'Shortage Assets', color: 'purple' },
   { value: 'duplicated',               label: 'Duplicated',           color: 'pink'   },
   { value: 'unique',                   label: 'Unique',               color: 'teal'   },
 ]
@@ -22,13 +22,13 @@ const STATUSES = [
 const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.value, s]))
 
 const statusBadgeCls = {
-  pending:                   'bg-gray-100 text-gray-700 border-gray-300',
-  reconciled:               'bg-green-100 text-[#8E288D] border-green-300',
-  unreconciled:             'bg-red-100 text-red-800 border-red-300',
-  surplus_assets:           'bg-orange-100 text-orange-800 border-orange-300',
-  exist_in_erp_not_physical:'bg-purple-100 text-purple-800 border-purple-300',
-  duplicated:               'bg-pink-100 text-pink-800 border-pink-300',
-  unique:                   'bg-teal-100 text-teal-800 border-teal-300',
+  pending:                   'bg-gray-100 text-gray-700',
+  reconciled:               'bg-gray-10 text-[#8E288D]',
+  unreconciled:             'bg-red-100 text-red-800',
+  surplus_assets:           'bg-orange-100 text-orange-800',
+  exist_in_erp_not_physical:'bg-purple-100 text-purple-800',
+  duplicated:               'bg-pink-100 text-pink-800',
+  unique:                   'bg-teal-100 text-teal-800',
 }
 
 // ── Category definitions ──────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ const BULK_OPTIONS_MATCHED = [
 ]
 const BULK_OPTIONS_UNMATCHED = [
   { value: 'surplus_assets',            label: 'Surplus Assets'             },
-  { value: 'exist_in_erp_not_physical', label: 'Exist in ERP not Physical'  },
+  { value: 'exist_in_erp_not_physical', label: 'Shortage Assets'  },
   { value: 'reconciled',                label: 'Reconciled'                 },
   { value: 'unreconciled',              label: 'Unreconciled'               },
 ]
@@ -136,7 +136,7 @@ const BulkDropdown = ({ category, onSelect, loading }) => {
   const UNMATCHED_SUBCATS = [
     { value: 'Unmatched',          label: 'All Unmatched'       },
     { value: 'Customer Unmatched', label: 'Pysical Unmatched'  },
-    { value: 'Finance Unmatched',  label: 'Finance Unmatched'   },
+    { value: 'Finance Unmatched',  label: 'ERP Unmatched'   },
   ]
 
   const optionsForCat = isDuplicate ? BULK_OPTIONS_DUPLICATE
@@ -375,10 +375,10 @@ const ApprovalPage = () => {
   // ── tab styles ─────────────────────────────────────────────────────────────
   const tabCls = (key) => {
     const active   = { all: 'bg-gray-700 text-white', 'Exact Match': 'bg-[#8E288D] text-white',
-                       'AI Match': 'bg-[#7A1E79] text-white', 'Manual Review': 'bg-[#CFB53B] text-white',
+                       'AI Match': 'bg-[#7A1E79] text-white', 'Manual Review': 'bg-[#CFB53B] font-bold text-white',
                        'Unmatched': 'bg-red-600 text-white', 'Duplicate': 'bg-pink-600 text-white' }
     const inactive = { all: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-                       'Exact Match': 'bg-green-50 text-[#8E288D] hover:text-[#8E288D] hover:bg-purple-100',
+                       'Exact Match': 'bg-gray-50 text-[#8E288D] hover:text-[#8E288D] hover:bg-purple-100',
                        'AI Match': 'bg-purple-50 text-[#8E288D] hover:bg-purple-100',
                        'Manual Review': 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100',
                        'Unmatched': 'bg-red-50 text-red-700 hover:bg-red-100',
@@ -401,14 +401,14 @@ const ApprovalPage = () => {
   return (
     <div className="px-4 sm:px-6 lg:px-8 pb-12">
       {/* Back */}
-      <div className="mb-4">
+      <div className="mb-0">
         <button onClick={() => navigate(-1)} className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
           <FiArrowLeft className="mr-2" /> Back
         </button>
       </div>
 
       {/* Title + progress */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">
             {canApprove ? 'Approval Review' : 'Approval Status'} — Reconciliation #{id}
@@ -419,7 +419,7 @@ const ApprovalPage = () => {
               : 'View approval status for this reconciliation'}
           </p>
         </div>
-        <div className="bg-white border rounded-lg p-4 min-w-[300px] shadow-sm">
+        <div className="bg-white border rounded-lg p-0 min-w-[300px] shadow-sm">
           {/* Overall approval progress — excludes Duplicate category */}
           <p className="text-xs text-gray-500 mb-1 font-medium">
             Approval Progress (excluding Duplicates)
@@ -434,7 +434,7 @@ const ApprovalPage = () => {
             {overall.total - overall.pending} of {overall.total} records reviewed
           </p>
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">
-            <span className="text-yellow-600 font-medium">⏳ {overall.pending} pending</span>
+            <span className="text-[#CFB53B] font-medium">⏳ {overall.pending} pending</span>
             <span className="text-[#8E288D] font-medium">✓ {overall.reconciled} reconciled</span>
             <span className="text-red-600 font-medium">✗ {overall.unreconciled} unreconciled</span>
             <span className="text-orange-600 font-medium">◈ {overall.surplus_assets} surplus</span>
@@ -452,40 +452,40 @@ const ApprovalPage = () => {
             return (
               <div className="border-t border-gray-100 pt-2 grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-purple-50 rounded p-2">
-                  <p className="text-gray-500 font-bold text-center">Physical</p>
-                  <p className="text-xl font-bold text-[#8E288D] text-center">{custRecRate}%</p>
-                  <p className="text-[#8E288D] font-bold text-center">Reconciled</p>
+                  <p className="text-gray-700 font-bold text-center">Physical</p>
+                  <p className="text-xl font-bold text-gray-700 text-center">{custRecRate}%</p>
+                  <p className="text-gray-600 font-bold text-center">Reconciled</p>
                   <div className="mt-1 space-y-0.5 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Total</span>
                       <span className="font-medium">{custTotal.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-red-400">Unmatched</span>
-                      <span className="font-medium text-red-500">{custUnmatch.toLocaleString()}</span>
+                      <span className="text-gray-700">Unmatched</span>
+                      <span className="font-bold text-gray-700">{custUnmatch.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-pink-400">Duplicates</span>
-                      <span className="font-medium text-pink-500">{(stats.customer_duplicates||0).toLocaleString()}</span>
+                      <span className="text-gray-700">Duplicates</span>
+                      <span className="font-bold text-gray-700">{(stats.customer_duplicates||0).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
                 <div className="bg-teal-50 rounded p-2">
-                  <p className="text-gray-500 font-bold text-center">ERP</p>
-                  <p className="text-xl font-bold text-teal-700 text-center">{finRecRate}%</p>
-                  <p className="text-teal-700 font-bold text-center">Reconciled</p>
+                  <p className="text-gray-700 font-bold text-center">ERP</p>
+                  <p className="text-xl font-bold text-gray-700 text-center">{finRecRate}%</p>
+                  <p className="text-gray-600 font-bold text-center">Reconciled</p>
                   <div className="mt-1 space-y-0.5 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Total</span>
                       <span className="font-medium">{finTotal.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-red-400">Unmatched</span>
-                      <span className="font-medium text-red-500">{finUnmatch.toLocaleString()}</span>
+                      <span className="text-gray-700">Unmatched</span>
+                      <span className="font-bold text-gray-700">{finUnmatch.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-pink-400">Duplicates</span>
-                      <span className="font-medium text-pink-500">{(stats.internal_duplicates||0).toLocaleString()}</span>
+                      <span className="text-gray-700">Duplicates</span>
+                      <span className="font-bold text-gray-700">{(stats.internal_duplicates||0).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -585,10 +585,10 @@ const ApprovalPage = () => {
               <tr className="bg-gray-50 border-b-2 border-gray-300">
                 {COLUMN_PAIRS.map(p => (
                   <React.Fragment key={p.label}>
-                    <th className="px-3 py-1 text-center text-xs font-medium text-black bg-purple-50 border-r border-gray-200 whitespace-nowrap">
+                    <th className="px-3 py-1 text-center text-xs font-medium text-black bg-gray-50 border-r border-gray-200 whitespace-nowrap">
                       Physical
                     </th>
-                    <th className="px-3 py-1 text-center text-xs font-medium text-[#8E288D] bg-purple-50 border-r border-gray-300 whitespace-nowrap">
+                    <th className="px-3 py-1 text-center text-xs font-medium text-black bg-gray-50 border-r border-gray-300 whitespace-nowrap">
                       ERP
                     </th>
                   </React.Fragment>
@@ -620,13 +620,13 @@ const ApprovalPage = () => {
                   className={`hover:bg-yellow-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
 
                   {/* Category badge */}
-                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-200">
+                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 bg-purple-200 border-r border-gray-200">
                     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
-                      rec.category === 'Exact Match'        ? 'bg-purple-100 text-[#8E288D]'   :
-                      rec.category === 'AI Match'           ? 'bg-purple-100 text-[#8E288D]' :
-                      rec.category === 'Manual Review'      ? 'bg-yellow-100 text-[#CFB53B]' :
-                      rec.category === 'Customer Unmatched' ? 'bg-red-100 text-red-700'       :
-                      rec.category === 'Finance Unmatched'  ? 'bg-orange-100 text-orange-700' :
+                      rec.category === 'Exact Match'        ? 'bg-white-100 text-[#8E288D]'   :
+                      rec.category === 'AI Match'           ? 'bg-white-100 text-[#8E288D]' :
+                      rec.category === 'Manual Review'      ? 'bg-white-100 text-[#8E288D]' :
+                      rec.category === 'Customer Unmatched' ? 'bg-white-100 text-[#8E288D]'       :
+                      rec.category === 'Finance Unmatched'  ? 'bg-white-100 text-[#8E288D]' :
                       'bg-gray-100 text-gray-700'
                     }`}>
                       {rec.category}
@@ -665,10 +665,10 @@ const ApprovalPage = () => {
                   {/* Dept Reconcile */}
                   <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200 bg-amber-50/40">
                     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
-                      rec.dept_reconcile === 'Same'                     ? 'bg-green-100 text-green-800'   :
+                      rec.dept_reconcile === 'Same'                     ? 'bg-purple-10 text-[#8E288D]'   :
                       rec.dept_reconcile === 'Same Dept, Diff District' ? 'bg-blue-100 text-blue-800'     :
                       rec.dept_reconcile === 'Diff Dept, Same District' ? 'bg-orange-100 text-orange-800' :
-                      rec.dept_reconcile === 'Different'                ? 'bg-red-100 text-red-700'       :
+                      rec.dept_reconcile === 'Different'                ? 'bg-yellow-10 text-[#CFB53B]'       :
                       'bg-gray-100 text-gray-500'
                     }`}>
                       {rec.dept_reconcile || 'N/A'}
@@ -752,11 +752,11 @@ const ApprovalPage = () => {
           const p = s.total > 0 ? ((done / s.total) * 100).toFixed(0) : 0
           const barColor = cat.key === 'Duplicate' ? '#ec4899' : '#8E288D'
           const border = {
-            'Exact Match':   'border-[#8E288D]',
-            'AI Match':      'border-[#7A1E79]',
-            'Manual Review': 'border-[#CFB53B]',
-            'Unmatched':     'border-red-400',
-            'Duplicate':     'border-pink-500',
+            'Exact Match':   'border-gray-250',
+            'AI Match':      'border-gray-250',
+            'Manual Review': 'border-gray-250',
+            'Unmatched':     'border-gray-250',
+            'Duplicate':     'border-gray-250',
           }
           return (
             <div key={cat.key} className={`bg-white rounded-lg shadow p-4 border-t-4 ${border[cat.key]}`}>

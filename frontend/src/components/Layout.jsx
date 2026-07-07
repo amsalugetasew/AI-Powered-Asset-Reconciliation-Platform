@@ -82,7 +82,7 @@ const Layout = () => {
       {/* Sidebar */}
       <aside
         className={`${
-          sidebarOpen ? 'w-64' : 'w-20'
+          sidebarOpen ? 'w-60' : 'w-20'
         } bg-gradient-to-b from-[#F8F8FF] to-[#F8F8FF] text-[#8E288D] transition-all duration-300 ease-in-out fixed h-full z-30 shadow-2xl`}
       >
         {/* Logo Section */}
@@ -112,7 +112,7 @@ const Layout = () => {
                     className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                       isActive(item.path)
                         ? 'bg-[#8E288D] text-white shadow-lg transform scale-105'
-                        : 'text-[#8E288D] hover:bg-[#008080] hover:text-white hover:transform hover:scale-105'
+                        : 'text-[#8E288D] hover:bg-[#CFB53C] hover:text-white hover:transform hover:scale-105'
                     }`}
                   >
                     <Icon className="h-5 w-5 flex-shrink-0" />
@@ -135,7 +135,7 @@ const Layout = () => {
             {sidebarOpen && (
               <div className="flex-1">
                 <p className="text-sm font-medium truncate text-[#8E288D]">{user?.username}</p>
-                <p className="text-xs text-[#008080] truncate">{user?.email}</p>
+                <p className="text-xs text-[#CFB53C] truncate">{user?.email}</p>
                 {userRole && (
                   <div className="mt-1">
                     <RoleBadge role={userRole} size="sm" />
@@ -148,10 +148,10 @@ const Layout = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 flex flex-col h-screen`}>
+      <div className={`flex-1 ${sidebarOpen ? 'ml-60' : 'ml-20'} transition-all duration-300 flex flex-col h-screen`}>
         {/* Top Navbar - Sticky */}
         <nav className="bg-white shadow-md sticky top-0 z-20 flex-shrink-0">
-          <div className="px-6 py-4">
+          <div className="px-2 py-2">
             <div className="flex justify-between items-center">
               {/* Left side - Toggle and Title */}
               <div className="flex items-center space-x-4">
@@ -178,7 +178,8 @@ const Layout = () => {
                 {/* Search Icon */}
                 <button className="p-3 rounded-lg hover:bg-gray-100 transition-colors relative group">
                   <FiSearch className="h-5 w-5 text-gray-600" />
-                  <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded
+                   opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                     Search
                   </span>
                 </button>
@@ -214,7 +215,7 @@ const Layout = () => {
                         ))}
                       </div>
                       <div className="px-4 py-2 border-t border-gray-200 text-center">
-                        <button className="text-sm text-[#8E288D] hover:text-[#008080]">View all</button>
+                        <button className="text-sm text-[#8E288D] hover:text-[#CFB53C]">View all</button>
                       </div>
                     </div>
                   )}
@@ -237,7 +238,7 @@ const Layout = () => {
                     }}
                     className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
                   >
-                    <div className="w-8 h-8 bg-gradient-to-br from-[#8E288D] to-[#008080] rounded-full flex items-center justify-center text-white font-semibold">
+                    <div className="w-8 h-8 bg-gradient-to-br from-[#8E288D] to-[#CFB53C] rounded-full flex items-center justify-center text-white font-semibold">
                       {user?.username?.charAt(0).toUpperCase()}
                     </div>
                     <FiChevronDown className="h-4 w-4 text-gray-600" />
@@ -282,12 +283,12 @@ const Layout = () => {
         {/* Scrollable Content Area (Main + Footer) */}
         <div className="flex-1 overflow-y-auto">
           {/* Main Content */}
-          <main className="p-6 bg-gray-50">
-            <div className="max-w-7xl mx-auto">
+          <main className="p-1 bg-gray-50">
+            <div className="max-w-[1550px] mx-auto">
               <Outlet />
             </div>
           </main>
-
+        </div>
           {/* Footer */}
           <footer className="bg-white border-t border-gray-200">
             <div className="max-w-7xl mx-auto px-6 py-4">
@@ -298,7 +299,6 @@ const Layout = () => {
             </div>
           </footer>
         </div>
-      </div>
 
       {/* Click outside to close dropdowns */}
       {(showUserMenu || showNotifications) && (

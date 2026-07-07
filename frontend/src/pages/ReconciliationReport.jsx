@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import {
-  FiArrowLeft, FiDatabase, FiCheckCircle, FiXCircle,
+  FiArrowLeft, FiDatabase, FiCheckCircle, FiXCircle,FiAlertTriangle,FiClock,FiTarget,FiCpu,FiCopy,FiRepeat,
   FiAlertCircle, FiLoader, FiPercent, FiLayers, FiMapPin, FiBarChart2
 } from 'react-icons/fi'
 import {
@@ -24,22 +24,37 @@ const APPROVAL_COLORS = {
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
-const KpiCard = ({ label, value, sub, icon: Icon, gradient }) => (
-  <div className={`rounded-xl shadow-lg p-5 ${gradient} text-white transform hover:scale-105 transition-transform`}>
+const KpiCard = ({
+  label,
+  value,
+  sub,
+  textColor = "text-white",
+  shadow = "shadow-lg",
+  borderColor = "",
+  icon: Icon,
+  gradient,
+}) => (
+  <div
+    className={`rounded-xl p-5 ${gradient} ${textColor} ${shadow} ${borderColor}
+    transform hover:scale-105 transition-all duration-300`}
+  >
     <div className="flex items-start justify-between">
       <div>
-        <p className="text-xs font-medium opacity-80 uppercase tracking-wide">{label}</p>
+        <p className="text-xs font-medium opacity-80 uppercase tracking-wide">
+          {label}
+        </p>
         <p className="text-2xl font-bold mt-1">{value}</p>
         {sub && <p className="text-xs mt-1 opacity-70">{sub}</p>}
       </div>
+
       {Icon && (
-        <div className="bg-white bg-opacity-20 p-2 rounded-lg">
+        <div className="bg-white/20 p-2 rounded-lg">
           <Icon className="h-6 w-6" />
         </div>
       )}
     </div>
   </div>
-)
+);
 
 // ── Horizontal bar ────────────────────────────────────────────────────────────
 const HBar = ({ name, rate, reconciled, total, color }) => (
@@ -157,18 +172,59 @@ const ReconciliationReport = () => {
 
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <KpiCard label="ERP Assets"         value={fmt(kpis.total_erp_assets)}  icon={FiDatabase}    gradient="bg-gradient-to-br from-[#8E288D] to-[#7A1E79]" />
-        <KpiCard label="Physical Count"     value={fmt(kpis.physical_count)}    icon={FiLayers}      gradient="bg-gradient-to-br from-blue-600 to-blue-700" />
-        <KpiCard label="Reconciled"         value={fmt(kpis.reconciled)}        icon={FiCheckCircle} gradient="bg-gradient-to-br from-green-500 to-green-600" />
-        <KpiCard label="Recon. Rate"        value={pct(kpis.reconciliation_rate)} icon={FiPercent}   gradient="bg-gradient-to-br from-teal-500 to-teal-600" />
-        <KpiCard label="Unreconciled"       value={fmt(kpis.unreconciled)}      icon={FiXCircle}     gradient="bg-gradient-to-br from-red-500 to-red-600" />
-        <KpiCard label="Surplus Assets"     value={fmt(kpis.surplus_assets)}    icon={FiAlertCircle} gradient="bg-gradient-to-br from-orange-500 to-orange-600" />
+        <KpiCard label="ERP Assets"         value={fmt(kpis.total_erp_assets)}  icon={FiDatabase}    
+        gradient="bg-gradient-to-br from-white-500 to-white-600"
+         borderColor="border-l-4 border-l-gray-100"
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
+        <KpiCard label="Physical Count"     value={fmt(kpis.physical_count)}    icon={FiLayers}      
+        gradient="bg-gradient-to-br from-white-500 to-white-600" 
+        borderColor="border-l-4 border-l-gray-100"
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
+        
+          
+        <KpiCard label="Exact Match"         value={fmt(kpis.exact_matched)}  icon={FiTarget}    
+        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
+        textColor="text-black-500" />
+        <KpiCard label="AI Match"         value={fmt(kpis.ai_matched)}  icon={FiCpu}    
+        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
+        textColor="text-black-500" />
+         <KpiCard label="Near Match"         value={fmt(kpis.near_match)}  icon={FiCopy}    
+        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
+        textColor="text-black-500" />
+        <KpiCard label="Reconciled(Appro.)"         value={fmt(kpis.reconciled)}        icon={FiCheckCircle} 
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]"
+        borderColor="border-l-4 border-l-gray-100"
+        gradient="bg-gradient-to-br from-white-500 to-white-600" textColor="text-black-500" />   
       </div>
 
       {/* secondary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        {[
-          { label: 'ERP not Physical',   value: kpis.exist_erp_not_physical,                              border: 'border-purple-400', text: 'text-purple-600' },
+        <KpiCard label="Recon. Rate"        value={pct(kpis.reconciliation_rate)} icon={FiPercent}   
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"
+        gradient="bg-gradient-to-br from-white-500 to-white-600" textColor="text-black-500"/>
+       
+        <KpiCard label="Pending"         value={fmt(kpis.pending)}  icon={FiClock}    
+        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
+        textColor="text-black-500" />
+        <KpiCard label="Unreconciled"       value={fmt(kpis.unreconciled)}      icon={FiXCircle}  
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"  
+        gradient="bg-gradient-to-br from-white-500 to-white-600" textColor='text-pink-700'/>
+        <KpiCard label="Shortage Assets"         value={fmt(kpis.exist_erp_not_physical)}  icon={FiAlertTriangle}    
+        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-[#F87171]" />
+        <KpiCard label="Surplus Assets"     value={fmt(kpis.surplus_assets)}    icon={FiAlertCircle} 
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"
+        gradient="bg-gradient-to-br from-white-500 to-white-600" textColor='text-orange-600'/>
+        <KpiCard label="Duplicates"         value={fmt(kpis.customer_duplicates)}  icon={FiRepeat}    
+        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
+        textColor="text-pink-500" />
+        {/* {[
+          { label: 'Shortage Assets',   value: kpis.exist_erp_not_physical,                              border: 'border-purple-400', text: 'text-purple-600' },
           { label: 'Pending Approval',   value: kpis.pending,                                              border: 'border-gray-400',   text: 'text-gray-600'   },
           { label: 'Exact Match',        value: kpis.exact_matched,                                        border: 'border-teal-400',   text: 'text-teal-600'   },
           { label: 'AI Match',           value: kpis.ai_matched,                                           border: 'border-[#8E288D]',  text: 'text-[#8E288D]'  },
@@ -179,7 +235,7 @@ const ReconciliationReport = () => {
             <p className="text-xs text-gray-500">{k.label}</p>
             <p className={`text-xl font-bold ${k.text}`}>{fmt(k.value)}</p>
           </div>
-        ))}
+        ))} */}
       </div>
 
       {/* Pending notice */}
