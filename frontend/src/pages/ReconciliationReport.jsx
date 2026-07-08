@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import {
-  FiArrowLeft, FiDatabase, FiCheckCircle, FiXCircle,FiAlertTriangle,FiClock,FiTarget,FiCpu,FiCopy,FiRepeat,
+  FiArrowLeft, FiDatabase, FiCheckCircle, FiXCircle, FiAlertTriangle, FiClock, FiTarget, FiCpu, FiCopy, FiRepeat,
   FiAlertCircle, FiLoader, FiPercent, FiLayers, FiMapPin, FiBarChart2
 } from 'react-icons/fi'
 import {
@@ -12,15 +12,15 @@ import {
 } from 'recharts'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-const fmt  = (n) => n == null ? '—' : Number(n).toLocaleString()
-const pct  = (n) => n == null ? '—' : `${Number(n).toFixed(2)}%`
+const fmt = (n) => n == null ? '—' : Number(n).toLocaleString()
+const pct = (n) => n == null ? '—' : `${Number(n).toFixed(2)}%`
 
 const APPROVAL_COLORS = {
-  reconciled:               '#8E288D',
-  unreconciled:             '#ef4444',
-  surplus_assets:           '#f97316',
-  exist_in_erp_not_physical:'#8b5cf6',
-  pending:                  '#9ca3af',
+  reconciled: '#8E288D',
+  unreconciled: '#ef4444',
+  surplus_assets: '#f97316',
+  exist_in_erp_not_physical: '#8b5cf6',
+  pending: '#4E79A7',
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ const HBar = ({ name, rate, reconciled, total, color }) => (
   </div>
 )
 
-// ── Custom tooltip ────────────────────────────────────────────────────────────
+// ── Custom tooltip (simple, kept for non-stacked charts) ─────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
@@ -88,14 +88,110 @@ const CustomTooltip = ({ active, payload, label }) => {
   )
 }
 
+// ── useSegmentTooltip — hover state for custom CSS horizontal bars ────────────
+const useSegmentTooltip = () => {
+  const [tip, setTip] = React.useState(null)
+  const show = (e, data) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTip({ x: rect.left + rect.width / 2, y: rect.top - 8, ...data })
+  }
+  const hide = () => setTip(null)
+  const Tooltip = tip ? (
+    <div className="fixed z-50 pointer-events-none"
+      style={{ left: tip.x, top: tip.y, transform: 'translate(-50%,-100%)' }}>
+      <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+        <p className="font-bold border-b border-gray-600 pb-1 mb-1">{tip.label}</p>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: tip.color }} />
+          <span>{tip.name}</span>
+        </div>
+        <div className="flex justify-between gap-4 mt-1">
+          <span className="text-gray-300">Count</span>
+          <span className="font-semibold">{tip.value.toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-300">Share</span>
+          <span className="font-semibold">{tip.pct}%</span>
+        </div>
+      </div>
+      <div className="flex justify-center"><div className="w-2 h-2 bg-gray-900 rotate-45 -mt-1" /></div>
+    </div>
+  ) : null
+  return { show, hide, Tooltip }
+}
+
+// ── HorizontalStackedBar — 100% stacked bar with live tooltip ─────────────────
+const HorizontalStackedBar = ({ row, statuses, colors, labels, rowLabel }) => {
+  const { show, hide, Tooltip } = useSegmentTooltip()
+  const rowTotal = statuses.reduce((s, k) => s + (row[k] || 0), 0)
+  if (rowTotal === 0) return null
+  return (
+    <div className="mb-4">
+      {Tooltip}
+      <div className="flex w-full rounded-md overflow-hidden h-9 shadow-sm">
+        {statuses.map(s => {
+          const val = row[s] || 0
+          if (val === 0) return null
+          const wp = ((val / rowTotal) * 100).toFixed(2)
+          const showLabel = parseFloat(wp) > 8
+          return (
+            <div key={s}
+              style={{ width: `${wp}%`, backgroundColor: colors[s] }}
+              className="flex items-center justify-center overflow-hidden cursor-default transition-opacity hover:opacity-90"
+              onMouseEnter={e => show(e, { label: rowLabel, name: labels[s] || s, value: val, pct: wp, color: colors[s] })}
+              onMouseLeave={hide}
+            >
+              {showLabel && (
+                <span className="text-white text-xs font-semibold truncate px-1 select-none">
+                  {labels[s] || s}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <p className="text-xs text-gray-500 mt-0.5 pl-1 truncate" title={row.full_name || rowLabel}>
+        {rowLabel} <span className="text-gray-400">({rowTotal.toLocaleString()})</span>
+      </p>
+    </div>
+  )
+}
+
+// ── Rich custom tooltip for stacked/aging charts ──────────────────────────────
+const AgingTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null
+  const total = payload.reduce((s, p) => s + (p.value || 0), 0)
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-xl p-3 text-xs min-w-[180px]">
+      <p className="font-bold text-gray-800 mb-2 border-b pb-1">{label}</p>
+      {payload.filter(p => p.value > 0).map((p, i) => (
+        <div key={i} className="flex items-center justify-between gap-3 py-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: p.fill }} />
+            <span className="text-gray-600">{p.name}</span>
+          </div>
+          <div className="text-right">
+            <span className="font-semibold text-gray-800">{p.value.toLocaleString()}</span>
+            <span className="text-gray-400 ml-1">({total > 0 ? ((p.value / total) * 100).toFixed(1) : 0}%)</span>
+          </div>
+        </div>
+      ))}
+      <div className="border-t mt-1 pt-1 flex justify-between font-semibold text-gray-700">
+        <span>Total</span><span>{total.toLocaleString()}</span>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 const ReconciliationReport = () => {
-  const { id }       = useParams()
-  const navigate     = useNavigate()
-  const [data, setData]           = useState(null)
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [data, setData] = useState(null)
   const [agingData, setAgingData] = useState(null)
-  const [loading, setLoading]     = useState(true)
+  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const [barSize, setBarSize] = useState(40)
 
   useEffect(() => {
     Promise.all([
@@ -115,29 +211,29 @@ const ReconciliationReport = () => {
   if (!data) return null
 
   const { kpis, donut, category_breakdown, department_breakdown,
-          district_breakdown, dept_rec_chart, reconciliation, total_records_in_db } = data
+    district_breakdown, dept_rec_chart, reconciliation, total_records_in_db } = data
 
-  const recon       = reconciliation
+  const recon = reconciliation
   const completedAt = recon.completed_at ? new Date(recon.completed_at).toLocaleString() : '—'
-  const createdAt   = new Date(recon.created_at).toLocaleString()
+  const createdAt = new Date(recon.created_at).toLocaleString()
 
   const tabs = [
-    { key: 'overview',   label: 'Overview'       },
-    { key: 'category',   label: 'By Category'    },
-    { key: 'department', label: 'By Division'    },
-    { key: 'district',   label: 'By Branch'      },
-    { key: 'dept_rec',   label: 'Dept. Reconcile'},
-    { key: 'aging',      label: 'Aging Analysis' },
+    { key: 'overview', label: 'Overview' },
+    { key: 'category', label: 'By Category' },
+    { key: 'department', label: 'By Division' },
+    { key: 'district', label: 'By Branch' },
+    { key: 'dept_rec', label: 'Dept. Reconcile' },
+    { key: 'aging', label: 'Aging Analysis' },
   ]
 
   // stacked bar data for category
   const stackedCatData = category_breakdown.map(c => ({
-    name:         c.name.length > 18 ? c.name.slice(0, 18) + '…' : c.name,
-    fullName:     c.name,
-    Reconciled:   c.reconciled,
+    name: c.name.length > 18 ? c.name.slice(0, 18) + '…' : c.name,
+    fullName: c.name,
+    Reconciled: c.reconciled,
     Unreconciled: c.unreconciled,
-    Pending:      c.pending,
-    Surplus:      c.surplus || 0,
+    Pending: c.pending,
+    Surplus: c.surplus || 0,
   }))
 
   return (
@@ -165,11 +261,11 @@ const ReconciliationReport = () => {
         </div>
         <div className="flex gap-2">
           <button onClick={() => navigate(`/results/${id}`)}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-[#8E288D] text-white hover:bg-[#7A1E79]">
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D]">
             View Records
           </button>
           <button onClick={() => navigate(`/approval/${id}`)}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-[#CFB53B] text-white hover:bg-[#CFB53C]">
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8E288D] to-[#000000] text-white rounded-lg hover:from-[#000000] hover:to-[#8E288D]">
             Approval
           </button>
         </div>
@@ -177,57 +273,57 @@ const ReconciliationReport = () => {
 
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <KpiCard label="ERP Assets"         value={fmt(kpis.total_erp_assets)}  icon={FiDatabase}    
-        gradient="bg-gradient-to-br from-white-500 to-white-600"
-         borderColor="border-l-4 border-l-gray-100"
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
-        <KpiCard label="Physical Count"     value={fmt(kpis.physical_count)}    icon={FiLayers}      
-        gradient="bg-gradient-to-br from-white-500 to-white-600" 
-        borderColor="border-l-4 border-l-gray-100"
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
-        
-          
-        <KpiCard label="Exact Match"         value={fmt(kpis.exact_matched)}  icon={FiTarget}    
-        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
-        textColor="text-black-500" />
-        <KpiCard label="AI Match"         value={fmt(kpis.ai_matched)}  icon={FiCpu}    
-        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
-        textColor="text-black-500" />
-         <KpiCard label="Near Match"         value={fmt(kpis.near_match)}  icon={FiCopy}    
-        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
-        textColor="text-black-500" />
-        <KpiCard label="Reconciled(Appro.)"         value={fmt(kpis.reconciled)}        icon={FiCheckCircle} 
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]"
-        borderColor="border-l-4 border-l-gray-100"
-        gradient="bg-gradient-to-br from-white-500 to-white-600" textColor="text-black-500" />   
+        <KpiCard label="ERP Assets" value={fmt(kpis.total_erp_assets)} icon={FiDatabase}
+          gradient="bg-gradient-to-br from-white-500 to-white-600"
+          borderColor="border-l-4 border-l-gray-100"
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
+        <KpiCard label="Physical Count" value={fmt(kpis.physical_count)} icon={FiLayers}
+          gradient="bg-gradient-to-br from-white-500 to-white-600"
+          borderColor="border-l-4 border-l-gray-100"
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
+
+
+        <KpiCard label="Exact Match" value={fmt(kpis.exact_matched)} icon={FiTarget}
+          gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]"
+          textColor="text-black-500" />
+        <KpiCard label="AI Match" value={fmt(kpis.ai_matched)} icon={FiCpu}
+          gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]"
+          textColor="text-black-500" />
+        <KpiCard label="Near Match" value={fmt(kpis.near_match)} icon={FiCopy}
+          gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]"
+          textColor="text-black-500" />
+        <KpiCard label="Reconciled(Appro.)" value={fmt(kpis.reconciled)} icon={FiCheckCircle}
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]"
+          borderColor="border-l-4 border-l-gray-100"
+          gradient="bg-gradient-to-br from-white-500 to-white-600" textColor="text-black-500" />
       </div>
 
       {/* secondary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <KpiCard label="Recon. Rate"        value={pct(kpis.reconciliation_rate)} icon={FiPercent}   
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"
-        gradient="bg-gradient-to-br from-white-500 to-white-600" textColor="text-black-500"/>
-       
-        <KpiCard label="Pending"         value={fmt(kpis.pending)}  icon={FiClock}    
-        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
-        textColor="text-black-500" />
-        <KpiCard label="Unreconciled"       value={fmt(kpis.unreconciled)}      icon={FiXCircle}  
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"  
-        gradient="bg-gradient-to-br from-white-500 to-white-600" textColor='text-pink-700'/>
-        <KpiCard label="Shortage Assets"         value={fmt(kpis.exist_erp_not_physical)}  icon={FiAlertTriangle}    
-        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-[#F87171]" />
-        <KpiCard label="Surplus Assets"     value={fmt(kpis.surplus_assets)}    icon={FiAlertCircle} 
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"
-        gradient="bg-gradient-to-br from-white-500 to-white-600" textColor='text-orange-600'/>
-        <KpiCard label="Duplicates"         value={fmt(kpis.customer_duplicates)}  icon={FiRepeat}    
-        gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
-        shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" 
-        textColor="text-pink-500" />
+        <KpiCard label="Recon. Rate" value={pct(kpis.reconciliation_rate)} icon={FiPercent}
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"
+          gradient="bg-gradient-to-br from-white-500 to-white-600" textColor="text-black-500" />
+
+        <KpiCard label="Pending" value={fmt(kpis.pending)} icon={FiClock}
+          gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]"
+          textColor="text-black-500" />
+        <KpiCard label="Unreconciled" value={fmt(kpis.unreconciled)} icon={FiXCircle}
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"
+          gradient="bg-gradient-to-br from-white-500 to-white-600" textColor='text-pink-700' />
+        <KpiCard label="Shortage Assets" value={fmt(kpis.exist_erp_not_physical)} icon={FiAlertTriangle}
+          gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-[#F87171]" />
+        <KpiCard label="Surplus Assets" value={fmt(kpis.surplus_assets)} icon={FiAlertCircle}
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"
+          gradient="bg-gradient-to-br from-white-500 to-white-600" textColor='text-orange-600' />
+        <KpiCard label="Duplicates" value={fmt(kpis.customer_duplicates)} icon={FiRepeat}
+          gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
+          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]"
+          textColor="text-pink-500" />
         {/* {[
           { label: 'Shortage Assets',   value: kpis.exist_erp_not_physical,                              border: 'border-purple-400', text: 'text-purple-600' },
           { label: 'Pending Approval',   value: kpis.pending,                                              border: 'border-gray-400',   text: 'text-gray-600'   },
@@ -258,11 +354,10 @@ const ReconciliationReport = () => {
       <div className="flex gap-2 mb-5 flex-wrap">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setActiveTab(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === t.key
-                ? 'bg-[#8E288D] text-white shadow'
-                : 'bg-white text-gray-600 border border-gray-200 hover:border-[#8E288D]'
-            }`}>
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === t.key
+              ? 'bg-[#8E288D] text-white shadow'
+              : 'bg-white text-gray-600 border border-gray-200 hover:border-[#8E288D]'
+              }`}>
             {t.label}
           </button>
         ))}
@@ -274,24 +369,51 @@ const ReconciliationReport = () => {
 
           {/* Approval Status Donut */}
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-base font-semibold text-gray-800 mb-3">Approval Status Breakdown</h3>
-            {donut.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={donut} cx="50%" cy="50%"
-                    innerRadius={65} outerRadius={110}
-                    paddingAngle={3} dataKey="value"
-                    label={({ name, percent }) =>
-                      percent > 0.03 ? `${(percent*100).toFixed(0)}%` : ''
-                    }
-                    labelLine={false}>
-                    {donut.map((e, i) => <Cell key={i} fill={e.color} />)}
-                  </Pie>
-                  <Tooltip formatter={(v) => v.toLocaleString()} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
+            <h3 className="text-base font-semibold text-gray-800 mb-1">Approval Status Breakdown</h3>
+            {donut.length > 0 ? (() => {
+              const donutTotal = donut.reduce((s, d) => s + d.value, 0) || 1
+              return (
+                <>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Total: {donutTotal.toLocaleString()} records
+                  </p>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie data={donut} cx="50%" cy="50%"
+                        innerRadius={65} outerRadius={110}
+                        paddingAngle={3} dataKey="value"
+                        label={({ name, value, percent }) =>
+                          percent > 0.04
+                            ? `${name.split(' ')[0]}: ${((value / donutTotal) * 100).toFixed(1)}%`
+                            : ''
+                        }
+                        labelLine={true}>
+                        {donut.map((e, i) => <Cell key={i} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null
+                        const p = payload[0]
+                        const sharePct = ((p.value / donutTotal) * 100).toFixed(1)
+                        return (
+                          <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                            <p className="font-bold border-b border-gray-600 pb-1 mb-1">{p.name}</p>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-300">Count</span>
+                              <span className="font-semibold">{p.value.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-300">Share</span>
+                              <span className="font-semibold">{sharePct}%</span>
+                            </div>
+                          </div>
+                        )
+                      }} />
+                      <Legend wrapperStyle={{ fontSize: '12px' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </>
+              )
+            })() : (
               <p className="text-gray-400 text-center py-12">No approval data yet</p>
             )}
           </div>
@@ -301,12 +423,12 @@ const ReconciliationReport = () => {
             <h3 className="text-base font-semibold text-gray-800 mb-4">Match Type Breakdown</h3>
             <div className="space-y-4">
               {[
-                { label: 'Exact Match',          value: kpis.exact_matched,                                           color: '#8E288D' },
-                { label: 'AI Match',             value: kpis.ai_matched,                                              color: '#7A1E79' },
-                { label: 'Near Match',           value: kpis.near_match,                                              color: '#CFB53B' },
-                { label: 'Unmatched',            value: kpis.customer_unmatched,                                      color: '#ef4444' },
-                { label: 'Physical Duplicates',     value: kpis.customer_duplicates || 0,                                color: '#ec4899' },
-                { label: 'ERP Duplicates',   value: kpis.internal_duplicates || 0,                                color: '#f97316' },
+                { label: 'Exact Match', value: kpis.exact_matched, color: '#8E288D' },
+                { label: 'AI Match', value: kpis.ai_matched, color: '#7A1E79' },
+                { label: 'Near Match', value: kpis.near_match, color: '#CFB53B' },
+                { label: 'Unmatched', value: kpis.customer_unmatched, color: '#ef4444' },
+                { label: 'Physical Duplicates', value: kpis.customer_duplicates || 0, color: '#ec4899' },
+                { label: 'ERP Duplicates', value: kpis.internal_duplicates || 0, color: '#f97316' },
               ].map(item => {
                 const total = kpis.physical_count || 1
                 const r = ((item.value / total) * 100).toFixed(1)
@@ -349,27 +471,29 @@ const ReconciliationReport = () => {
           </h3>
           {category_breakdown.length ? (
             <>
-              <div className="mb-6">
-                {category_breakdown.map(c => (
-                  <HBar key={c.name} name={c.name} rate={c.rate}
-                    reconciled={c.reconciled} total={c.total} color="#8E288D" />
-                ))}
+              <div className="mb-2">
+                {(() => {
+                  const CAT_COLORS = { Reconciled:'#CFB53B', Unreconciled:'#000000', Surplus:'#8E288D', Pending:'#4E79A7' }
+                  const CAT_LABELS = { Reconciled:'Reconciled', Unreconciled:'Unmatched', Surplus:'Surplus Assets', Pending:'Pending' }
+                  const activeKeys = Object.keys(CAT_COLORS).filter(k => stackedCatData.some(r => (r[k]||0) > 0))
+                  return (
+                    <>
+                      {stackedCatData.map(row => (
+                        <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
+                          colors={CAT_COLORS} labels={CAT_LABELS} rowLabel={row.fullName || row.name} />
+                      ))}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                        {activeKeys.map(s => (
+                          <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                            <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: CAT_COLORS[s] }} />
+                            {CAT_LABELS[s]}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={stackedCatData}
-                  margin={{ top: 5, right: 20, left: 10, bottom: 60 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30}
-                    textAnchor="end" interval={0} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="Reconciled"   stackId="a" fill="#8E288D" />
-                  <Bar dataKey="Unreconciled" stackId="a" fill="#ef4444" />
-                  <Bar dataKey="Surplus"      stackId="a" fill="#f97316" />
-                  <Bar dataKey="Pending"      stackId="a" fill="#9ca3af" radius={[4,4,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
             </>
           ) : <p className="text-gray-400 text-center py-12">No category data — approve records first</p>}
         </div>
@@ -383,30 +507,29 @@ const ReconciliationReport = () => {
           </h3>
           {department_breakdown.length ? (
             <>
-              <div className="mb-6">
-                {department_breakdown.map(d => (
-                  <HBar key={d.name} name={d.name} rate={d.rate}
-                    reconciled={d.reconciled} total={d.total} color="#8E288D" />
-                ))}
-              </div>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={department_breakdown.map(d => ({
-                    ...d,
-                    name: d.name.length > 15 ? d.name.slice(0,15)+'…' : d.name
-                  }))}
-                  margin={{ top: 5, right: 20, left: 10, bottom: 80 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-35}
-                    textAnchor="end" interval={0} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="reconciled"   name="Reconciled"   fill="#8E288D" stackId="a" />
-                  <Bar dataKey="unreconciled" name="Unreconciled" fill="#ef4444" stackId="a" />
-                  <Bar dataKey="pending"      name="Pending"      fill="#9ca3af" stackId="a" radius={[4,4,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {(() => {
+                const DEPT_COLORS = { reconciled:'#CFB53B', unreconciled:'#F28E2B', pending:'#4E79A7', 
+                    surplus_assets:'#8E288D', exist_in_erp_not_physical:'#B07AA1', duplicated:'#9C755F' }
+                const DEPT_LABELS = { reconciled:'Reconciled', unreconciled:'Unmatched', pending:'Pending', 
+                  surplus_assets:'Surplus Assets', exist_in_erp_not_physical:'Shortage/Loss Assets', duplicated:'Duplicated' }
+                const activeKeys = Object.keys(DEPT_COLORS).filter(k => department_breakdown.some(r => (r[k]||0) > 0))
+                return (
+                  <>
+                    {department_breakdown.map(row => (
+                      <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
+                        colors={DEPT_COLORS} labels={DEPT_LABELS} rowLabel={row.name} />
+                    ))}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                      {activeKeys.map(s => (
+                        <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                          <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: DEPT_COLORS[s] }} />
+                          {DEPT_LABELS[s]}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )
+              })()}
             </>
           ) : <p className="text-gray-400 text-center py-12">No department data — approve records first</p>}
         </div>
@@ -418,34 +541,40 @@ const ReconciliationReport = () => {
           <h3 className="text-base font-semibold text-gray-800 mb-5 flex items-center gap-2">
             <FiMapPin className="text-[#8E288D]" /> Reconciliation by Branch / District
           </h3>
-          {district_breakdown.length ? (
-            <>
-              <div className="mb-6">
-                {district_breakdown.map(d => (
-                  <HBar key={d.name} name={d.name} rate={d.rate}
-                    reconciled={d.reconciled} total={d.total} color="#8E288D" />
-                ))}
-              </div>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={district_breakdown.map(d => ({
-                    ...d,
-                    name: d.name.length > 12 ? d.name.slice(0,12)+'…' : d.name
-                  }))}
-                  margin={{ top: 5, right: 20, left: 10, bottom: 70 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-35}
-                    textAnchor="end" interval={0} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="reconciled"   name="Reconciled"   fill="#8E288D" stackId="a" />
-                  <Bar dataKey="unreconciled" name="Unreconciled" fill="#ef4444" stackId="a" />
-                  <Bar dataKey="pending"      name="Pending"      fill="#9ca3af" stackId="a" radius={[4,4,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </>
-          ) : <p className="text-gray-400 text-center py-12">No district/branch data — approve records first</p>}
+          <div>
+            {district_breakdown.length ? (
+              <>
+                {(() => {
+          //         reconciled: "#4E79A7",
+          // unreconciled: "#E15759",
+          // pending: "#F28E2B",
+          // surplus_assets: "#59A14F",
+          // exist_in_erp_not_physical: "#B07AA1",
+          // duplicated: "#9C755F",
+                  const DIST_COLORS = { reconciled:'#CFB53B', unreconciled:'#000', pending:'#4E79A7', 
+                    surplus_assets:'#8E288D', exist_in_erp_not_physical:'#B07AA1', duplicated:'#9C755F' }
+                  const DIST_LABELS = { reconciled:'Reconciled', unreconciled:'Unreconciled', pending:'Pending', surplus_assets:'Surplus Assets', exist_in_erp_not_physical:'Shortage/Loss Assets', duplicated:'Duplicated' }
+                  const activeKeys = Object.keys(DIST_COLORS).filter(k => district_breakdown.some(r => (r[k]||0) > 0))
+                  return (
+                    <>
+                      {district_breakdown.map(row => (
+                        <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
+                          colors={DIST_COLORS} labels={DIST_LABELS} rowLabel={row.name} />
+                      ))}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                        {activeKeys.map(s => (
+                          <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                            <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: DIST_COLORS[s] }} />
+                            {DIST_LABELS[s]}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )
+                })()}
+              </>
+            ) : <p className="text-gray-400 text-center py-12">No district/branch data — approve records first</p>}
+          </div>
         </div>
       )}
 
@@ -458,9 +587,9 @@ const ReconciliationReport = () => {
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie data={dept_rec_chart} cx="50%" cy="50%"
-                    outerRadius={110} paddingAngle={3} dataKey="value"
+                    innerRadius={60} outerRadius={110} paddingAngle={3} dataKey="value"
                     label={({ name, percent }) =>
-                      percent > 0.03 ? `${(percent*100).toFixed(0)}%` : ''
+                      percent > 0.03 ? `${(percent * 100).toFixed(0)}%` : ''
                     }
                     labelLine={false}>
                     {dept_rec_chart.map((e, i) => <Cell key={i} fill={e.color} />)}
@@ -513,96 +642,136 @@ const ReconciliationReport = () => {
         )
 
         const STATUS_COLORS = {
-          reconciled:               '#10b981',
-          unreconciled:             '#ef4444',
-          pending:                  '#9ca3af',
-          surplus_assets:           '#f97316',
-          exist_in_erp_not_physical:'#8b5cf6',
-          duplicated:               '#ec4899',
-          unique:                   '#14b8a6',
+          // reconciled: '#8E288D',
+          // unreconciled: '#ef4444',
+          // pending: '#868477ff',
+          // surplus_assets: '#a4ad4dff',
+          // exist_in_erp_not_physical: '#7A1E79',
+          // duplicated: '#ee8a9bff',
+          reconciled: "#CFB53B",
+          unreconciled: "#000",
+          pending: "#4E79A7",
+          surplus_assets: "#ec7beaff",
+          exist_in_erp_not_physical: "#e64595ff",
+          duplicated: "#9C755F",
         }
         const STATUS_LABELS = {
-          reconciled: 'Reconciled', unreconciled: 'Unreconciled',
+          reconciled: 'Reconciled', unreconciled: 'Unmatched',
           pending: 'Pending', surplus_assets: 'Surplus Assets',
-          exist_in_erp_not_physical: 'ERP not Physical',
-          duplicated: 'Duplicated', unique: 'Unique',
+          exist_in_erp_not_physical: 'Shortage Asset',
+          duplicated: 'Duplicated',
         }
 
         const { aging_chart = [], department_chart = [], district_chart = [], current_year } = agingData
 
+        const agingActiveStatuses = Object.keys(STATUS_COLORS).filter(s =>
+          aging_chart.some(row => (row[s] || 0) > 0)
+        )
+        const deptActiveStatuses = Object.keys(STATUS_COLORS).filter(s =>
+          department_chart.some(row => (row[s] || 0) > 0)
+        )
+        const distActiveStatuses = Object.keys(STATUS_COLORS).filter(s =>
+          district_chart.some(row => (row[s] || 0) > 0)
+        )
+
         return (
           <div className="space-y-6">
-            {/* Aging Bar Chart */}
-            <div className="bg-white rounded-xl shadow p-6">
-              <h3 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                📅 Asset Aging — Finance Records (vs {current_year})
-              </h3>
-              <p className="text-xs text-gray-400 mb-4">
-                Based on the year field in Finance data. Stacked by approval status.
-              </p>
-              {aging_chart.length ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={aging_chart} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    {Object.entries(STATUS_COLORS).map(([s, c]) => (
-                      <Bar key={s} dataKey={s} name={STATUS_LABELS[s]} stackId="a" fill={c}
-                        radius={s === 'unique' ? [4,4,0,0] : [0,0,0,0]} />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in Finance records</p>}
-            </div>
+            <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-2 gap-4">
+              {/* Aging Bar Chart */}
+              <div className="bg-white rounded-xl shadow p-6">
+                <h3 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                  📅 Asset Aging — ERP Records (vs {current_year})
+                </h3>
+                <p className="text-xs text-gray-400 mb-2">
+                  Based on the year field in ERP data. Stacked by approval status.
+                </p>
+                {aging_chart.length ? (
+                  <>
+                    <div className="mt-2">
+                      {aging_chart.map(row => (
+                        <HorizontalStackedBar
+                          key={row.bucket}
+                          row={row}
+                          statuses={agingActiveStatuses}
+                          colors={STATUS_COLORS}
+                          labels={STATUS_LABELS}
+                          rowLabel={row.bucket}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4 pt-3 border-t border-gray-100">
+                      {agingActiveStatuses.map(s => (
+                        <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                          <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                          {STATUS_LABELS[s]}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in Finance records</p>}
+              </div>
 
-            {/* Department stacked bar */}
-            <div className="bg-white rounded-xl shadow p-6">
-              <h3 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                🏢 By Department — Approval Status Breakdown
-              </h3>
-              {department_chart.length ? (
-                <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={department_chart}
-                    margin={{ top: 5, right: 20, left: 10, bottom: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-35}
-                      textAnchor="end" interval={0} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    {Object.entries(STATUS_COLORS).map(([s, c]) => (
-                      <Bar key={s} dataKey={s} name={STATUS_LABELS[s]} stackId="a" fill={c}
-                        radius={s === 'unique' ? [4,4,0,0] : [0,0,0,0]} />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <p className="text-gray-400 text-center py-8">No department data</p>}
-            </div>
+              {/* Department stacked bar */}
+              <div className="bg-white rounded-xl shadow p-6">
+                <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  🏢 By Department — Approval Status
+                </h3>
+                {department_chart.length ? (
+                  <>
+                    <div className="mt-1">
+                      {department_chart.map(row => (
+                        <HorizontalStackedBar
+                          key={row.name}
+                          row={row}
+                          statuses={deptActiveStatuses}
+                          colors={STATUS_COLORS}
+                          labels={STATUS_LABELS}
+                          rowLabel={row.name}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                      {deptActiveStatuses.map(s => (
+                        <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                          <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                          {STATUS_LABELS[s]}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : <p className="text-gray-400 text-center py-8">No department data</p>}
+              </div>
 
-            {/* District/Branch stacked bar */}
-            <div className="bg-white rounded-xl shadow p-6">
-              <h3 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                📍 By Branch / District — Approval Status Breakdown
-              </h3>
-              {district_chart.length ? (
-                <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={district_chart}
-                    margin={{ top: 5, right: 20, left: 10, bottom: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-35}
-                      textAnchor="end" interval={0} />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    {Object.entries(STATUS_COLORS).map(([s, c]) => (
-                      <Bar key={s} dataKey={s} name={STATUS_LABELS[s]} stackId="a" fill={c}
-                        radius={s === 'unique' ? [4,4,0,0] : [0,0,0,0]} />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : <p className="text-gray-400 text-center py-8">No branch/district data</p>}
+              {/* District/Branch stacked bar */}
+              <div className="bg-white rounded-xl shadow p-6">
+                <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  📍 By Branch / District — Approval Status
+                </h3>
+                {district_chart.length ? (
+                  <>
+                    <div className="mt-1">
+                      {district_chart.map(row => (
+                        <HorizontalStackedBar
+                          key={row.name}
+                          row={row}
+                          statuses={distActiveStatuses}
+                          colors={STATUS_COLORS}
+                          labels={STATUS_LABELS}
+                          rowLabel={row.name}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                      {distActiveStatuses.map(s => (
+                        <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                          <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                          {STATUS_LABELS[s]}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : <p className="text-gray-400 text-center py-8">No branch/district data</p>}
+              </div>
             </div>
           </div>
         )

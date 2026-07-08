@@ -5,12 +5,99 @@ import { toast } from 'react-toastify'
 import { logActivity } from '../services/activityService'
 import { useAuth } from '../context/AuthContext'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
-} from 'recharts'
-import {
   FiUpload, FiDownload, FiClock, FiCheckCircle, FiXCircle, FiLoader,
-  FiFileText, FiFilter, FiSearch, FiCheck, FiCopy,FiCpu,FiTarget
+  FiFileText, FiFilter, FiSearch, FiCheck, FiCopy, FiTarget
 } from 'react-icons/fi'
+
+// ── Age bucket colours (green → red as assets age) ────────────────────────────
+const AGE_COLORS = ['#CFB53B', '#8E288D', '#4E79A7', '#f97316', '#000', '#CFB53B', '#8E288D']
+
+// ── useSegmentTooltip — hover state for aging bars ────────────────────────────
+const useSegmentTooltip = () => {
+  const [tip, setTip] = React.useState(null)
+  const show = (e, data) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTip({ x: rect.left + rect.width / 2, y: rect.top - 8, ...data })
+  }
+  const hide = () => setTip(null)
+  const TooltipEl = tip ? (
+    <div className="fixed z-50 pointer-events-none"
+      style={{ left: tip.x, top: tip.y, transform: 'translate(-50%,-100%)' }}>
+      <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+        <p className="font-bold border-b border-gray-600 pb-1 mb-1">{tip.label}</p>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: tip.color }} />
+          <span>Assets</span>
+        </div>
+        <div className="flex justify-between gap-4 mt-1">
+          <span className="text-gray-300">Count</span>
+          <span className="font-semibold">{tip.count.toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-gray-300">Share</span>
+          <span className="font-semibold">{tip.pct}%</span>
+        </div>
+      </div>
+      <div className="flex justify-center"><div className="w-2 h-2 bg-gray-900 rotate-45 -mt-1" /></div>
+    </div>
+  ) : null
+  return { show, hide, TooltipEl }
+}
+
+// ── AgingChart — horizontal bars for asset aging ─────────────────────────────
+const AgingChart = ({ agingData, agingYear }) => {
+  const { show, hide, TooltipEl } = useSegmentTooltip()
+  const maxCount = Math.max(...agingData.map(d => d.count), 1)
+  return (
+    <div className="bg-white rounded-xl shadow-md p-6">
+      {TooltipEl}
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-lg font-bold text-gray-800">Asset Aging Analysis</h2>
+        <p className="text-xs text-gray-500">
+          (Finance asset year vs {agingYear} — Finance records only)
+        </p>
+      </div>
+      <div className="space-y-3">
+        {agingData.map((d, i) => {
+          const pct = maxCount > 0 ? ((d.count / maxCount) * 100).toFixed(1) : 0
+          const color = AGE_COLORS[Math.min(i, AGE_COLORS.length - 1)]
+          return (
+            <div key={d.bucket}>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 w-16 flex-shrink-0">{d.bucket}</span>
+                <div className="flex-1 bg-gray-100 rounded-md h-8 overflow-hidden relative">
+                  <div
+                    className="h-full flex items-center justify-start rounded-md transition-all duration-700 cursor-default"
+                    style={{ width: `${pct}%`, backgroundColor: color }}
+                    onMouseEnter={e => show(e, { label: d.bucket, count: d.count, pct, color })}
+                    onMouseLeave={hide}
+                  >
+                    <span className="text-white text-xs font-semibold px-2 select-none">
+                      {d.count.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-xs text-gray-400 w-10 text-right">{pct}%</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-gray-100">
+        {agingData.map((d, i) => {
+          const color = AGE_COLORS[Math.min(i, AGE_COLORS.length - 1)]
+          return (
+            <div key={d.bucket} className="flex items-center gap-1 text-xs text-gray-600">
+              <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: color }} />
+              {d.bucket}: <strong className="ml-0.5">{d.count.toLocaleString()}</strong>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 
 const Dashboard = () => {
   const [reconciliations, setReconciliations] = useState([])
@@ -129,39 +216,40 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl 
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
+          <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl 
           shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(142,40,141,0.4)] 
           hover:shadow-[0_8px_25px_rgba(142,40,141,0.6)] 
            p-5 text-[#8E288D] transform hover:scale-105 transition-all duration-300">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[#8E288D] text-xs font-medium">Total Jobs</p>
-              <p className="text-3xl font-bold mt-1">{stats.total}</p>
-            </div>
-            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-              <FiFileText className="h-6 w-6" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[#8E288D] text-xs font-medium">Total Jobs</p>
+                <p className="text-3xl font-bold mt-1">{stats.total}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+                <FiFileText className="h-6 w-6" />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl 
+          <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl 
           shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(0,128,128,0.4)] 
           hover:shadow-[0_8px_25px_rgba(0,128,128,0.6)] p-5 
           text-[#008080] transform hover:scale-105 transition-transform">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[#008080] text-xs font-medium">Completed</p>
-              <p className="text-3xl font-bold mt-1">{stats.completed}</p>
-            </div>
-            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-              <FiCheckCircle className="h-6 w-6" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[#008080] text-xs font-medium">Completed</p>
+                <p className="text-3xl font-bold mt-1">{stats.completed}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+                <FiCheckCircle className="h-6 w-6" />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl shadow-xl 
+          {/* <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl shadow-xl 
         hover:shadow-2xl shadow-[0_4px_15px_rgba(245,158,11,0.4)] 
           hover:shadow-[0_8px_25px_rgba(245,158,11,0.6)]
         p-5 text-[#F59E0B] transform hover:scale-105 transition-transform">
@@ -192,24 +280,24 @@ const Dashboard = () => {
           </div>
         </div> */}
 
-        <div className="bg-gradient-to-br from-white-500 to-white-600 
+          <div className="bg-gradient-to-br from-white-500 to-white-600 
           rounded-xl shadow-xl 
           hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
           hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
           p-5 text-gray-800 transform hover:scale-105 transition-transform">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-700 text-xs font-medium">Tag Matched</p>
-              <p className="text-3xl font-bold mt-1">{(stats.exactMatch || 0).toLocaleString()}</p>
-              <p className="text-xs font-semibold text-gray-500 mt-0.5">Rule / Matched</p>
-            </div>
-            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-              <FiTarget className="h-6 w-6" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-700 text-xs font-medium">Tag Matched</p>
+                <p className="text-3xl font-bold mt-1">{(stats.exactMatch || 0).toLocaleString()}</p>
+                <p className="text-xs font-semibold text-gray-500 mt-0.5">Rule / Matched</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+                <FiTarget className="h-6 w-6" />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* <div className="bg-gradient-to-br from-white-500 to-white-600 
+          {/* <div className="bg-gradient-to-br from-white-500 to-white-600 
           rounded-xl shadow-xl 
           hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
           hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
@@ -226,101 +314,64 @@ const Dashboard = () => {
           </div>
         </div> */}
 
-        <div className="bg-gradient-to-br from-white-500 to-white-600 
+          <div className="bg-gradient-to-br from-white-500 to-white-600 
           rounded-xl shadow-xl 
           hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
           hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
           p-5 text-gray-800 transform hover:scale-105 transition-transform">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-700 text-xs font-medium">Near Match</p>
-              <p className="text-3xl font-bold mt-1">{(stats.nearMatch+stats.aiMatched || 0).toLocaleString()}</p>
-              <p className="text-xs font-semibold text-gray-500 mt-0.5">AI+Fuzzy / Require Review</p>
-            </div>
-            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-              <FiSearch className="h-6 w-6" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-700 text-xs font-medium">Near Match</p>
+                <p className="text-3xl font-bold mt-1">{(stats.nearMatch + stats.aiMatched || 0).toLocaleString()}</p>
+                <p className="text-xs font-semibold text-gray-500 mt-0.5">AI+Fuzzy / Require Review</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+                <FiSearch className="h-6 w-6" />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-gradient-to-br from-white-500 to-white-600 
+          <div className="bg-gradient-to-br from-white-500 to-white-600 
           rounded-xl shadow-xl 
           hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
           hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
           p-5 text-gray-800 transform hover:scale-105 transition-transform">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-700 text-xs font-medium">Unmatch</p>
-              <p className="text-3xl font-bold mt-1">{(stats.unMatch || 0).toLocaleString()}</p>
-              <p className="text-xs font-semibold text-gray-500 mt-0.5">Unmatched Assets</p>
-            </div>
-            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-              <FiSearch className="h-6 w-6" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-700 text-xs font-medium">Unmatch</p>
+                <p className="text-3xl font-bold mt-1">{(stats.unMatch || 0).toLocaleString()}</p>
+                <p className="text-xs font-semibold text-gray-500 mt-0.5">Unmatched Assets</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+                <FiSearch className="h-6 w-6" />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="bg-gradient-to-br from-white-500 to-white-600 
+          <div className="bg-gradient-to-br from-white-500 to-white-600 
         rounded-xl shadow-xl 
         hover:shadow-2xl shadow-[0_4px_15px_rgba(236,72,153,0.4)] 
           hover:shadow-[0_8px_25px_rgba(236,72,153,0.6)]  
         p-5 text-pink-500 transform hover:scale-105 transition-transform">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-pink-500 text-xs font-medium">Duplicates</p>
-              <p className="text-3xl font-bold mt-1">{(stats.duplicates || 0).toLocaleString()}</p>
-              <p className="text-xs text-pink-500 mt-0.5">Phys. + ERP</p>
-            </div>
-            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-              <FiCopy className="h-6 w-6" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-pink-500 text-xs font-medium">Duplicates</p>
+                <p className="text-3xl font-bold mt-1">{(stats.duplicates || 0).toLocaleString()}</p>
+                <p className="text-xs text-pink-500 mt-0.5">Phys. + ERP</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+                <FiCopy className="h-6 w-6" />
+              </div>
             </div>
           </div>
+        </div>
+        <div>
+          {/* Aging Analysis Chart */}
+          {agingData.length > 0 && (
+            <AgingChart agingData={agingData} agingYear={agingYear} />
+          )}
         </div>
       </div>
-
-      {/* Aging Analysis Chart */}
-      {agingData.length > 0 && (
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-gray-800">Asset Aging Analysis</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Based on Finance asset year vs current year ({agingYear}) — Finance records only
-              </p>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={agingData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="bucket" tick={{ fontSize: 12, fill: '#6b7280' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} />
-              <Tooltip
-                formatter={(v) => [v.toLocaleString(), 'Assets']}
-                contentStyle={{ fontSize: '12px', borderRadius: '8px' }}
-              />
-              <Bar dataKey="count" name="Assets" radius={[6, 6, 0, 0]}>
-                {agingData.map((entry, i) => {
-                  // colour gets redder as assets age
-                  const colors = ['#10b981', '#34d399', '#fbbf24', '#f97316', '#ef4444', '#b91c1c', '#9ca3af']
-                  return <Cell key={i} fill={colors[Math.min(i, colors.length - 1)]} />
-                })}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="flex flex-wrap gap-3 mt-2 justify-center">
-            {agingData.map((d, i) => {
-              const colors = ['#10b981', '#34d399', '#fbbf24', '#f97316', '#ef4444', '#b91c1c', '#9ca3af']
-              return (
-                <div key={d.bucket} className="flex items-center gap-1 text-xs text-gray-600">
-                  <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: colors[Math.min(i, colors.length - 1)] }} />
-                  {d.bucket}: <strong>{d.count.toLocaleString()}</strong>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Action Bar */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
@@ -331,8 +382,8 @@ const Dashboard = () => {
           <Link
             to="/upload"
             className="inline-flex items-center justify-center 
-            px-6 py-3 bg-gradient-to-r from-[#8E288D] to-[#7A1E79]  
-            text-white rounded-lg hover:from-[#008080] hover:to-[#008070]
+            px-6 py-3 bg-gradient-to-r from-[#8E288D] to-[#CFB53B]  
+            text-white rounded-lg hover:from-[#D4AF37] hover:to-[#7A1E79]
             transition-all shadow-md hover:shadow-lg transform hover:scale-105"
           >
             <FiUpload className="mr-2 h-5 w-5" />
@@ -433,13 +484,13 @@ const Dashboard = () => {
                           logActivity(window.location.pathname, `VIEW_RESULTS_ID_${recon.id}`)
                           navigate(`/results/${recon.id}`)
                         }}
-                        className="px-4 py-2 bg-[#8E288D] text-white rounded-lg hover:bg-[#7A1E79] transition-colors text-sm font-medium"
+                        className="px-4 py-2 bg-gradient-to-r from-[#CFB53B] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#CFB53B] transition-colors text-sm font-medium"
                       >
                         View Results
                       </button>
                       <button
                         onClick={() => navigate(`/report/${recon.id}`)}
-                        className="px-4 py-2 bg-[#000000] text-white rounded-lg hover:bg-[#001111] transition-colors text-sm font-medium flex items-center justify-center"
+                        className="px-4 py-2 bg-gradient-to-r from-[#000] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#000] transition-colors text-sm font-medium flex items-center justify-center"
                       >
                         📊 Dashboard
                       </button>
@@ -448,7 +499,7 @@ const Dashboard = () => {
                           logActivity(window.location.pathname, `VIEW_APPROVAL_ID_${recon.id}`)
                           navigate(`/approval/${recon.id}`)
                         }}
-                        className="px-4 py-2 bg-[#CFB53B] text-white rounded-lg hover:bg-[#CFB53B] transition-colors
+                        className="px-4 py-2 bg-gradient-to-r from-[#CFB53B] to-[#000000] text-white rounded-lg hover:from-[#000000] hover:to-[#CFB53B] transition-colors
                          text-sm font-medium flex items-center justify-center"
                       >
                         <FiCheck className="mr-2 h-4 w-4" />
@@ -456,7 +507,7 @@ const Dashboard = () => {
                       </button>
                       <button
                         onClick={() => handleDownload(recon.id)}
-                        className="px-4 py-2 bg-[#000040] text-white rounded-lg hover:bg-black transition-colors text-sm font-medium flex items-center justify-center"
+                        className="px-4 py-2 bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] transition-colors text-sm font-medium flex items-center justify-center"
                       >
                         <FiDownload className="mr-2 h-4 w-4" />
                         Download

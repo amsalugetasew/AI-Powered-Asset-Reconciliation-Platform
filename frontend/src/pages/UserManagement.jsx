@@ -97,7 +97,7 @@ const UserManagement = () => {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 bg-[#8E288D] text-white px-4 py-2 rounded-lg hover:bg-[#7a2279] transition-colors"
+          className="flex items-center gap-2 bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] px-4 py-2 transition-colors"
         >
           <FiPlus className="h-5 w-5" />
           Create User
@@ -132,7 +132,7 @@ const UserManagement = () => {
                 <tr key={user.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gradient-to-br from-[#8E288D] to-[#008080] rounded-full flex items-center justify-center text-white font-semibold">
+                      <div className="w-10 h-10 bg-gradient-to-r from-[#8E288D] to-[#CFB53B] hover:from-[#CFB53B] hover:to-[#8E288D] rounded-full flex items-center justify-center text-white font-semibold">
                         {user.username.charAt(0).toUpperCase()}
                       </div>
                       <div className="ml-4">
@@ -286,7 +286,7 @@ const UserManagement = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-[#8E288D] text-white rounded-lg hover:bg-[#7a2279] transition-colors"
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] transition-colors"
                 >
                   Create User
                 </button>

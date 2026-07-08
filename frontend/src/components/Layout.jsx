@@ -111,8 +111,8 @@ const Layout = () => {
                     to={item.path}
                     className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                       isActive(item.path)
-                        ? 'bg-[#8E288D] text-white shadow-lg transform scale-105'
-                        : 'text-[#8E288D] hover:bg-[#CFB53C] hover:text-white hover:transform hover:scale-105'
+                        ? 'bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] shadow-lg transform scale-105'
+                        : 'text-[#8E288D] hover:bg-gradient-to-r from-[#CFB53C] to-[#8E288D] hover:text-white hover:transform hover:scale-105'
                     }`}
                   >
                     <Icon className="h-5 w-5 flex-shrink-0" />

@@ -56,6 +56,7 @@ const Results = () => {
   const [totalPages, setTotalPages] = useState(0)
   const [recordsStored, setRecordsStored] = useState(false)
   const [expandedCols, setExpandedCols] = useState({})
+  const [tableCollapsed, setTableCollapsed] = useState(false)
 
   const toggleCol = (label) =>
     setExpandedCols(prev => ({ ...prev, [label]: !prev[label] }))
@@ -226,7 +227,7 @@ const Results = () => {
 
       <div className="sm:flex sm:items-center sm:justify-between">
         <div className='flex'>
-          <h1 className="text-3xl font-semibold  text-gray-900">
+          <h1 className="text-3xl font-semibold  text-gray-900 mr-4">
             Reconciliation Results #{id}
           </h1>
           <p className="mt-2 text-sm text-gray-700">
@@ -237,7 +238,7 @@ const Results = () => {
           <button
             onClick={() => navigate(`/report/${id}`)}
             className="inline-flex items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium 
-            text-white bg-[#000020] hover:bg-[#001111]"
+            text-white bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D]"
           >
             <FiBarChart2 className="w-5 h-5 mr-2" />
             Dashboard Report
@@ -245,8 +246,7 @@ const Results = () => {
           <button
             onClick={() => navigate(`/approval/${id}`)}
             className="inline-flex items-center px-4 py-3 border 
-            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#8E288D]
-            hover:bg-[#7A1E79]"
+            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#8E288D] to-[#000000] text-white rounded-lg hover:from-[#000000] hover:to-[#8E288D]"
           >
             <FiCheck className="mr-2" />
             {hasRole('manager') ? 'Review & Approve' : 'View Approval Status'}
@@ -254,8 +254,7 @@ const Results = () => {
           <button
             onClick={handleDownload}
             className="inline-flex items-center px-4 py-3 border 
-            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#CFB53B]
-            hover:bg-[#CFB53C]"
+            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#CFB53B] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#CFB53B]"
           >
             <FiDownload className="mr-2" />
             Download
@@ -264,184 +263,274 @@ const Results = () => {
       </div>
 
       {/* Processed Records Table */}
-      <div className="mt-8 bg-white shadow rounded-xl overflow-hidden">
-        {/* Header + category tabs */}
-        <div className="p-5 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Processed Records</h2>
-            <span className="text-sm text-gray-500">Total: {totalRecords} records</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { key: 'all',           label: 'All',                                      cls: 'bg-purple-100 text-[#8E288D]',   active: 'bg-[#8E288D] text-white'  },
-              { key: 'Exact Match',   label: `Exact Match (${stats.rule_matched})`,       cls: 'bg-green-100 text-green-700',    active: 'bg-green-600 text-white'   },
-              { key: 'AI Match',      label: `AI Match (${stats.ai_matched})`,            cls: 'bg-purple-100 text-[#7A1E79]',   active: 'bg-[#7A1E79] text-white'   },
-              { key: 'Manual Review', label: `Near Match (${stats.manual_review})`,       cls: 'bg-blue-100 text-blue-700',      active: 'bg-blue-600 text-white'    },
-              { key: 'Unmatched',     label: `Unmatched (${stats.customer_unmatched})`,   cls: 'bg-red-100 text-red-700',        active: 'bg-red-600 text-white'     },
-              { key: 'Duplicate',     label: `Duplicates (${(stats.customer_duplicates||0)+(stats.internal_duplicates||0)})`, cls: 'bg-pink-100 text-pink-700', active: 'bg-pink-600 text-white' },
-            ].map(tab => (
-              <button key={tab.key}
-                onClick={() => handleCategoryChange(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  selectedCategory === tab.key ? tab.active : tab.cls + ' hover:opacity-80'
-                }`}>
-                {tab.label}
-              </button>
-            ))}
+      <div className="mt-8 shadow rounded-xl overflow-hidden" style={{ background: '#fff' }}>
+        {/* Table header bar — dark blue like reference */}
+        <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)" }}>
+          <h2 className="text-base font-semibold text-white tracking-wide">Processed Records</h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-blue-200">{totalRecords} records</span>
+            <button
+              onClick={() => setTableCollapsed(c => !c)}
+              className="text-white opacity-70 hover:opacity-100 font-bold text-lg leading-none px-1"
+              title={tableCollapsed ? 'Expand' : 'Collapse'}>
+              {tableCollapsed ? '+' : '−'}
+            </button>
           </div>
         </div>
 
-        {/* Paired-column table */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-xl border-collapse">
-            <thead>
-              {/* Row 1 — group headers */}
-              <tr className="bg-gray-100 border-b border-gray-500">
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-500 sticky left-0 bg-gray-100 z-10">
-                  Category
-                </th>
-                {RESULT_COLUMN_PAIRS.map(p => (
-                  <th key={p.label} colSpan={2}
-                    onClick={p.expandable ? () => toggleCol(p.label) : undefined}
-                    className={`px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r 
-                      border-gray-500 whitespace-nowrap
-                      ${p.expandable ? 'cursor-pointer select-none hover:bg-yellow-100' : ''}
-                      ${expandedCols[p.label] ? 'bg-yellow-50' : ''}`}
-                    title={p.expandable ? (expandedCols[p.label] ? 'Click to collapse' : 'Click to expand') : undefined}>
-                    {p.label}
-                    {p.expandable && (
-                      <span className="ml-1 text-gray-400 text-xs">
-                        {expandedCols[p.label] ? '⇤' : '⇥'}
-                      </span>
-                    )}
-                  </th>
-                ))}
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-500">Match</th>
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-500">Conf.</th>
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-amber-700 uppercase whitespace-nowrap border-r border-gray-500 bg-amber-50">Dept. Reconcile</th>
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-500">Approval</th>
-              </tr>
-              {/* Row 2 — Customer / Finance */}
-              <tr className="bg-gray-50 border-b-2 border-gray-400">
-                {RESULT_COLUMN_PAIRS.map(p => (
-                  <React.Fragment key={p.label}>
-                    <th className="px-3 py-1 text-center text-xs font-bold text-[#8E288D] bg-purple-50 border-r border-gray-400 whitespace-nowrap">Physical</th>
-                    <th className="px-3 py-1 text-center text-xs font-bold text-[#CFB53C] bg-teal-50 border-r border-gray-400 whitespace-nowrap">ERP</th>
-                  </React.Fragment>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {recordsLoading ? (
-                <tr>
-                  <td colSpan={3 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#8E288D] mx-auto mb-3" />
-                    <p className="text-gray-500">Loading records…</p>
-                  </td>
-                </tr>
-              ) : records.length === 0 ? (
-                <tr>
-                  <td colSpan={3 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center text-gray-400">
-                    <FiDatabase className="mx-auto h-10 w-10 mb-2" />
-                    <p>No records found</p>
-                  </td>
-                </tr>
-              ) : records.map((rec, idx) => (
-                <tr key={rec.id} className={`hover:bg-yellow-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                  {/* Category */}
-                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-400">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
-                      rec.category === 'Exact Match'        ? 'bg-green-100 text-green-800'   :
-                      rec.category === 'AI Match'           ? 'bg-purple-100 text-purple-800' :
-                      rec.category === 'Manual Review'      ? 'bg-blue-100 text-blue-700'     :
-                      rec.category === 'Customer Unmatched' ? 'bg-red-100 text-red-700'       :
-                      rec.category === 'Finance Unmatched'  ? 'bg-orange-100 text-orange-700' :
-                      rec.category === 'Duplicate'          ? 'bg-pink-100 text-pink-700'     :
-                      'bg-gray-100 text-gray-700'
-                    }`}>{rec.category}</span>
-                  </td>
-                  {/* Paired columns */}
-                  {RESULT_COLUMN_PAIRS.map(p => {
-                    const isExpanded = expandedCols[p.label]
-                    const cellCls = isExpanded
-                      ? 'px-3 py-2 text-xs text-gray-800 border-r border-gray-300 min-w-[200px] max-w-[400px] whitespace-normal break-words'
-                      : 'px-3 py-2 text-xs text-gray-800 border-r border-gray-300 max-w-[140px] whitespace-nowrap overflow-hidden'
-                    return (
+        {/* Category tabs */}
+        <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap gap-2" style={{ background: '#f8fafc'}}>
+          {[
+            { key: 'all',           label: 'All',                                          cls: 'bg-white text-gray-600 border-gray-300',       active: 'bg-[#1a3a5c] text-white border-[#1a3a5c]' },
+            { key: 'Exact Match',   label: `Tag Match (${stats.rule_matched})`,           cls: 'bg-white text-[#1a3a5c] border-[#1a3a5c]',     active: 'bg-[#1a3a5c] text-white border-[#1a3a5c]'  },
+            { key: 'AI Match',      label: `AI Match (${stats.ai_matched})`,                cls: 'bg-white text-purple-700 border-purple-300',   active: 'bg-[#7A1E79] text-white border-[#7A1E79]'  },
+            { key: 'Manual Review', label: `Near Match (${stats.manual_review})`,           cls: 'bg-white text-[#1a3a5c] border-[#1a3a5c]',       active: 'bg-[#1a3a5c] text-white border-[#1a3a5c]'    },
+            { key: 'Unmatched',     label: `Unmatched (${stats.customer_unmatched})`,       cls: 'bg-white text-red-600 border-red-300',         active: 'bg-red-600 text-white border-red-600'      },
+            { key: 'Duplicate',     label: `Duplicates (${(stats.customer_duplicates||0)+(stats.internal_duplicates||0)})`, cls: 'bg-white text-pink-600 border-pink-300', active: 'bg-pink-600 text-white border-pink-600' },
+          ].map(tab => (
+            <button key={tab.key}
+              onClick={() => handleCategoryChange(tab.key)}
+              className={`px-3 py-1 rounded border text-xs font-semibold transition-colors ${
+                selectedCategory === tab.key ? tab.active : tab.cls + ' hover:opacity-80'
+              }`}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Table — collapsible */}
+        {!tableCollapsed && (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full" style={{ borderCollapse: 'collapse' }}>
+                <thead>
+                  {/* Row 1 — dark blue group headers like reference */}
+                  <tr style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)" }}>
+                    <th rowSpan={2}
+                      className="px-4 py-3 text-left text-xs font-bold text-white uppercase whitespace-nowrap sticky left-0 z-10"
+                      style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)", letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
+                      Category
+                    </th>
+                    {RESULT_COLUMN_PAIRS.map(p => (
+                      <th key={p.label} colSpan={2}
+                        onClick={p.expandable ? () => toggleCol(p.label) : undefined}
+                        className={`px-3 py-2 text-center text-xs font-bold text-gray-700 uppercase whitespace-nowrap ${p.expandable ? 'cursor-pointer select-none' : ''}`}
+                        style={{
+                          background: expandedCols[p.label] ? '#E0E0E0' : '#E0E0E0',
+                          letterSpacing: '0.07em',
+                          borderRight: '1px solid rgba(255,255,255,0.15)',
+                        }}
+                        title={p.expandable ? (expandedCols[p.label] ? 'Collapse' : 'Expand') : undefined}>
+                        {p.label}
+                        {p.expandable && (
+                          <span className="ml-1 text-white/50 text-xs">
+                            {expandedCols[p.label] ? ' ⇤' : ' ⇥'}
+                          </span>
+                        )}
+                      </th>
+                    ))}
+                    <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap"
+                      style={{ background: '#E0E0E0', letterSpacing: '0.07em', borderLeft: '1px solid rgba(255,255,255,0.2)', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                      Match ⇅
+                    </th>
+                    <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap"
+                      style={{ background: '#E0E0E0', letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                      Conf. ⇅
+                    </th>
+                    <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap"
+                      style={{ background: '#E0E0E0', letterSpacing: '0.07em', borderRight: '1px solid #B0B0B0' }}>
+                      Dept. Reconcile ⇅
+                    </th>
+                    <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap"
+                      style={{ background: '#E0E0E0', letterSpacing: '0.07em' }}>
+                      Approval ⇅
+                    </th>
+                  </tr>
+                  {/* Row 2 — Physical / ERP sub-headers */}
+                  <tr style={{ background: '#E0E0E0', borderBottom: '1px solid #a19a9aff',borderTop: '0.15px solid #cfcdcdff' }}>
+                    {RESULT_COLUMN_PAIRS.map(p => (
                       <React.Fragment key={p.label}>
-                        <td className={`${cellCls} bg-purple-50/30`}>
-                          {isExpanded
-                            ? <span>{rec[p.cKey]}</span>
-                            : <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>
-                          }
-                        </td>
-                        <td className={`${cellCls} bg-teal-50/30 border-r border-gray-200`}>
-                          {isExpanded
-                            ? <span>{rec[p.iKey]}</span>
-                            : <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>
-                          }
-                        </td>
+                        <th className="px-3 py-1.5 text-center text-xs font-semibold text-gray-600/90 whitespace-nowrap"
+                          style={{ background: '#E0E0E0', borderRight: '0.15px solid #cfcdcdff' }}>
+                          Physical
+                        </th>
+                        <th className="px-3 py-1.5 text-center text-xs font-semibold text-gray-600/90 whitespace-nowrap"
+                          style={{ background: '#E0E0E0', borderRight: '0.51px solid #cfcdcdff' }}>
+                          ERP
+                        </th>
                       </React.Fragment>
-                    )
-                  })}
-                  {/* Match */}
-                  <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap border-r border-gray-300">{rec.match_method}</td>
-                  {/* Confidence */}
-                  <td className="px-3 py-2 text-xs font-medium text-gray-800 whitespace-nowrap border-r border-gray-300">{rec.confidence}</td>
-                  {/* Dept Reconcile */}
-                  <td className="px-3 py-2 whitespace-nowrap border-r border-gray-400 bg-amber-50/40">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${rec.dept_reconcile === 'Same' ? 'font-bold text-[#8E288D]' :
-                      rec.dept_reconcile === 'Same Dept, Diff District' ? 'font-bold text-[#CFB53C]' :
-                        rec.dept_reconcile === 'Diff Dept, Same District' ? 'font-bold text-orange-800' :
-                          rec.dept_reconcile === 'Different' ? 'font-bold text-[#CFB53C]' :
-                            'bg-gray-100 text-gray-500'
-                      }`}>
-                      {rec.dept_reconcile || 'N/A'}
-                    </span>
-                  </td>
-                  {/* Approval status badge */}
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${APPROVAL_BADGE_CLS[rec.approval_status] || APPROVAL_BADGE_CLS.pending}`}>
-                      {APPROVAL_LABEL[rec.approval_status] || 'Pending'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    ))}
+                  </tr>
+                </thead>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-4 py-3 flex items-center justify-between border-t border-gray-300 bg-white">
-            <p className="text-sm text-gray-600">
-              Showing {((currentPage - 1) * recordsPerPage) + 1}–{Math.min(currentPage * recordsPerPage, totalRecords)} of {totalRecords}
-            </p>
-            <div className="flex gap-1.5 items-center">
-              <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1}
-                className="p-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50">
-                <FiChevronLeft className="h-4 w-4" />
-              </button>
-              {[...Array(totalPages)].map((_, i) => {
-                const pn = i + 1
-                if (pn === 1 || pn === totalPages || (pn >= currentPage - 1 && pn <= currentPage + 1)) {
-                  return (
-                    <button key={pn} onClick={() => handlePageChange(pn)}
-                      className={`px-3 py-1 rounded border text-sm font-medium ${currentPage === pn ? 'bg-[#8E288D] text-white border-[#8E288D]'
-                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                      {pn}
+                <tbody>
+                  {recordsLoading ? (
+                    <tr>
+                      <td colSpan={3 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#1a3a5c] mx-auto mb-3" />
+                        <p className="text-gray-400 text-sm">Loading records…</p>
+                      </td>
+                    </tr>
+                  ) : records.length === 0 ? (
+                    <tr>
+                      <td colSpan={3 + RESULT_COLUMN_PAIRS.length * 2} className="px-4 py-12 text-center text-gray-400">
+                        <FiDatabase className="mx-auto h-10 w-10 mb-2 opacity-30" />
+                        <p className="text-sm">No records found</p>
+                      </td>
+                    </tr>
+                  ) : records.map((rec, idx) => (
+                    <tr key={rec.id}
+                      style={{ background: idx % 2 === 0 ? '#ffffff' : '#f4f7fa', borderBottom: '1px solid #e8ecf0' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#eef4ff'}
+                      onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f4f7fa'}>
+
+                      {/* Category */}
+                      <td className="px-4 py-2.5 whitespace-nowrap sticky left-0 z-10"
+                        style={{ background: 'inherit', borderRight: '1px solid #e2e8f0' }}>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                          style={{
+                            color: rec.category === 'Exact Match' ? '#1a3a5c' :
+                                   rec.category === 'AI Match' ? '#1a3a5c' :
+                                   rec.category === 'Manual Review' ? '#1a3a5c' :
+                                   rec.category === 'Customer Unmatched' ? '#1a3a5c' :
+                                   rec.category === 'Finance Unmatched' ? '#1a3a5c' :
+                                   rec.category === 'Duplicate' ? '#1a3a5c' : '#1a3a5c',
+                            background: rec.category === 'Exact Match' ? '#fff' :
+                                        rec.category === 'AI Match' ? '#fff' :
+                                        rec.category === 'Manual Review' ? '#fff' :
+                                        rec.category === 'Customer Unmatched' ? '#fff' :
+                                        rec.category === 'Finance Unmatched' ? '#fff' :
+                                        rec.category === 'Duplicate' ? '#fce7f3' : '#f1f5f9',
+                          }}>
+                          {rec.category}
+                        </span>
+                      </td>
+
+                      {/* Paired columns */}
+                      {RESULT_COLUMN_PAIRS.map(p => {
+                        const isExpanded = expandedCols[p.label]
+                        const w = isExpanded
+                          ? 'min-w-[200px] max-w-[400px] whitespace-normal break-words'
+                          : 'max-w-[140px] whitespace-nowrap overflow-hidden'
+                        return (
+                          <React.Fragment key={p.label}>
+                            <td className={`px-4 py-2.5 text-xs ${w}`}
+                              style={{ color: '#334155', background: 'rgba(124,58,237,0.015)' }}>
+                              {isExpanded ? <span>{rec[p.cKey]}</span> : <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>}
+                            </td>
+                            <td className={`px-4 py-2.5 text-xs ${w}`}
+                              style={{ color: '#334155', background: 'rgba(15,118,110,0.015)', borderRight: '1px solid #e8ecf0' }}>
+                              {isExpanded ? <span>{rec[p.iKey]}</span> : <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>}
+                            </td>
+                          </React.Fragment>
+                        )
+                      })}
+
+                      {/* Match */}
+                      <td className="px-4 py-2.5 text-xs font-medium whitespace-nowrap"
+                        style={{ color: '#64748b', borderLeft: '1px solid #e2e8f0' }}>
+                        {rec.match_method}
+                      </td>
+
+                      {/* Confidence */}
+                      <td className="px-4 py-2.5 text-xs font-bold whitespace-nowrap"
+                        style={{ color: '#8E288D' }}>
+                        {rec.confidence}
+                      </td>
+
+                      {/* Dept Reconcile — pastel full-cell */}
+                      <td className="px-3 py-2.5 whitespace-nowrap text-center"
+                        style={{
+                          background: rec.dept_reconcile === 'Same'                     ? '#f1f1f1' :
+                                      rec.dept_reconcile === 'Same Dept, Diff District' ? '#dbeafe' :
+                                      rec.dept_reconcile === 'Diff Dept, Same District' ? '#ffedd5' :
+                                      rec.dept_reconcile === 'Different'                ? '#f2f2f2' : '#f8fafc',
+                          color:      rec.dept_reconcile === 'Same'                     ? '#1a3a5c' :
+                                      rec.dept_reconcile === 'Same Dept, Diff District' ? '#1e40af' :
+                                      rec.dept_reconcile === 'Diff Dept, Same District' ? '#92400e' :
+                                      rec.dept_reconcile === 'Different'                ? '#991b1b' : '#94a3b8',
+                        }}>
+                        <span className="text-xs font-bold">{rec.dept_reconcile || 'N/A'}</span>
+                      </td>
+
+                      {/* Approval — pastel full-cell */}
+                      <td className="px-3 py-2.5 whitespace-nowrap text-center"
+                        style={{
+                          background: {
+                            reconciled:               '#f1f1f1',
+                            unreconciled:             '#fee2e2',
+                            surplus_assets:           '#ede9fe',
+                            exist_in_erp_not_physical:'#fce7f3',
+                            duplicated:               '#f1f5f9',
+                            unique:                   '#ccfbf1',
+                            pending:                  '#e7e3cfff',
+                          }[rec.approval_status] || '#f8fafc',
+                        }}>
+                        <span className="text-xs font-bold"
+                          style={{
+                            color: {
+                              reconciled: '#1a3a5c', unreconciled: '#991b1b',
+                              surplus_assets: '#3c4349ff', exist_in_erp_not_physical: '#9c5b75ff',
+                              duplicated: '#334155', unique: '#134e4a', pending: '#000',
+                            }[rec.approval_status] || '#64748b'
+                          }}>
+                          {APPROVAL_LABEL[rec.approval_status] || 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer — pagination + download */}
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
+              {totalPages > 1 ? (
+                <div className="flex items-center gap-3">
+                  <p className="text-xs text-gray-500">
+                    Showing {((currentPage-1)*recordsPerPage)+1}–{Math.min(currentPage*recordsPerPage, totalRecords)} of {totalRecords}
+                  </p>
+                  <div className="flex gap-1 items-center">
+                    <button onClick={() => handlePageChange(currentPage-1)} disabled={currentPage===1}
+                      className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
+                      <FiChevronLeft className="h-3.5 w-3.5 text-gray-500" />
                     </button>
-                  )
-                } else if (pn === currentPage - 2 || pn === currentPage + 2) {
-                  return <span key={pn} className="px-1 text-gray-400">…</span>
-                }
-                return null
-              })}
-              <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages}
-                className="p-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50">
-                <FiChevronRight className="h-4 w-4" />
+                    {[...Array(totalPages)].map((_, i) => {
+                      const pn = i+1
+                      if (pn===1||pn===totalPages||(pn>=currentPage-1&&pn<=currentPage+1)) {
+                        return (
+                          <button key={pn} onClick={() => handlePageChange(pn)}
+                            className={`px-2.5 py-1 rounded border text-xs font-medium ${
+                              currentPage===pn ? 'border-[#1a3a5c] text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                            }`}
+                            style={{ background: currentPage===pn ? '#1a3a5c' : undefined }}>
+                            {pn}
+                          </button>
+                        )
+                      } else if (pn===currentPage-2||pn===currentPage+2) {
+                        return <span key={pn} className="text-gray-400 text-xs">…</span>
+                      }
+                      return null
+                    })}
+                    <button onClick={() => handlePageChange(currentPage+1)} disabled={currentPage===totalPages}
+                      className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
+                      <FiChevronRight className="h-3.5 w-3.5 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-xs text-gray-400">{totalRecords} records</span>
+              )}
+              {/* Download CSV */}
+              <button
+                onClick={handleDownload}
+                className="text-xs font-semibold hover:underline flex items-center gap-1"
+                style={{ color: '#1a3a5c' }}>
+                <FiDownload className="h-3.5 w-3.5" />
+                Download Data (CSV/Excel)
               </button>
             </div>
-          </div>
+          </>
         )}
       </div>
 

@@ -10,65 +10,65 @@ import { useAuth } from '../context/AuthContext'
 
 // ── Status definitions ────────────────────────────────────────────────────────
 const STATUSES = [
-  { value: 'pending',                   label: 'Pending',              color: '#CFB53B'   },
-  { value: 'reconciled',               label: 'Reconciled',           color: '#8E288D'  },
-  { value: 'unreconciled',             label: 'Unreconciled',         color: 'red'    },
-  { value: 'surplus_assets',           label: 'Surplus Assets',       color: 'orange' },
-  { value: 'exist_in_erp_not_physical',label: 'Shortage Assets', color: 'purple' },
-  { value: 'duplicated',               label: 'Duplicated',           color: 'pink'   },
-  { value: 'unique',                   label: 'Unique',               color: 'teal'   },
+  { value: 'pending', label: 'Pending', color: '#CFB53B' },
+  { value: 'reconciled', label: 'Reconciled', color: '#1a3a5c' },
+  { value: 'unreconciled', label: 'Unreconciled', color: 'red' },
+  { value: 'surplus_assets', label: 'Surplus Assets', color: 'orange' },
+  { value: 'exist_in_erp_not_physical', label: 'Shortage Assets', color: 'purple' },
+  { value: 'duplicated', label: 'Duplicated', color: 'pink' },
+  { value: 'unique', label: 'Unique', color: 'teal' },
 ]
 
 const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.value, s]))
 
 const statusBadgeCls = {
-  pending:                   'bg-gray-100 text-gray-700',
-  reconciled:               'bg-gray-10 text-[#8E288D]',
-  unreconciled:             'bg-red-100 text-red-800',
-  surplus_assets:           'bg-orange-100 text-orange-800',
-  exist_in_erp_not_physical:'bg-purple-100 text-purple-800',
-  duplicated:               'bg-pink-100 text-pink-800',
-  unique:                   'bg-teal-100 text-teal-800',
+  pending: 'bg-gray-100 text-gray-700',
+  reconciled: 'bg-gray-10 text-[#8E288D]',
+  unreconciled: 'bg-red-100 text-red-800',
+  surplus_assets: 'bg-orange-100 text-orange-800',
+  exist_in_erp_not_physical: 'bg-purple-100 text-purple-800',
+  duplicated: 'bg-pink-100 text-pink-800',
+  unique: 'bg-teal-100 text-teal-800',
 }
 
 // ── Category definitions ──────────────────────────────────────────────────────
 const CATEGORIES = [
-  { key: 'all',            label: 'All'           },
-  { key: 'Exact Match',   label: 'Exact Match'   },
-  { key: 'AI Match',      label: 'AI Match'      },
+  { key: 'all', label: 'All' },
+  { key: 'Exact Match', label: 'Exact Match' },
+  { key: 'AI Match', label: 'AI Match' },
   { key: 'Manual Review', label: 'Manual Review' },
-  { key: 'Unmatched',     label: 'Unmatched'     },
-  { key: 'Duplicate',     label: 'Duplicate'     },
+  { key: 'Unmatched', label: 'Unmatched' },
+  { key: 'Duplicate', label: 'Duplicate' },
 ]
 
 // Bulk action options per category type
 const BULK_OPTIONS_MATCHED = [
-  { value: 'reconciled',   label: 'Reconciled'   },
-  { value: 'unreconciled', label: 'Unreconciled'  },
+  { value: 'reconciled', label: 'Reconciled' },
+  { value: 'unreconciled', label: 'Unreconciled' },
 ]
 const BULK_OPTIONS_UNMATCHED = [
-  { value: 'surplus_assets',            label: 'Surplus Assets'             },
-  { value: 'exist_in_erp_not_physical', label: 'Shortage Assets'  },
-  { value: 'reconciled',                label: 'Reconciled'                 },
-  { value: 'unreconciled',              label: 'Unreconciled'               },
+  { value: 'surplus_assets', label: 'Surplus Assets' },
+  { value: 'exist_in_erp_not_physical', label: 'Shortage Assets' },
+  { value: 'reconciled', label: 'Reconciled' },
+  { value: 'unreconciled', label: 'Unreconciled' },
 ]
 const BULK_OPTIONS_DUPLICATE = [
   { value: 'duplicated', label: 'Duplicated' },
-  { value: 'unique',     label: 'Unique'     },
+  { value: 'unique', label: 'Unique' },
 ]
 
 // ── Paired column definitions ─────────────────────────────────────────────────
 const COLUMN_PAIRS = [
-  { label: 'Old Tag',     cKey: 'customer_old_tag',     iKey: 'internal_old_tag',     expandable: false },
-  { label: 'New Tag',     cKey: 'customer_new_tag',     iKey: 'internal_new_tag',     expandable: false },
-  { label: 'Year',        cKey: 'customer_year',        iKey: 'internal_year',        expandable: false },
-  { label: 'Category',    cKey: 'customer_category',    iKey: 'internal_category',    expandable: true  },
-  { label: 'Description', cKey: 'customer_description', iKey: 'internal_description', expandable: true  },
-  { label: 'Department',  cKey: 'customer_department',  iKey: 'internal_department',  expandable: true  },
-  { label: 'District',    cKey: 'customer_district',    iKey: 'internal_district',    expandable: true  },
-  { label: 'Book Value',  cKey: 'customer_book_value',  iKey: 'internal_book_value',  expandable: false },
-  { label: 'Asset No.',   cKey: 'customer_asset_no',    iKey: 'internal_asset_no',    expandable: false },
-  { label: 'Serial No.',  cKey: 'customer_serial',      iKey: 'internal_serial',      expandable: false },
+  { label: 'Old Tag', cKey: 'customer_old_tag', iKey: 'internal_old_tag', expandable: false },
+  { label: 'New Tag', cKey: 'customer_new_tag', iKey: 'internal_new_tag', expandable: false },
+  { label: 'Year', cKey: 'customer_year', iKey: 'internal_year', expandable: false },
+  { label: 'Category', cKey: 'customer_category', iKey: 'internal_category', expandable: true },
+  { label: 'Description', cKey: 'customer_description', iKey: 'internal_description', expandable: true },
+  { label: 'Department', cKey: 'customer_department', iKey: 'internal_department', expandable: true },
+  { label: 'District', cKey: 'customer_district', iKey: 'internal_district', expandable: true },
+  { label: 'Book Value', cKey: 'customer_book_value', iKey: 'internal_book_value', expandable: false },
+  { label: 'Asset No.', cKey: 'customer_asset_no', iKey: 'internal_asset_no', expandable: false },
+  { label: 'Serial No.', cKey: 'customer_serial', iKey: 'internal_serial', expandable: false },
 ]
 
 // ── Status Badge ─────────────────────────────────────────────────────────────
@@ -76,8 +76,8 @@ const StatusBadge = ({ status }) => {
   const s = STATUS_MAP[status] || STATUS_MAP.pending
   const cls = statusBadgeCls[status] || statusBadgeCls.pending
   const Icon = status === 'reconciled' ? FiCheckCircle
-             : status === 'pending'    ? FiClock
-             : FiXCircle
+    : status === 'pending' ? FiClock
+      : FiXCircle
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border whitespace-nowrap ${cls}`}>
       <Icon className="w-3 h-3 flex-shrink-0" />{s.label}
@@ -110,9 +110,8 @@ const StatusDropdown = ({ recordId, current, onSelect, loading }) => {
               <button
                 key={s.value}
                 onClick={() => { setOpen(false); if (s.value !== current) onSelect(recordId, s.value) }}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${
-                  s.value === current ? 'font-semibold text-[#8E288D]' : 'text-gray-700'
-                }`}
+                className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${s.value === current ? 'font-semibold text-[#8E288D]' : 'text-gray-700'
+                  }`}
               >
                 <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[s.value].split(' ')[0]}`} />
                 {s.label}
@@ -134,14 +133,14 @@ const BulkDropdown = ({ category, onSelect, loading }) => {
   const isUnmatched = category === 'Unmatched'
 
   const UNMATCHED_SUBCATS = [
-    { value: 'Unmatched',          label: 'All Unmatched'       },
-    { value: 'Customer Unmatched', label: 'Pysical Unmatched'  },
-    { value: 'Finance Unmatched',  label: 'ERP Unmatched'   },
+    { value: 'Unmatched', label: 'All Unmatched' },
+    { value: 'Customer Unmatched', label: 'Pysical Unmatched' },
+    { value: 'Finance Unmatched', label: 'ERP Unmatched' },
   ]
 
   const optionsForCat = isDuplicate ? BULK_OPTIONS_DUPLICATE
-                      : isUnmatched ? BULK_OPTIONS_UNMATCHED
-                      : BULK_OPTIONS_MATCHED
+    : isUnmatched ? BULK_OPTIONS_UNMATCHED
+      : BULK_OPTIONS_MATCHED
 
   const loadingKey = loading && Object.keys(loading).find(k => k.startsWith(category) && loading[k])
 
@@ -237,19 +236,20 @@ const ApprovalPage = () => {
   const canApprove = hasRole('manager')
 
   const [reconciliation, setReconciliation] = useState(null)
-  const [records, setRecords]               = useState([])
-  const [summary, setSummary]               = useState({})
-  const [loading, setLoading]               = useState(true)
+  const [records, setRecords] = useState([])
+  const [summary, setSummary] = useState({})
+  const [loading, setLoading] = useState(true)
   const [recordsLoading, setRecordsLoading] = useState(false)
-  const [actionLoading, setActionLoading]   = useState({}) // { [recordId]: true }
-  const [bulkLoading, setBulkLoading]       = useState({}) // { [category-decision]: true }
+  const [actionLoading, setActionLoading] = useState({}) // { [recordId]: true }
+  const [bulkLoading, setBulkLoading] = useState({}) // { [category-decision]: true }
 
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [statusFilter, setStatusFilter]         = useState('all')
-  const [page, setPage]                         = useState(1)
-  const [totalPages, setTotalPages]             = useState(1)
-  const [totalRecords, setTotalRecords]         = useState(0)
-  const [expandedCols, setExpandedCols]         = useState({}) // { [colLabel]: true }
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [expandedCols, setExpandedCols] = useState({}) // { [colLabel]: true }
+  const [tableCollapsed, setTableCollapsed] = useState(false)
   const PER_PAGE = 10
 
   const toggleCol = (label) =>
@@ -268,7 +268,7 @@ const ApprovalPage = () => {
     try {
       const r = await axios.get(`/api/reconciliation/records/approval-summary/${id}`)
       setSummary(r.data.summary || {})
-    } catch {}
+    } catch { }
   }, [id])
 
   useEffect(() => { fetchSummary() }, [fetchSummary])
@@ -332,9 +332,11 @@ const ApprovalPage = () => {
 
   // ── summary helpers ────────────────────────────────────────────────────────
   const getSummary = (cat) => {
-    const empty = { total: 0, pending: 0, reconciled: 0, unreconciled: 0,
-                    surplus_assets: 0, exist_in_erp_not_physical: 0,
-                    duplicated: 0, unique: 0 }
+    const empty = {
+      total: 0, pending: 0, reconciled: 0, unreconciled: 0,
+      surplus_assets: 0, exist_in_erp_not_physical: 0,
+      duplicated: 0, unique: 0
+    }
     if (cat === 'all') {
       // Use only canonical keys — skip raw sub-keys that are already grouped
       // 'Unmatched' = Customer Unmatched + Finance Unmatched (already combined by backend)
@@ -359,7 +361,7 @@ const ApprovalPage = () => {
 
   // Customer / Finance unmatched split for display
   const customerUnmatched = summary['Customer Unmatched'] || {}
-  const financeUnmatched  = summary['Finance Unmatched']  || {}
+  const financeUnmatched = summary['Finance Unmatched'] || {}
 
   // For duplicate category separate summary
   const getDuplicateSummary = () => {
@@ -374,15 +376,19 @@ const ApprovalPage = () => {
 
   // ── tab styles ─────────────────────────────────────────────────────────────
   const tabCls = (key) => {
-    const active   = { all: 'bg-gray-700 text-white', 'Exact Match': 'bg-[#8E288D] text-white',
-                       'AI Match': 'bg-[#7A1E79] text-white', 'Manual Review': 'bg-[#CFB53B] font-bold text-white',
-                       'Unmatched': 'bg-red-600 text-white', 'Duplicate': 'bg-pink-600 text-white' }
-    const inactive = { all: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-                       'Exact Match': 'bg-gray-50 text-[#8E288D] hover:text-[#8E288D] hover:bg-purple-100',
-                       'AI Match': 'bg-purple-50 text-[#8E288D] hover:bg-purple-100',
-                       'Manual Review': 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100',
-                       'Unmatched': 'bg-red-50 text-red-700 hover:bg-red-100',
-                       'Duplicate': 'bg-pink-50 text-pink-700 hover:bg-pink-100' }
+    const active = {
+      all: 'bg-gray-700 text-white', 'Exact Match': 'bg-[#8E288D] text-white',
+      'AI Match': 'bg-[#7A1E79] text-white', 'Manual Review': 'bg-[#CFB53B] font-bold text-white',
+      'Unmatched': 'bg-red-600 text-white', 'Duplicate': 'bg-pink-600 text-white'
+    }
+    const inactive = {
+      all: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+      'Exact Match': 'bg-gray-50 text-[#8E288D] hover:text-[#8E288D] hover:bg-purple-100',
+      'AI Match': 'bg-purple-50 text-[#8E288D] hover:bg-purple-100',
+      'Manual Review': 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100',
+      'Unmatched': 'bg-red-50 text-red-700 hover:bg-red-100',
+      'Duplicate': 'bg-pink-50 text-pink-700 hover:bg-pink-100'
+    }
     return selectedCategory === key
       ? (active[key] || 'bg-gray-700 text-white')
       : (inactive[key] || 'bg-gray-100 text-gray-700 hover:bg-gray-200')
@@ -442,13 +448,13 @@ const ApprovalPage = () => {
           {/* Per-side reconciliation rates based on APPROVAL decisions */}
           {reconciliation && (() => {
             const stats = reconciliation.statistics
-            const custTotal    = stats.total_customer_records || 1
-            const finTotal     = stats.total_internal_records || 1
-            const custUnmatch  = stats.customer_unmatched || 0
-            const finUnmatch   = stats.internal_unmatched || 0
+            const custTotal = stats.total_customer_records || 1
+            const finTotal = stats.total_internal_records || 1
+            const custUnmatch = stats.customer_unmatched || 0
+            const finUnmatch = stats.internal_unmatched || 0
             // Reconciliation rate = approved-reconciled / total (from approval decisions)
-            const custRecRate  = ((overall.reconciled / custTotal) * 100).toFixed(1)
-            const finRecRate   = ((overall.reconciled / finTotal)  * 100).toFixed(1)
+            const custRecRate = ((overall.reconciled / custTotal) * 100).toFixed(1)
+            const finRecRate = ((overall.reconciled / finTotal) * 100).toFixed(1)
             return (
               <div className="border-t border-gray-100 pt-2 grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-purple-50 rounded p-2">
@@ -466,7 +472,7 @@ const ApprovalPage = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-700">Duplicates</span>
-                      <span className="font-bold text-gray-700">{(stats.customer_duplicates||0).toLocaleString()}</span>
+                      <span className="font-bold text-gray-700">{(stats.customer_duplicates || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -485,7 +491,7 @@ const ApprovalPage = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-700">Duplicates</span>
-                      <span className="font-bold text-gray-700">{(stats.internal_duplicates||0).toLocaleString()}</span>
+                      <span className="font-bold text-gray-700">{(stats.internal_duplicates || 0).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -495,26 +501,7 @@ const ApprovalPage = () => {
         </div>
       </div>
 
-      {/* Category tabs */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {CATEGORIES.map(cat => {
-          const s = getSummary(cat.key)
-          return (
-            <button key={cat.key}
-              onClick={() => { setSelectedCategory(cat.key); setPage(1) }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${tabCls(cat.key)}`}>
-              {cat.label}
-              {cat.key !== 'all' && (
-                <span className="ml-1.5 text-xs opacity-80">
-                  ({s.pending} pending · {nonPendingCount(s)} done)
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Filter + bulk row */}
+      {/* Filter + bulk row (outside table card) */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         {/* Status filter pills */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -522,11 +509,10 @@ const ApprovalPage = () => {
           {['all', ...STATUSES.map(s => s.value)].map(sf => (
             <button key={sf}
               onClick={() => { setStatusFilter(sf); setPage(1) }}
-              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
-                statusFilter === sf
+              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${statusFilter === sf
                   ? 'bg-[#8E288D] text-white border-[#8E288D]'
                   : 'bg-white text-gray-600 border-gray-300 hover:border-[#8E288D]'
-              }`}>
+                }`}>
               {sf === 'all' ? 'All' : (STATUS_MAP[sf]?.label || sf)}
             </button>
           ))}
@@ -542,53 +528,119 @@ const ApprovalPage = () => {
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
+      {/* Reconciliation Records Table */}
+      <div className="mt-2 shadow rounded-xl overflow-hidden" style={{ background: '#fff' }}>
+        {/* Dark navy header bar */}
+        <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)" }}>
+          <h2 className="text-base font-semibold text-white tracking-wide">Reconciliation Records</h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-blue-200">{totalRecords} records</span>
+            <button
+              onClick={() => setTableCollapsed(c => !c)}
+              className="text-white opacity-70 hover:opacity-100 font-bold text-lg leading-none px-1"
+              title={tableCollapsed ? 'Expand' : 'Collapse'}>
+              {tableCollapsed ? '+' : '−'}
+            </button>
+          </div>
+        </div>
+
+        {/* Category tab pills */}
+        <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap gap-2" style={{ background: '#f8fafc' }}>
+          {CATEGORIES.map(cat => {
+            const s = getSummary(cat.key)
+            const isActive = selectedCategory === cat.key
+            const activeCls = {
+              all:            'bg-[#1a3a5c] text-white border-[#1a3a5c]',
+              'Exact Match':  'bg-[#1a3a5c] text-white border-[#1a3a5c]',
+              'AI Match':     'bg-[#7A1E79] text-white border-[#7A1E79]',
+              'Manual Review':'bg-[#1a3a5c] text-white border-[#1a3a5c]',
+              'Unmatched':    'bg-red-600 text-white border-red-600',
+              'Duplicate':    'bg-pink-600 text-white border-pink-600',
+            }
+            const inactiveCls = {
+              all:            'bg-white text-gray-600 border-gray-300 hover:opacity-80',
+              'Exact Match':  'bg-white text-[#1a3a5c] border-[#1a3a5c] hover:opacity-80',
+              'AI Match':     'bg-white text-purple-700 border-purple-300 hover:opacity-80',
+              'Manual Review':'bg-white text-[#1a3a5c] border-[#1a3a5c] hover:opacity-80',
+              'Unmatched':    'bg-white text-red-600 border-red-300 hover:opacity-80',
+              'Duplicate':    'bg-white text-pink-600 border-pink-300 hover:opacity-80',
+            }
+            return (
+              <button key={cat.key}
+                onClick={() => { setSelectedCategory(cat.key); setPage(1) }}
+                className={`px-3 py-1 rounded border text-xs font-semibold transition-colors ${isActive ? activeCls[cat.key] : inactiveCls[cat.key]}`}>
+                {cat.label}
+                {cat.key !== 'all' && (
+                  <span className="ml-1 opacity-80">
+                    ({s.pending}p · {nonPendingCount(s)}d)
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        {/* Table — collapsible */}
+        {!tableCollapsed && (
+        <>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-2xl border-collapse">
+          <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
             <thead>
-              {/* Row 1 — group headers */}
-              <tr className="bg-gray-100 border-b border-gray-300">
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300 sticky left-0 bg-gray-100 z-10">
+              {/* Row 1 — dark navy group headers */}
+              <tr style={{ background: "#e7e7e7"}}>
+                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-white uppercase whitespace-nowrap sticky left-0 z-10"
+                  style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)", letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
                   Category
                 </th>
                 {COLUMN_PAIRS.map(p => (
                   <th key={p.label} colSpan={2}
                     onClick={p.expandable ? () => toggleCol(p.label) : undefined}
-                    className={`px-3 py-1.5 text-center text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 whitespace-nowrap
-                      ${p.expandable ? 'cursor-pointer select-none hover:bg-yellow-100' : ''}
-                      ${expandedCols[p.label] ? 'bg-yellow-50' : ''}`}
-                    title={p.expandable ? (expandedCols[p.label] ? 'Click to collapse' : 'Click to expand') : undefined}>
+                    className={`px-3 py-2 text-center text-xs font-bold text-gray-600 uppercase whitespace-nowrap ${p.expandable ? 'cursor-pointer select-none' : ''}`}
+                    style={{
+                      letterSpacing: '0.07em',
+                      borderRight: '1px solid rgba(255,255,255,0.15)',
+                    }}
+                    title={p.expandable ? (expandedCols[p.label] ? 'Collapse' : 'Expand') : undefined}>
                     {p.label}
                     {p.expandable && (
-                      <span className="ml-1 text-gray-400 text-xs">
-                        {expandedCols[p.label] ? '⇤' : '⇥'}
+                      <span className="ml-1 text-white/50 text-xs">
+                        {expandedCols[p.label] ? ' ⇤' : ' ⇥'}
                       </span>
                     )}
                   </th>
                 ))}
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Match</th>
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">Conf.</th>
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300 bg-amber-50 text-amber-700">
+                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
+                  style={{ letterSpacing: '0.07em', borderLeft: '1px solid rgba(255,255,255,0.2)', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                  Match
+                </th>
+                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
+                  style={{ letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                  Conf.
+                </th>
+                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
+                  style={{ letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
                   Dept. Reconcile
                 </th>
-                <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap border-r border-gray-300">
+                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
+                  style={{ letterSpacing: '0.07em', borderRight: canApprove ? '1px solid rgba(255,255,255,0.15)' : 'none' }}>
                   Approval Status
                 </th>
                 {canApprove && (
-                  <th rowSpan={2} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">
+                  <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
+                    style={{ letterSpacing: '0.07em' }}>
                     Approved By
                   </th>
                 )}
               </tr>
-              {/* Row 2 — Customer / Finance sub-headers */}
-              <tr className="bg-gray-50 border-b-2 border-gray-300">
+              {/* Row 2 — Physical (purple tint) / ERP (teal tint) sub-headers */}
+              <tr style={{ borderBottom: '1px solid #a19a9a', borderTop: '0.15px solid #cfcdcd' }}>
                 {COLUMN_PAIRS.map(p => (
                   <React.Fragment key={p.label}>
-                    <th className="px-3 py-1 text-center text-xs font-medium text-black bg-gray-50 border-r border-gray-200 whitespace-nowrap">
+                    <th className="px-3 py-1.5 text-center text-xs font-semibold whitespace-nowrap"
+                      style={{ color: '#1a3a5c', background: 'rgba(124,58,237,0.08)', borderRight: '0.15px solid #cfcdcd' }}>
                       Physical
                     </th>
-                    <th className="px-3 py-1 text-center text-xs font-medium text-black bg-gray-50 border-r border-gray-300 whitespace-nowrap">
+                    <th className="px-3 py-1.5 text-center text-xs font-semibold whitespace-nowrap"
+                      style={{ color: '#1a3a5c', background: 'rgba(15,118,110,0.08)', borderRight: '1px solid #e8ecf0' }}>
                       ERP
                     </th>
                   </React.Fragment>
@@ -596,100 +648,133 @@ const ApprovalPage = () => {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {recordsLoading ? (
                 <tr>
                   <td colSpan={3 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
-                    className="px-4 py-12 text-center">
+                    className="px-4 py-12 text-center" style={{ color: '#94a3b8' }}>
                     <div className="flex flex-col items-center">
                       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#8E288D] mb-3" />
-                      <p className="text-gray-500">Loading records…</p>
+                      <p className="text-sm">Loading records…</p>
                     </div>
                   </td>
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
                   <td colSpan={3 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
-                    className="px-4 py-12 text-center text-gray-400">
-                    <FiAlertCircle className="mx-auto h-10 w-10 mb-2" />
-                    <p>No records found for this filter</p>
+                    className="px-4 py-10 text-center" style={{ color: '#94a3b8' }}>
+                    <FiAlertCircle className="mx-auto h-10 w-10 mb-2 opacity-30" />
+                    <p className="text-sm">No records found for this filter</p>
                   </td>
                 </tr>
               ) : records.map((rec, idx) => (
                 <tr key={rec.id}
-                  className={`hover:bg-yellow-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                  style={{ background: idx % 2 === 0 ? '#ffffff' : '#f4f7fa', borderBottom: '1px solid #e8ecf0' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#eef4ff'}
+                  onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f4f7fa'}>
 
-                  {/* Category badge */}
-                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-200">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
-                      rec.category === 'Exact Match'        ? 'bg-green-100 text-green-800'   :
-                      rec.category === 'AI Match'           ? 'bg-purple-100 text-purple-800' :
-                      rec.category === 'Manual Review'      ? 'bg-blue-100 text-blue-700'     :
-                      rec.category === 'Customer Unmatched' ? 'bg-red-100 text-red-700'       :
-                      rec.category === 'Finance Unmatched'  ? 'bg-orange-100 text-orange-700' :
-                      rec.category === 'Duplicate'          ? 'bg-pink-100 text-pink-700'     :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
+                  {/* Category */}
+                  <td className="px-4 py-2.5 whitespace-nowrap sticky left-0 z-10"
+                    style={{ background: 'inherit', borderRight: '1px solid #e2e8f0' }}>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                      style={{
+                        color: rec.category === 'Exact Match' ? '#1a3a5c' :
+                               rec.category === 'AI Match' ? '#1a3a5c' :
+                               rec.category === 'Manual Review' ? '#1a3a5c' :
+                               rec.category === 'Customer Unmatched' ? '#1a3a5c' :
+                               rec.category === 'Finance Unmatched' ? '#1a3a5c' :
+                               rec.category === 'Duplicate' ? '#1a3a5c' : '#1a3a5c',
+                        background: rec.category === 'Exact Match' ? '#f1f1f1' :
+                                    rec.category === 'AI Match' ? '#f1f1f1' :
+                                    rec.category === 'Manual Review' ? '#f1f1f1' :
+                                    rec.category === 'Customer Unmatched' ? '#f1f1f1' :
+                                    rec.category === 'Finance Unmatched' ? '#f1f1f1' :
+                                    rec.category === 'Duplicate' ? '#f1f1f1' : '#f1f1f1',
+                      }}>
                       {rec.category}
                     </span>
                   </td>
 
-                  {/* Paired data columns */}
-                  {COLUMN_PAIRS.map(p => {
+                  {/* Paired columns — NO inner column lines, only group separator */}
+                  {COLUMN_PAIRS.map((p) => {
                     const isExpanded = expandedCols[p.label]
-                    const cellCls = isExpanded
-                      ? 'px-3 py-2 text-xs text-gray-800 border-r border-gray-200 min-w-[200px] max-w-[400px] whitespace-normal break-words'
-                      : 'px-3 py-2 text-xs text-gray-800 border-r border-gray-100 max-w-[140px] whitespace-nowrap overflow-hidden'
+                    const w = isExpanded ? 'min-w-[200px] max-w-[400px] whitespace-normal break-words' : 'max-w-[140px] whitespace-nowrap overflow-hidden'
                     return (
                       <React.Fragment key={p.label}>
-                        <td className={`${cellCls} bg-purple-50/30`}>
-                          {isExpanded
-                            ? <span>{rec[p.cKey]}</span>
-                            : <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>
-                          }
+                        <td className={`px-4 py-2.5 text-xs ${w}`}
+                          style={{ color: '#334155', background: 'rgba(124,58,237,0.02)' }}>
+                          {isExpanded ? <span>{rec[p.cKey]}</span> : <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>}
                         </td>
-                        <td className={`${cellCls} bg-teal-50/30 border-r border-gray-200`}>
-                          {isExpanded
-                            ? <span>{rec[p.iKey]}</span>
-                            : <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>
-                          }
+                        <td className={`px-4 py-2.5 text-xs ${w}`}
+                          style={{ color: '#334155', background: 'rgba(15,118,110,0.02)', borderRight: '1px solid #e2e8f0' }}>
+                          {isExpanded ? <span>{rec[p.iKey]}</span> : <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>}
                         </td>
                       </React.Fragment>
                     )
                   })}
 
-                  {/* Match method */}
-                  <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap border-r border-gray-200">{rec.match_method}</td>
-                  {/* Confidence */}
-                  <td className="px-3 py-2 text-xs font-medium text-gray-800 whitespace-nowrap border-r border-gray-200">{rec.confidence}</td>
+                  {/* Match */}
+                  <td className="px-4 py-2.5 text-xs whitespace-nowrap font-medium"
+                    style={{ color: '#64748b', borderLeft: '1px solid #e2e8f0' }}>{rec.match_method}</td>
 
-                  {/* Dept Reconcile */}
-                  <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200 bg-amber-50/40">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
-                      rec.dept_reconcile === 'Same'                     ? 'bg-purple-10 text-[#8E288D]'   :
-                      rec.dept_reconcile === 'Same Dept, Diff District' ? 'bg-blue-100 text-blue-800'     :
-                      rec.dept_reconcile === 'Diff Dept, Same District' ? 'bg-orange-100 text-orange-800' :
-                      rec.dept_reconcile === 'Different'                ? 'bg-yellow-10 text-[#CFB53B]'       :
-                      'bg-gray-100 text-gray-500'
-                    }`}>
-                      {rec.dept_reconcile || 'N/A'}
-                    </span>
+                  {/* Confidence */}
+                  <td className="px-4 py-2.5 text-xs whitespace-nowrap font-bold"
+                    style={{ color: '#8E288D' }}>{rec.confidence}</td>
+
+                  {/* Dept Reconcile — full cell color */}
+                  <td className="px-3 py-2.5 whitespace-nowrap text-center"
+                    style={{
+                      background:
+                        rec.dept_reconcile === 'Same'                     ? '#f1f1f1' :
+                        rec.dept_reconcile === 'Same Dept, Diff District' ? '#f1f1f1' :
+                        rec.dept_reconcile === 'Diff Dept, Same District' ? '#f1f1f1' :
+                        rec.dept_reconcile === 'Different'                ? '#f1f1f1' : '#f1f1f1',
+                      color:
+                        rec.dept_reconcile === 'Same'                     ? '#1a3a5c' :
+                        rec.dept_reconcile === 'Same Dept, Diff District' ? '#1e40af' :
+                        rec.dept_reconcile === 'Diff Dept, Same District' ? '#92400e' :
+                        rec.dept_reconcile === 'Different'                ? '#991b1b' : '#64748b',
+                    }}>
+                    <span className="text-xs font-bold">{rec.dept_reconcile || 'N/A'}</span>
                   </td>
 
-                  {/* Approval status */}
-                  <td className="px-3 py-2 whitespace-nowrap border-r border-gray-200">
+                  {/* Approval Status — full cell color */}
+                  <td className="whitespace-nowrap text-center"
+                    style={{
+                      background: {
+                        reconciled:               '#f1f1f1',
+                        unreconciled:             '#f1f1f1',
+                        surplus_assets:           '#f1f1f1',
+                        exist_in_erp_not_physical:'#f1f1f1',
+                        duplicated:               '#f1f1f1',
+                        unique:                   '#f1f1f1',
+                        pending:                  '#f1f1f1',
+                      }[rec.approval_status] || '#f1f1f1',
+                    }}>
                     {canApprove ? (
-                      <StatusDropdown
-                        recordId={rec.id}
-                        current={rec.approval_status || 'pending'}
-                        onSelect={handleRecordDecision}
-                        loading={!!actionLoading[rec.id]}
-                      />
+                      <div className="px-3 py-2.5">
+                        <StatusDropdown
+                          recordId={rec.id}
+                          current={rec.approval_status || 'pending'}
+                          onSelect={handleRecordDecision}
+                          loading={!!actionLoading[rec.id]}
+                        />
+                      </div>
                     ) : (
-                      <StatusBadge status={rec.approval_status || 'pending'} />
+                      <div className="px-4 py-2.5">
+                        <span className="text-xs font-bold" style={{
+                          color: {
+                            reconciled: '#1a3a5c', unreconciled: '#991b1b',
+                            surplus_assets: '#4c1d95', exist_in_erp_not_physical: '#831843',
+                            duplicated: '#334155', unique: '#134e4a', pending: '#92400e',
+                          }[rec.approval_status] || '#475569'
+                        }}>
+                          {STATUS_MAP[rec.approval_status || 'pending']?.label || 'Pending'}
+                        </span>
+                      </div>
                     )}
                     {rec.approved_at && (
-                      <div className="text-xs text-gray-400 mt-0.5">
+                      <div className="text-xs px-2 pb-1" style={{ color: '#94a3b8' }}>
                         {new Date(rec.approved_at).toLocaleDateString()}
                       </div>
                     )}
@@ -697,7 +782,8 @@ const ApprovalPage = () => {
 
                   {/* Approved by */}
                   {canApprove && (
-                    <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                    <td className="px-4 py-2.5 text-xs whitespace-nowrap font-medium"
+                      style={{ color: '#64748b' }}>
                       {rec.approved_by || '—'}
                     </td>
                   )}
@@ -707,103 +793,112 @@ const ApprovalPage = () => {
           </table>
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 bg-white">
-            <p className="text-sm text-gray-600">
-              Page {page} of {totalPages} · {totalRecords} records
-            </p>
-            <div className="flex gap-1.5 items-center">
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="p-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50">
-                <FiChevronLeft />
-              </button>
-              {[...Array(totalPages)].map((_, i) => {
-                const pn = i + 1
-                if (pn === 1 || pn === totalPages || (pn >= page - 1 && pn <= page + 1)) {
-                  return (
-                    <button key={pn} onClick={() => setPage(pn)}
-                      className={`px-3 py-1 rounded border text-sm font-medium ${
-                        page === pn ? 'bg-[#8E288D] text-white border-[#8E288D]'
-                                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
-                      {pn}
-                    </button>
-                  )
-                } else if (pn === page - 2 || pn === page + 2) {
-                  return <span key={pn} className="px-1 text-gray-400">…</span>
-                }
-                return null
-              })}
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="p-1.5 rounded border border-gray-300 disabled:opacity-40 hover:bg-gray-50">
-                <FiChevronRight />
-              </button>
+        {/* Footer — pagination only */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
+          {totalPages > 1 ? (
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-gray-500">
+                Showing {((page - 1) * PER_PAGE) + 1}–{Math.min(page * PER_PAGE, totalRecords)} of {totalRecords}
+              </p>
+              <div className="flex gap-1 items-center">
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
+                  <FiChevronLeft className="h-3.5 w-3.5 text-gray-500" />
+                </button>
+                {[...Array(totalPages)].map((_, i) => {
+                  const pn = i + 1
+                  if (pn === 1 || pn === totalPages || (pn >= page - 1 && pn <= page + 1)) {
+                    return (
+                      <button key={pn} onClick={() => setPage(pn)}
+                        className={`px-2.5 py-1 rounded border text-xs font-medium ${
+                          page === pn ? 'border-[#1a3a5c] text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                        style={{ background: page === pn ? '#1a3a5c' : undefined }}>
+                        {pn}
+                      </button>
+                    )
+                  } else if (pn === page - 2 || pn === page + 2) {
+                    return <span key={pn} className="text-gray-400 text-xs">…</span>
+                  }
+                  return null
+                })}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
+                  <FiChevronRight className="h-3.5 w-3.5 text-gray-500" />
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <span className="text-xs text-gray-400">{totalRecords} records</span>
+          )}
+        </div>
+        </>
         )}
       </div>
 
       {/* Summary cards */}
       <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
-        {CATEGORIES.filter(c => c.key !== 'all').map(cat => {
-          const s = getSummary(cat.key)
-          const done = cat.key === 'Duplicate'
-            ? (s.duplicated || 0) + (s.unique || 0)
-            : nonPendingCount(s)
-          const p = s.total > 0 ? ((done / s.total) * 100).toFixed(0) : 0
-          const barColor = cat.key === 'Duplicate' ? '#ec4899' : '#8E288D'
-          const border = {
-            'Exact Match':   'border-gray-250',
-            'AI Match':      'border-gray-250',
-            'Manual Review': 'border-gray-250',
-            'Unmatched':     'border-gray-250',
-            'Duplicate':     'border-gray-250',
-          }
-          return (
-            <div key={cat.key} className={`bg-white rounded-lg shadow p-4 border-t-4 ${border[cat.key]}`}>
-              <h3 className="text-sm font-semibold text-gray-700 mb-1">{cat.label}</h3>
-              <div className="text-2xl font-bold text-gray-800 mb-1">{s.total}</div>
-              <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
-                <div className="h-1.5 rounded-full" style={{ width: `${p}%`, backgroundColor: barColor }} />
-              </div>
-              <div className="space-y-0.5 text-xs">
-                {cat.key === 'Duplicate' ? (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-[#CFB53B]">{s.pending} pending</span>
-                      <span className="text-pink-600">{s.duplicated || 0} duplicated</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#8E288D]">{s.unique || 0} unique</span>
-                    </div>
-                  </>
-                ) : cat.key === 'Unmatched' ? (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-[#CFB53B]">{s.pending} pending</span>
-                      <span className="text-[#8E288D]">{s.reconciled} reconciled</span>
-                    </div>
-                    <div className="flex justify-between text-gray-500 mt-1 border-t border-gray-100 pt-1">
-                      <span>Physical: <strong className="text-[#CFB53B]">{customerUnmatched.total || 0}</strong></span>
-                      <span>ERP: <strong className="text-[#8E288D]">{financeUnmatched.total || 0}</strong></span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-[#CFB53B]">{s.pending} pending</span>
-                      <span className="text-[#8E288D]">{s.reconciled} reconciled</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-red-600">{s.unreconciled} unreconciled</span>
-                      <span className="text-orange-600">{s.surplus_assets} surplus</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          )
-        })}
+  {
+    CATEGORIES.filter(c => c.key !== 'all').map(cat => {
+      const s = getSummary(cat.key)
+      const done = cat.key === 'Duplicate'
+        ? (s.duplicated || 0) + (s.unique || 0)
+        : nonPendingCount(s)
+      const p = s.total > 0 ? ((done / s.total) * 100).toFixed(0) : 0
+      const barColor = cat.key === 'Duplicate' ? '#ec4899' : '#8E288D'
+      const border = {
+        'Exact Match': 'border-gray-250',
+        'AI Match': 'border-gray-250',
+        'Manual Review': 'border-gray-250',
+        'Unmatched': 'border-gray-250',
+        'Duplicate': 'border-gray-250',
+      }
+      return (
+        <div key={cat.key} className={`bg-white rounded-lg shadow p-4 border-t-4 ${border[cat.key]}`}>
+          <h3 className="text-sm font-semibold text-gray-700 mb-1">{cat.label}</h3>
+          <div className="text-2xl font-bold text-gray-800 mb-1">{s.total}</div>
+          <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+            <div className="h-1.5 rounded-full" style={{ width: `${p}%`, backgroundColor: barColor }} />
+          </div>
+          <div className="space-y-0.5 text-xs">
+            {cat.key === 'Duplicate' ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-[#CFB53B]">{s.pending} pending</span>
+                  <span className="text-pink-600">{s.duplicated || 0} duplicated</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#8E288D]">{s.unique || 0} unique</span>
+                </div>
+              </>
+            ) : cat.key === 'Unmatched' ? (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-[#CFB53B]">{s.pending} pending</span>
+                  <span className="text-[#8E288D]">{s.reconciled} reconciled</span>
+                </div>
+                <div className="flex justify-between text-gray-500 mt-1 border-t border-gray-100 pt-1">
+                  <span>Physical: <strong className="text-[#CFB53B]">{customerUnmatched.total || 0}</strong></span>
+                  <span>ERP: <strong className="text-[#8E288D]">{financeUnmatched.total || 0}</strong></span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-[#CFB53B]">{s.pending} pending</span>
+                  <span className="text-[#8E288D]">{s.reconciled} reconciled</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-red-600">{s.unreconciled} unreconciled</span>
+                  <span className="text-orange-600">{s.surplus_assets} surplus</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )
+    })
+  }
       </div>
     </div>
   )

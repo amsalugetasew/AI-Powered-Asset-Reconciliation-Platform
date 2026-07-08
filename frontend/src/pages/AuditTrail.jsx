@@ -71,7 +71,7 @@ const AuditTrail = () => {
         </div>
         <button
           onClick={fetchAuditLogs}
-          className="bg-[#8E288D] text-white px-4 py-2 rounded-lg hover:bg-[#7a2279] transition-colors"
+          className="bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] px-4 py-2 transition-colors"
         >
           Refresh
         </button>

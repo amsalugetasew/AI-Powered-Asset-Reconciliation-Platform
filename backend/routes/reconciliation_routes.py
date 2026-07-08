@@ -1877,8 +1877,8 @@ def get_aging_analysis():
 
         for rec in records:
             j = rec.full_record_json or {}
-            raw_year = (j.get('internal_year') or j.get('year') or
-                        j.get('internal_Year') or j.get('Year'))
+            raw_year = (j.get('internal_year') or j.get('internal_Year'))
+            # DO NOT fall back to j.get('year') — that could be customer data
             try:
                 asset_year = int(float(str(raw_year).strip()))
                 age = current_year - asset_year
@@ -1968,7 +1968,8 @@ def get_reconciliation_aging(reconciliation_id):
         aging = {b: _empty_status() for b in BUCKET_ORDER}
         for rec in all_records:
             j = rec.full_record_json or {}
-            raw_yr = _pick(j, 'internal_year', 'year')
+            raw_yr = _pick(j, 'internal_year', 'internal_Year')
+            # 'year' and 'Year' removed — those could be customer data
             bucket = _bucket(raw_yr)
             status = rec.approval_status or 'pending'
             aging[bucket][status] = aging[bucket].get(status, 0) + 1
