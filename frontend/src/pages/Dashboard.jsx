@@ -4,18 +4,12 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 import { logActivity } from '../services/activityService'
 import { useAuth } from '../context/AuthContext'
-import { 
-  FiUpload, 
-  FiDownload, 
-  FiClock, 
-  FiCheckCircle, 
-  FiXCircle, 
-  FiLoader,
-  FiFileText,
-  FiFilter,
-  FiSearch,
-  FiCheck,
-  FiCopy
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+} from 'recharts'
+import {
+  FiUpload, FiDownload, FiClock, FiCheckCircle, FiXCircle, FiLoader,
+  FiFileText, FiFilter, FiSearch, FiCheck, FiCopy,FiCpu,FiTarget
 } from 'react-icons/fi'
 
 const Dashboard = () => {
@@ -23,17 +17,17 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [agingData, setAgingData] = useState([])
+  const [agingYear, setAgingYear] = useState(new Date().getFullYear())
   const [stats, setStats] = useState({
-    total: 0,
-    completed: 0,
-    processing: 0,
-    pending: 0
+    total: 0, completed: 0, processing: 0, pending: 0, nearMatch: 0, duplicates: 0
   })
   const navigate = useNavigate()
   const { hasRole } = useAuth()
 
   useEffect(() => {
     fetchReconciliations()
+    fetchAging()
   }, [])
 
   useEffect(() => {
@@ -51,15 +45,28 @@ const Dashboard = () => {
     }
   }
 
+  const fetchAging = async () => {
+    try {
+      const r = await axios.get('/api/reconciliation/analytics/aging')
+      setAgingData(r.data.buckets || [])
+      setAgingYear(r.data.current_year || new Date().getFullYear())
+    } catch {
+      // non-fatal — chart just won't show
+    }
+  }
+
   const calculateStats = () => {
     const completed = reconciliations.filter(r => r.status === 'completed')
     setStats({
-      total:        reconciliations.length,
-      completed:    completed.length,
-      processing:   reconciliations.filter(r => r.status === 'processing').length,
-      pending:      reconciliations.filter(r => r.status === 'pending').length,
-      nearMatch:    completed.reduce((s, r) => s + (r.statistics?.manual_review || 0), 0),
-      duplicates:   completed.reduce((s, r) => s + (r.statistics?.customer_duplicates || 0) + (r.statistics?.internal_duplicates || 0), 0),
+      total: reconciliations.length,
+      completed: completed.length,
+      processing: reconciliations.filter(r => r.status === 'processing').length,
+      pending: reconciliations.filter(r => r.status === 'pending').length,
+      unMatch: completed.reduce((s, r) => s + (r.statistics?.customer_unmatched || 0), 0),
+      nearMatch: completed.reduce((s, r) => s + (r.statistics?.manual_review || 0), 0),
+      exactMatch: completed.reduce((s, r) => s + (r.statistics?.rule_matched || 0), 0),
+      aiMatched: completed.reduce((s, r) => s + (r.statistics?.ai_matched || 0), 0),
+      duplicates: completed.reduce((s, r) => s + (r.statistics?.customer_duplicates || 0) + (r.statistics?.internal_duplicates || 0), 0),
     })
   }
 
@@ -107,7 +114,7 @@ const Dashboard = () => {
 
   const filteredReconciliations = reconciliations.filter(recon => {
     const matchesSearch = recon.customer_file.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         recon.internal_file.toLowerCase().includes(searchTerm.toLowerCase())
+      recon.internal_file.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesFilter = filterStatus === 'all' || recon.status === filterStatus
     return matchesSearch && matchesFilter
   })
@@ -142,7 +149,7 @@ const Dashboard = () => {
         <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl 
           shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(0,128,128,0.4)] 
           hover:shadow-[0_8px_25px_rgba(0,128,128,0.6)] p-5 
-        text-[#008080] transform hover:scale-105 transition-transform">
+          text-[#008080] transform hover:scale-105 transition-transform">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[#008080] text-xs font-medium">Completed</p>
@@ -154,7 +161,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl shadow-xl 
+        {/* <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl shadow-xl 
         hover:shadow-2xl shadow-[0_4px_15px_rgba(245,158,11,0.4)] 
           hover:shadow-[0_8px_25px_rgba(245,158,11,0.6)]
         p-5 text-[#F59E0B] transform hover:scale-105 transition-transform">
@@ -177,23 +184,75 @@ const Dashboard = () => {
             <div>
               <p className="text-[#6B7280] text-xs font-medium">Pending</p>
               <p className="text-3xl font-bold mt-1">{stats.pending}</p>
+              <p className="text-xs font-semibold text-gray-500 mt-0.5">Waiting Approval</p>
             </div>
             <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
               <FiClock className="h-6 w-6" />
             </div>
           </div>
+        </div> */}
+
+        <div className="bg-gradient-to-br from-white-500 to-white-600 
+          rounded-xl shadow-xl 
+          hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
+          hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
+          p-5 text-gray-800 transform hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-700 text-xs font-medium">Tag Matched</p>
+              <p className="text-3xl font-bold mt-1">{(stats.exactMatch || 0).toLocaleString()}</p>
+              <p className="text-xs font-semibold text-gray-500 mt-0.5">Rule / Matched</p>
+            </div>
+            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+              <FiTarget className="h-6 w-6" />
+            </div>
+          </div>
+        </div>
+
+        {/* <div className="bg-gradient-to-br from-white-500 to-white-600 
+          rounded-xl shadow-xl 
+          hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
+          hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
+          p-5 text-gray-800 transform hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-700 text-xs font-medium">AI Matched</p>
+              <p className="text-3xl font-bold mt-1">{(stats.aiMatched || 0).toLocaleString()}</p>
+              <p className="text-xs font-semibold text-gray-500 mt-0.5">By Desc. / Dep.</p>
+            </div>
+            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+              <FiCpu className="h-6 w-6" />
+            </div>
+          </div>
+        </div> */}
+
+        <div className="bg-gradient-to-br from-white-500 to-white-600 
+          rounded-xl shadow-xl 
+          hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
+          hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
+          p-5 text-gray-800 transform hover:scale-105 transition-transform">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-gray-700 text-xs font-medium">Near Match</p>
+              <p className="text-3xl font-bold mt-1">{(stats.nearMatch+stats.aiMatched || 0).toLocaleString()}</p>
+              <p className="text-xs font-semibold text-gray-500 mt-0.5">AI+Fuzzy / Require Review</p>
+            </div>
+            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
+              <FiSearch className="h-6 w-6" />
+            </div>
+          </div>
         </div>
 
         <div className="bg-gradient-to-br from-white-500 to-white-600 
-        rounded-xl shadow-xl 
-        hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
+          rounded-xl shadow-xl 
+          hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
           hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
-        p-5 text-[#CFB53B] transform hover:scale-105 transition-transform">
+          p-5 text-gray-800 transform hover:scale-105 transition-transform">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[#CFB53B] text-xs font-medium">Near Match</p>
-              <p className="text-3xl font-bold mt-1">{(stats.nearMatch || 0).toLocaleString()}</p>
-              <p className="text-xs text-[#CFB53B] mt-0.5">Fuzzy / review</p>
+              <p className="text-gray-700 text-xs font-medium">Unmatch</p>
+              <p className="text-3xl font-bold mt-1">{(stats.unMatch || 0).toLocaleString()}</p>
+              <p className="text-xs font-semibold text-gray-500 mt-0.5">Unmatched Assets</p>
             </div>
             <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
               <FiSearch className="h-6 w-6" />
@@ -218,6 +277,49 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Aging Analysis Chart */}
+      {agingData.length > 0 && (
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-800">Asset Aging Analysis</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Based on Finance asset year vs current year ({agingYear}) — Finance records only
+              </p>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={agingData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="bucket" tick={{ fontSize: 12, fill: '#6b7280' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} />
+              <Tooltip
+                formatter={(v) => [v.toLocaleString(), 'Assets']}
+                contentStyle={{ fontSize: '12px', borderRadius: '8px' }}
+              />
+              <Bar dataKey="count" name="Assets" radius={[6, 6, 0, 0]}>
+                {agingData.map((entry, i) => {
+                  // colour gets redder as assets age
+                  const colors = ['#10b981', '#34d399', '#fbbf24', '#f97316', '#ef4444', '#b91c1c', '#9ca3af']
+                  return <Cell key={i} fill={colors[Math.min(i, colors.length - 1)]} />
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          <div className="flex flex-wrap gap-3 mt-2 justify-center">
+            {agingData.map((d, i) => {
+              const colors = ['#10b981', '#34d399', '#fbbf24', '#f97316', '#ef4444', '#b91c1c', '#9ca3af']
+              return (
+                <div key={d.bucket} className="flex items-center gap-1 text-xs text-gray-600">
+                  <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: colors[Math.min(i, colors.length - 1)] }} />
+                  {d.bucket}: <strong>{d.count.toLocaleString()}</strong>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Action Bar */}
       <div className="bg-white rounded-xl shadow-md p-6">
@@ -273,8 +375,8 @@ const Dashboard = () => {
           <FiUpload className="mx-auto h-16 w-16 text-gray-400" />
           <h3 className="mt-4 text-lg font-medium text-gray-900">No reconciliations found</h3>
           <p className="mt-2 text-sm text-gray-500">
-            {searchTerm || filterStatus !== 'all' 
-              ? 'Try adjusting your search or filter' 
+            {searchTerm || filterStatus !== 'all'
+              ? 'Try adjusting your search or filter'
               : 'Get started by uploading your first files'}
           </p>
           {!searchTerm && filterStatus === 'all' && (

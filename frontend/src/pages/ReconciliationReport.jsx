@@ -93,12 +93,16 @@ const ReconciliationReport = () => {
   const { id }       = useParams()
   const navigate     = useNavigate()
   const [data, setData]           = useState(null)
+  const [agingData, setAgingData] = useState(null)
   const [loading, setLoading]     = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
 
   useEffect(() => {
-    axios.get(`/api/reconciliation/analytics/single/${id}`)
-      .then(r => setData(r.data))
+    Promise.all([
+      axios.get(`/api/reconciliation/analytics/single/${id}`),
+      axios.get(`/api/reconciliation/analytics/aging/${id}`),
+    ])
+      .then(([r1, r2]) => { setData(r1.data); setAgingData(r2.data) })
       .catch(() => { toast.error('Failed to load report'); navigate('/') })
       .finally(() => setLoading(false))
   }, [id])
@@ -118,11 +122,12 @@ const ReconciliationReport = () => {
   const createdAt   = new Date(recon.created_at).toLocaleString()
 
   const tabs = [
-    { key: 'overview',   label: 'Overview'    },
-    { key: 'category',   label: 'By Category' },
-    { key: 'department', label: 'By Division' },
-    { key: 'district',   label: 'By Branch'   },
-    { key: 'dept_rec',   label: 'Dept. Reconcile' },
+    { key: 'overview',   label: 'Overview'       },
+    { key: 'category',   label: 'By Category'    },
+    { key: 'department', label: 'By Division'    },
+    { key: 'district',   label: 'By Branch'      },
+    { key: 'dept_rec',   label: 'Dept. Reconcile'},
+    { key: 'aging',      label: 'Aging Analysis' },
   ]
 
   // stacked bar data for category
@@ -497,6 +502,111 @@ const ReconciliationReport = () => {
           </div>
         </div>
       )}
+
+      {/* ── Aging Analysis ───────────────────────────────────────────────── */}
+      {activeTab === 'aging' && (() => {
+        if (!agingData) return (
+          <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400">
+            <FiLoader className="animate-spin mx-auto h-8 w-8 mb-2" />
+            <p>Loading aging data…</p>
+          </div>
+        )
+
+        const STATUS_COLORS = {
+          reconciled:               '#10b981',
+          unreconciled:             '#ef4444',
+          pending:                  '#9ca3af',
+          surplus_assets:           '#f97316',
+          exist_in_erp_not_physical:'#8b5cf6',
+          duplicated:               '#ec4899',
+          unique:                   '#14b8a6',
+        }
+        const STATUS_LABELS = {
+          reconciled: 'Reconciled', unreconciled: 'Unreconciled',
+          pending: 'Pending', surplus_assets: 'Surplus Assets',
+          exist_in_erp_not_physical: 'ERP not Physical',
+          duplicated: 'Duplicated', unique: 'Unique',
+        }
+
+        const { aging_chart = [], department_chart = [], district_chart = [], current_year } = agingData
+
+        return (
+          <div className="space-y-6">
+            {/* Aging Bar Chart */}
+            <div className="bg-white rounded-xl shadow p-6">
+              <h3 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                📅 Asset Aging — Finance Records (vs {current_year})
+              </h3>
+              <p className="text-xs text-gray-400 mb-4">
+                Based on the year field in Finance data. Stacked by approval status.
+              </p>
+              {aging_chart.length ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={aging_chart} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    {Object.entries(STATUS_COLORS).map(([s, c]) => (
+                      <Bar key={s} dataKey={s} name={STATUS_LABELS[s]} stackId="a" fill={c}
+                        radius={s === 'unique' ? [4,4,0,0] : [0,0,0,0]} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in Finance records</p>}
+            </div>
+
+            {/* Department stacked bar */}
+            <div className="bg-white rounded-xl shadow p-6">
+              <h3 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                🏢 By Department — Approval Status Breakdown
+              </h3>
+              {department_chart.length ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={department_chart}
+                    margin={{ top: 5, right: 20, left: 10, bottom: 80 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-35}
+                      textAnchor="end" interval={0} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    {Object.entries(STATUS_COLORS).map(([s, c]) => (
+                      <Bar key={s} dataKey={s} name={STATUS_LABELS[s]} stackId="a" fill={c}
+                        radius={s === 'unique' ? [4,4,0,0] : [0,0,0,0]} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p className="text-gray-400 text-center py-8">No department data</p>}
+            </div>
+
+            {/* District/Branch stacked bar */}
+            <div className="bg-white rounded-xl shadow p-6">
+              <h3 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                📍 By Branch / District — Approval Status Breakdown
+              </h3>
+              {district_chart.length ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={district_chart}
+                    margin={{ top: 5, right: 20, left: 10, bottom: 80 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-35}
+                      textAnchor="end" interval={0} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    {Object.entries(STATUS_COLORS).map(([s, c]) => (
+                      <Bar key={s} dataKey={s} name={STATUS_LABELS[s]} stackId="a" fill={c}
+                        radius={s === 'unique' ? [4,4,0,0] : [0,0,0,0]} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : <p className="text-gray-400 text-center py-8">No branch/district data</p>}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

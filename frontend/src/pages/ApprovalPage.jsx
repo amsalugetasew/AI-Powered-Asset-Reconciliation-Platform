@@ -620,13 +620,14 @@ const ApprovalPage = () => {
                   className={`hover:bg-yellow-50/50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
 
                   {/* Category badge */}
-                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 bg-purple-200 border-r border-gray-200">
+                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-200">
                     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
-                      rec.category === 'Exact Match'        ? 'bg-white-100 text-[#8E288D]'   :
-                      rec.category === 'AI Match'           ? 'bg-white-100 text-[#8E288D]' :
-                      rec.category === 'Manual Review'      ? 'bg-white-100 text-[#8E288D]' :
-                      rec.category === 'Customer Unmatched' ? 'bg-white-100 text-[#8E288D]'       :
-                      rec.category === 'Finance Unmatched'  ? 'bg-white-100 text-[#8E288D]' :
+                      rec.category === 'Exact Match'        ? 'bg-green-100 text-green-800'   :
+                      rec.category === 'AI Match'           ? 'bg-purple-100 text-purple-800' :
+                      rec.category === 'Manual Review'      ? 'bg-blue-100 text-blue-700'     :
+                      rec.category === 'Customer Unmatched' ? 'bg-red-100 text-red-700'       :
+                      rec.category === 'Finance Unmatched'  ? 'bg-orange-100 text-orange-700' :
+                      rec.category === 'Duplicate'          ? 'bg-pink-100 text-pink-700'     :
                       'bg-gray-100 text-gray-700'
                     }`}>
                       {rec.category}

@@ -273,16 +273,18 @@ const Results = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             {[
-              { key: 'all', label: 'All', cls: 'bg-purple-100 text-[#8E288D]', active: 'bg-[#8E288D] text-white' },
-              { key: 'Exact Match', label: `Exact Match (${stats.rule_matched})`, cls: 'bg-purple-100 text-[#8E288D]', active: 'bg-[#8E288D] text-white' },
-              { key: 'AI Match', label: `AI Match (${stats.ai_matched})`, cls: 'bg-purple-100 text-[#7A1E79]', active: 'bg-[#7A1E79] text-white' },
-              { key: 'Manual Review', label: `Manual Review (${stats.manual_review})`, cls: 'bg-gold-100 text-[#CFB53B]', active: 'bg-[#CFB53B] text-white' },
-              { key: 'Unmatched', label: `Unmatched (${stats.customer_unmatched})`, cls: 'bg-red-100 text-red-700', active: 'bg-red-600 text-white' },
+              { key: 'all',           label: 'All',                                      cls: 'bg-purple-100 text-[#8E288D]',   active: 'bg-[#8E288D] text-white'  },
+              { key: 'Exact Match',   label: `Exact Match (${stats.rule_matched})`,       cls: 'bg-green-100 text-green-700',    active: 'bg-green-600 text-white'   },
+              { key: 'AI Match',      label: `AI Match (${stats.ai_matched})`,            cls: 'bg-purple-100 text-[#7A1E79]',   active: 'bg-[#7A1E79] text-white'   },
+              { key: 'Manual Review', label: `Near Match (${stats.manual_review})`,       cls: 'bg-blue-100 text-blue-700',      active: 'bg-blue-600 text-white'    },
+              { key: 'Unmatched',     label: `Unmatched (${stats.customer_unmatched})`,   cls: 'bg-red-100 text-red-700',        active: 'bg-red-600 text-white'     },
+              { key: 'Duplicate',     label: `Duplicates (${(stats.customer_duplicates||0)+(stats.internal_duplicates||0)})`, cls: 'bg-pink-100 text-pink-700', active: 'bg-pink-600 text-white' },
             ].map(tab => (
               <button key={tab.key}
                 onClick={() => handleCategoryChange(tab.key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${selectedCategory === tab.key ? tab.active : tab.cls + ' hover:opacity-80'
-                  }`}>
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  selectedCategory === tab.key ? tab.active : tab.cls + ' hover:opacity-80'
+                }`}>
                 {tab.label}
               </button>
             ))}
@@ -347,14 +349,16 @@ const Results = () => {
               ) : records.map((rec, idx) => (
                 <tr key={rec.id} className={`hover:bg-yellow-50/40 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                   {/* Category */}
-                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit bg-purple-200 z-10 border-r border-gray-400">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${rec.category === 'Exact Match' ? 'bg-wite-100 text-[#8E288D]' :
-                      rec.category === 'AI Match' ? 'bg-wite-100 text-[#8E288D]' :
-                        rec.category === 'Manual Review' ? 'bg-wite-100 text-[#8E288D]' :
-                          rec.category === 'Customer Unmatched' ? 'bg-wite-100 text-[#8E288D]' :
-                            rec.category === 'Finance Unmatched' ? 'bg-wite-100 text-[#8E288D]' :
-                              'bg-gray-100 text-gray-700'
-                      }`}>{rec.category}</span>
+                  <td className="px-3 py-2 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-400">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
+                      rec.category === 'Exact Match'        ? 'bg-green-100 text-green-800'   :
+                      rec.category === 'AI Match'           ? 'bg-purple-100 text-purple-800' :
+                      rec.category === 'Manual Review'      ? 'bg-blue-100 text-blue-700'     :
+                      rec.category === 'Customer Unmatched' ? 'bg-red-100 text-red-700'       :
+                      rec.category === 'Finance Unmatched'  ? 'bg-orange-100 text-orange-700' :
+                      rec.category === 'Duplicate'          ? 'bg-pink-100 text-pink-700'     :
+                      'bg-gray-100 text-gray-700'
+                    }`}>{rec.category}</span>
                   </td>
                   {/* Paired columns */}
                   {RESULT_COLUMN_PAIRS.map(p => {

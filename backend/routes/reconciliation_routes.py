@@ -1827,3 +1827,201 @@ def get_reconciliation_analytics(reconciliation_id):
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ── Aging analysis endpoint ───────────────────────────────────────────────────
+@reconciliation_bp.route('/analytics/aging', methods=['GET'])
+@jwt_required()
+def get_aging_analysis():
+    """
+    Compute asset aging from Finance (internal) records.
+    Uses the 'year' field from full_record_json and compares to current year.
+    Groups into age buckets: <1yr, 1-3yr, 3-5yr, 5-10yr, 10-20yr, >20yr
+    """
+    try:
+        from datetime import date
+        user_id   = int(get_jwt_identity())
+        user_role = get_user_role()
+
+        if user_role in ['manager', 'admin']:
+            reconciliations = Reconciliation.query.filter_by(status='completed').all()
+            recon_ids = [r.id for r in reconciliations]
+        else:
+            reconciliations = Reconciliation.query.filter_by(
+                user_id=user_id, status='completed').all()
+            recon_ids = [r.id for r in reconciliations]
+
+        if not recon_ids:
+            return jsonify({'buckets': [], 'current_year': date.today().year}), 200
+
+        current_year = date.today().year
+
+        # Only Finance-side records (internal) — unmatched, matched, duplicate
+        FINANCE_CATEGORIES = ['Exact Match', 'AI Match', 'Manual Review',
+                              'Finance Unmatched', 'Duplicate']
+
+        records = ReconciliationRecord.query.filter(
+            ReconciliationRecord.reconciliation_id.in_(recon_ids),
+            ReconciliationRecord.match_category.in_(FINANCE_CATEGORIES)
+        ).all()
+
+        buckets = {
+            '< 1 yr':   0,
+            '1 – 3 yr': 0,
+            '3 – 5 yr': 0,
+            '5 – 10 yr':0,
+            '10 – 20 yr':0,
+            '> 20 yr':  0,
+            'Unknown':  0,
+        }
+
+        for rec in records:
+            j = rec.full_record_json or {}
+            raw_year = (j.get('internal_year') or j.get('year') or
+                        j.get('internal_Year') or j.get('Year'))
+            try:
+                asset_year = int(float(str(raw_year).strip()))
+                age = current_year - asset_year
+                if age < 1:          buckets['< 1 yr']    += 1
+                elif age < 4:        buckets['1 – 3 yr']  += 1
+                elif age < 6:        buckets['3 – 5 yr']  += 1
+                elif age < 11:       buckets['5 – 10 yr'] += 1
+                elif age < 21:       buckets['10 – 20 yr']+= 1
+                else:                buckets['> 20 yr']   += 1
+            except (ValueError, TypeError):
+                buckets['Unknown'] += 1
+
+        result = [
+            {'bucket': k, 'count': v}
+            for k, v in buckets.items() if v > 0
+        ]
+
+        return jsonify({
+            'buckets': result,
+            'current_year': current_year,
+            'total_records': len(records)
+        }), 200
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Per-reconciliation aging + dept/branch charts ─────────────────────────────
+@reconciliation_bp.route('/analytics/aging/<int:reconciliation_id>', methods=['GET'])
+@jwt_required()
+def get_reconciliation_aging(reconciliation_id):
+    """
+    Per-reconciliation aging from Finance records broken down by approval status.
+    Also returns department and district breakdowns with approval status stacks.
+    """
+    try:
+        from datetime import date
+        user_id   = int(get_jwt_identity())
+        user_role = get_user_role()
+
+        recon = Reconciliation.query.get(reconciliation_id)
+        if not recon:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+        if user_role == 'officer' and recon.user_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+
+        current_year = date.today().year
+
+        FINANCE_CATEGORIES = ['Exact Match', 'AI Match', 'Manual Review',
+                              'Finance Unmatched', 'Duplicate']
+
+        all_records = ReconciliationRecord.query.filter(
+            ReconciliationRecord.reconciliation_id == reconciliation_id,
+            ReconciliationRecord.match_category.in_(FINANCE_CATEGORIES)
+        ).all()
+
+        STATUSES = ['reconciled', 'unreconciled', 'pending',
+                    'surplus_assets', 'exist_in_erp_not_physical',
+                    'duplicated', 'unique']
+        BUCKET_ORDER = ['< 1 yr','1 – 3 yr','3 – 5 yr',
+                        '5 – 10 yr','10 – 20 yr','> 20 yr','Unknown']
+
+        def _pick(j, *keys):
+            for k in keys:
+                v = j.get(k)
+                if v and str(v).strip() not in ('', 'nan', 'None'):
+                    return str(v).strip()
+            return None
+
+        def _bucket(raw_year):
+            try:
+                age = current_year - int(float(str(raw_year).strip()))
+                if age < 1:   return '< 1 yr'
+                if age < 4:   return '1 – 3 yr'
+                if age < 6:   return '3 – 5 yr'
+                if age < 11:  return '5 – 10 yr'
+                if age < 21:  return '10 – 20 yr'
+                return '> 20 yr'
+            except (ValueError, TypeError):
+                return 'Unknown'
+
+        def _empty_status():
+            return {s: 0 for s in STATUSES}
+
+        # ── aging by approval status ───────────────────────────────────────────
+        aging = {b: _empty_status() for b in BUCKET_ORDER}
+        for rec in all_records:
+            j = rec.full_record_json or {}
+            raw_yr = _pick(j, 'internal_year', 'year')
+            bucket = _bucket(raw_yr)
+            status = rec.approval_status or 'pending'
+            aging[bucket][status] = aging[bucket].get(status, 0) + 1
+
+        aging_chart = []
+        for b in BUCKET_ORDER:
+            row = {'bucket': b}
+            row.update(aging[b])
+            row['total'] = sum(aging[b].values())
+            if row['total'] > 0:
+                aging_chart.append(row)
+
+        # ── department breakdown with approval stacks ──────────────────────────
+        dept_map = {}
+        for rec in all_records:
+            j = rec.full_record_json or {}
+            dept = _pick(j, 'internal_department', 'customer_department', 'department') or 'Unknown'
+            if dept == 'Unknown': continue
+            if dept not in dept_map: dept_map[dept] = _empty_status()
+            status = rec.approval_status or 'pending'
+            dept_map[dept][status] = dept_map[dept].get(status, 0) + 1
+
+        dept_chart = sorted([
+            dict({'name': k[:25] + '…' if len(k) > 25 else k, 'full_name': k}, **v,
+                 total=sum(v.values()))
+            for k, v in dept_map.items()
+        ], key=lambda x: -x['total'])[:15]
+
+        # ── district/branch breakdown with approval stacks ─────────────────────
+        dist_map = {}
+        for rec in all_records:
+            j = rec.full_record_json or {}
+            dist = _pick(j, 'internal_district', 'customer_district', 'district') or 'Unknown'
+            if dist == 'Unknown': continue
+            if dist not in dist_map: dist_map[dist] = _empty_status()
+            status = rec.approval_status or 'pending'
+            dist_map[dist][status] = dist_map[dist].get(status, 0) + 1
+
+        dist_chart = sorted([
+            dict({'name': k[:20] + '…' if len(k) > 20 else k, 'full_name': k}, **v,
+                 total=sum(v.values()))
+            for k, v in dist_map.items()
+        ], key=lambda x: -x['total'])[:15]
+
+        return jsonify({
+            'current_year':      current_year,
+            'total_records':     len(all_records),
+            'aging_chart':       aging_chart,
+            'department_chart':  dept_chart,
+            'district_chart':    dist_chart,
+            'statuses':          STATUSES,
+        }), 200
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

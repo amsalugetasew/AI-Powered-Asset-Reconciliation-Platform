@@ -82,7 +82,7 @@ const Layout = () => {
       {/* Sidebar */}
       <aside
         className={`${
-          sidebarOpen ? 'w-60' : 'w-20'
+          sidebarOpen ? 'w-64' : 'w-20'
         } bg-gradient-to-b from-[#F8F8FF] to-[#F8F8FF] text-[#8E288D] transition-all duration-300 ease-in-out fixed h-full z-30 shadow-2xl`}
       >
         {/* Logo Section */}
@@ -148,7 +148,7 @@ const Layout = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className={`flex-1 ${sidebarOpen ? 'ml-60' : 'ml-20'} transition-all duration-300 flex flex-col h-screen`}>
+      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 flex flex-col h-screen`}>
         {/* Top Navbar - Sticky */}
         <nav className="bg-white shadow-md sticky top-0 z-20 flex-shrink-0">
           <div className="px-2 py-2">
