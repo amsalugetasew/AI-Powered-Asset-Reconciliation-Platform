@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import AIAnalysisModal from '../components/AIAnalysisModal'
+import AIContextMenu from '../components/AIContextMenu'
 import {
   FiArrowLeft, FiCheckCircle, FiXCircle, FiClock,
   FiChevronLeft, FiChevronRight, FiAlertCircle, FiFilter, FiChevronDown
@@ -242,6 +244,42 @@ const ApprovalPage = () => {
   const [recordsLoading, setRecordsLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState({}) // { [recordId]: true }
   const [bulkLoading, setBulkLoading] = useState({}) // { [category-decision]: true }
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [showAIContextMenu, setShowAIContextMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
+  const [aiModalConfig, setAiModalConfig] = useState({
+    chartData: null,
+    chartType: 'table',
+    title: 'AI Analysis',
+    targetLabel: '',
+    analysisContext: {}
+  })
+  const [aiModalAction, setAiModalAction] = useState('modal')
+  const [aiModalAnalysisType, setAiModalAnalysisType] = useState('summary')
+  const [aiModalOutputFormat, setAiModalOutputFormat] = useState('combined')
+
+  const openAIModal = ({ chartData, chartType, title, targetLabel, analysisContext, action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
+    setAiModalConfig({ chartData, chartType, title, targetLabel, analysisContext })
+    setAiModalAction(action)
+    setAiModalAnalysisType(analysisType)
+    setAiModalOutputFormat(outputFormat)
+    setShowAIModal(true)
+  }
+
+  const openAIContextMenu = (event, config) => {
+    event.preventDefault()
+    setAiModalConfig(config)
+    setMenuPosition({ x: event.clientX, y: event.clientY })
+    setShowAIContextMenu(true)
+  }
+
+  const handleAIContextSelect = ({ action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
+    setAiModalAction(action)
+    setAiModalAnalysisType(analysisType)
+    setAiModalOutputFormat(outputFormat)
+    setShowAIModal(true)
+    setShowAIContextMenu(false)
+  }
 
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -432,7 +470,7 @@ const ApprovalPage = () => {
           </p>
           <div className="flex items-center gap-2 mb-1">
             <div className="flex-1 bg-gray-200 rounded-full h-2">
-              <div className="bg-[#8E288D] h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+              <div className="bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
             </div>
             <span className="text-sm font-bold text-gray-700">{pct}% reviewed</span>
           </div>
@@ -529,7 +567,20 @@ const ApprovalPage = () => {
       </div>
 
       {/* Reconciliation Records Table */}
-      <div className="mt-2 shadow rounded-xl overflow-hidden" style={{ background: '#fff' }}>
+      <div className="mt-2 shadow rounded-xl overflow-hidden cursor-context-menu" style={{ background: '#f8fafc' }} title="Right-click for AI insights"
+        onContextMenu={e => openAIContextMenu(e, {
+          chartData: {
+            source: 'approval_records_table',
+            reconciliationId: parseInt(id),
+            category: selectedCategory,
+            statusFilter,
+            recordPreview: records.slice(0, 10)
+          },
+          chartType: 'table',
+          title: 'AI Analysis - Approval Records',
+          targetLabel: 'Approval Records Table',
+          analysisContext: { page: 'Approval', section: 'Approval Records Table' }
+        })}>
         {/* Dark navy header bar */}
         <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)" }}>
           <h2 className="text-base font-semibold text-white tracking-wide">Reconciliation Records</h2>
@@ -588,7 +639,7 @@ const ApprovalPage = () => {
               {/* Row 1 — dark navy group headers */}
               <tr style={{ background: "#e7e7e7"}}>
                 <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-white uppercase whitespace-nowrap sticky left-0 z-10"
-                  style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)", letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
+                  style={{color:'#1a3a5c', background: "#cfcdcd", letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
                   Category
                 </th>
                 {COLUMN_PAIRS.map(p => (
@@ -635,12 +686,13 @@ const ApprovalPage = () => {
               <tr style={{ borderBottom: '1px solid #a19a9a', borderTop: '0.15px solid #cfcdcd' }}>
                 {COLUMN_PAIRS.map(p => (
                   <React.Fragment key={p.label}>
-                    <th className="px-3 py-1.5 text-center text-xs font-semibold whitespace-nowrap"
-                      style={{ color: '#1a3a5c', background: 'rgba(124,58,237,0.08)', borderRight: '0.15px solid #cfcdcd' }}>
+                    <th className="px-3 py-1.5 bg-white text-center text-xs font-semibold whitespace-nowrap"
+                      style={{ color: '#1a3a5c', background: '#cfcdcd', borderRight: '0.15px solid #cfcdcd' }}
+                      >
                       Physical
                     </th>
                     <th className="px-3 py-1.5 text-center text-xs font-semibold whitespace-nowrap"
-                      style={{ color: '#1a3a5c', background: 'rgba(15,118,110,0.08)', borderRight: '1px solid #e8ecf0' }}>
+                      style={{ color: '#1a3a5c', background: '#cfcdcd', borderRight: '1px solid #e8ecf0' }}>
                       ERP
                     </th>
                   </React.Fragment>
@@ -835,6 +887,27 @@ const ApprovalPage = () => {
         </>
         )}
       </div>
+
+      <AIAnalysisModal
+        isOpen={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        reconciliationId={parseInt(id)}
+        chartData={aiModalConfig.chartData}
+        chartType={aiModalConfig.chartType}
+        title={aiModalConfig.title}
+        targetLabel={aiModalConfig.targetLabel}
+        analysisContext={aiModalConfig.analysisContext}
+        action={aiModalAction}
+        analysisType={aiModalAnalysisType}
+        outputFormat={aiModalOutputFormat}
+      />
+      <AIContextMenu
+        isOpen={showAIContextMenu}
+        x={menuPosition.x}
+        y={menuPosition.y}
+        onClose={() => setShowAIContextMenu(false)}
+        onSelect={handleAIContextSelect}
+      />
 
       {/* Summary cards */}
       <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">

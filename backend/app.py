@@ -1,11 +1,15 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template_string, redirect
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import config
 from models import db
 from flask_migrate import Migrate
+from dotenv import load_dotenv
 import os
 import logging
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -67,20 +71,29 @@ def create_app(config_name='default'):
     from routes.reconciliation_routes import reconciliation_bp
     from routes.activity_routes import activity_bp
     from routes.admin_routes import admin_bp
+    from routes.analysis_routes import analysis_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(reconciliation_bp)
     app.register_blueprint(activity_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(analysis_bp)
     
     # Create database tables is handled by Flask-Migrate/Alembic now, but keeping for safety if tables don't exist
     with app.app_context():
         db.create_all()
     
-    # Health check endpoint
-    @app.route('/api/health', methods=['GET'])
-    def health_check():
-        return {'status': 'healthy', 'message': 'AssetSync AI API is running'}, 200
+        # Health check endpoint
+        @app.route('/api/health', methods=['GET'])
+        def health_check():
+                return {'status': 'healthy', 'message': 'AssetSync AI API is running'}, 200
+
+        # Root friendly status page
+        @app.route('/', methods=['GET'])
+        def index():
+                # In development, redirect to the Vite frontend login page. Can be overridden with FRONTEND_URL env var.
+                frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3002/login')
+                return redirect(frontend_url)
     
     return app
 

@@ -1708,7 +1708,10 @@ def get_reconciliation_analytics(reconciliation_id):
                 cat_stats[cat] = {s: 0 for s in STATUS_LIST}
                 cat_stats[cat]['total'] = 0
             cat_stats[cat]['total'] += 1
-            cat_stats[cat][rec.approval_status or 'pending'] += 1
+            status_key = rec.approval_status or 'pending'
+            if status_key not in cat_stats[cat]:
+                cat_stats[cat][status_key] = 0
+            cat_stats[cat][status_key] += 1
 
         category_breakdown = sorted([
             {

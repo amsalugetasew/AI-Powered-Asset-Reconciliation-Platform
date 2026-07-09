@@ -4,6 +4,8 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 import { logActivity } from '../services/activityService'
 import { useAuth } from '../context/AuthContext'
+import AIAnalysisModal from '../components/AIAnalysisModal'
+import AIContextMenu from '../components/AIContextMenu'
 import {
   FiUpload, FiDownload, FiClock, FiCheckCircle, FiXCircle, FiLoader,
   FiFileText, FiFilter, FiSearch, FiCheck, FiCopy, FiTarget
@@ -47,19 +49,19 @@ const useSegmentTooltip = () => {
 // ── AgingChart — horizontal bars for asset aging ─────────────────────────────
 const AgingChart = ({ agingData, agingYear }) => {
   const { show, hide, TooltipEl } = useSegmentTooltip()
-  const maxCount = Math.max(...agingData.map(d => d.count), 1)
+  const totalCount = agingData.reduce((s, d) => s + d.count, 0) || 1
   return (
     <div className="bg-white rounded-xl shadow-md p-6">
       {TooltipEl}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-800">Asset Aging Analysis</h2>
         <p className="text-xs text-gray-500">
-          (Finance asset year vs {agingYear} — Finance records only)
+          ERP records vs {agingYear} · {totalCount.toLocaleString()} total
         </p>
       </div>
       <div className="space-y-3">
         {agingData.map((d, i) => {
-          const pct = maxCount > 0 ? ((d.count / maxCount) * 100).toFixed(1) : 0
+          const sharePct = ((d.count / totalCount) * 100).toFixed(1)
           const color = AGE_COLORS[Math.min(i, AGE_COLORS.length - 1)]
           return (
             <div key={d.bucket}>
@@ -68,8 +70,8 @@ const AgingChart = ({ agingData, agingYear }) => {
                 <div className="flex-1 bg-gray-100 rounded-md h-8 overflow-hidden relative">
                   <div
                     className="h-full flex items-center justify-start rounded-md transition-all duration-700 cursor-default"
-                    style={{ width: `${pct}%`, backgroundColor: color }}
-                    onMouseEnter={e => show(e, { label: d.bucket, count: d.count, pct, color })}
+                    style={{ width: `${sharePct}%`, backgroundColor: color }}
+                    onMouseEnter={e => show(e, { label: d.bucket, count: d.count, pct: sharePct, color })}
                     onMouseLeave={hide}
                   >
                     <span className="text-white text-xs font-semibold px-2 select-none">
@@ -77,7 +79,7 @@ const AgingChart = ({ agingData, agingYear }) => {
                     </span>
                   </div>
                 </div>
-                <span className="text-xs text-gray-400 w-10 text-right">{pct}%</span>
+                <span className="text-xs font-medium text-gray-600 w-12 text-right">{sharePct}%</span>
               </div>
             </div>
           )
@@ -86,10 +88,12 @@ const AgingChart = ({ agingData, agingYear }) => {
       <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-gray-100">
         {agingData.map((d, i) => {
           const color = AGE_COLORS[Math.min(i, AGE_COLORS.length - 1)]
+          const sharePct = ((d.count / totalCount) * 100).toFixed(1)
           return (
             <div key={d.bucket} className="flex items-center gap-1 text-xs text-gray-600">
               <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: color }} />
               {d.bucket}: <strong className="ml-0.5">{d.count.toLocaleString()}</strong>
+              <span className="text-gray-400 ml-0.5">({sharePct}%)</span>
             </div>
           )
         })}
@@ -109,6 +113,19 @@ const Dashboard = () => {
   const [stats, setStats] = useState({
     total: 0, completed: 0, processing: 0, pending: 0, nearMatch: 0, duplicates: 0
   })
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [showAIContextMenu, setShowAIContextMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
+  const [aiModalConfig, setAiModalConfig] = useState({
+    chartData: null,
+    chartType: 'pie',
+    title: 'AI Analysis',
+    targetLabel: '',
+    analysisContext: {}
+  })
+  const [aiModalAction, setAiModalAction] = useState('modal')
+  const [aiModalAnalysisType, setAiModalAnalysisType] = useState('summary')
+  const [aiModalOutputFormat, setAiModalOutputFormat] = useState('combined')
   const navigate = useNavigate()
   const { hasRole } = useAuth()
 
@@ -178,6 +195,29 @@ const Dashboard = () => {
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200'
     }
     return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'
+  }
+
+  const openAIModal = ({ chartData, chartType, title, targetLabel, analysisContext, action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
+    setAiModalConfig({ chartData, chartType, title, targetLabel, analysisContext })
+    setAiModalAction(action)
+    setAiModalAnalysisType(analysisType)
+    setAiModalOutputFormat(outputFormat)
+    setShowAIModal(true)
+  }
+
+  const openAIContextMenu = (event, config) => {
+    event.preventDefault()
+    setAiModalConfig(config)
+    setMenuPosition({ x: event.clientX, y: event.clientY })
+    setShowAIContextMenu(true)
+  }
+
+  const handleAIContextSelect = ({ action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
+    setAiModalAction(action)
+    setAiModalAnalysisType(analysisType)
+    setAiModalOutputFormat(outputFormat)
+    setShowAIModal(true)
+    setShowAIContextMenu(false)
   }
 
   const handleDownload = async (id) => {
@@ -365,7 +405,21 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-        <div>
+        <div
+          className="cursor-context-menu"
+          title="Right-click for AI insights"
+          onContextMenu={e => openAIContextMenu(e, {
+              chartData: {
+                source: 'dashboard_aging_analysis',
+                agingData,
+                year: agingYear
+              },
+              chartType: 'bar',
+              title: 'AI Analysis - Dashboard Aging Chart',
+              targetLabel: 'Dashboard Aging Chart',
+              analysisContext: { page: 'Dashboard', section: 'Aging Analysis' }
+            })}
+        >
           {/* Aging Analysis Chart */}
           {agingData.length > 0 && (
             <AgingChart agingData={agingData} agingYear={agingYear} />
@@ -557,6 +611,26 @@ const Dashboard = () => {
           ))}
         </div>
       )}
+      <AIAnalysisModal
+        isOpen={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        reconciliationId={null}
+        chartData={aiModalConfig.chartData}
+        chartType={aiModalConfig.chartType}
+        title={aiModalConfig.title}
+        targetLabel={aiModalConfig.targetLabel}
+        analysisContext={aiModalConfig.analysisContext}
+        action={aiModalAction}
+        analysisType={aiModalAnalysisType}
+        outputFormat={aiModalOutputFormat}
+      />
+      <AIContextMenu
+        isOpen={showAIContextMenu}
+        x={menuPosition.x}
+        y={menuPosition.y}
+        onClose={() => setShowAIContextMenu(false)}
+        onSelect={handleAIContextSelect}
+      />
     </div>
   )
 }

@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import AIAnalysisModal from '../components/AIAnalysisModal'
+import AIContextMenu from '../components/AIContextMenu'
 import {
   FiDatabase, FiCheckCircle, FiXCircle, FiAlertCircle,FiAlertTriangle,FiClock,
   FiTrendingUp, FiBarChart2, FiLoader, FiPercent, FiLayers, FiMapPin,FiCopy
 } from 'react-icons/fi'
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
-  LineChart, Line, CartesianGrid, XAxis, YAxis
+  CartesianGrid, XAxis, YAxis
 } from 'recharts'
 
 // ── colour palette ────────────────────────────────────────────────────────────
@@ -194,13 +196,53 @@ const AgingTooltip = ({ active, payload, label }) => {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 const Analytics = () => {
-  const [data, setData]       = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview') // overview | category | branch | division | monthly
+  const [data, setData]           = useState(null)
+  const [agingData, setAgingData] = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [aiModalConfig, setAiModalConfig] = useState({
+    chartData: null,
+    chartType: 'pie',
+    title: 'AI Analysis',
+    targetLabel: '',
+    analysisContext: {}
+  })
+  const [aiModalAction, setAiModalAction] = useState('modal')
+  const [aiModalAnalysisType, setAiModalAnalysisType] = useState('summary')
+  const [aiModalOutputFormat, setAiModalOutputFormat] = useState('combined')
+  const [showAIContextMenu, setShowAIContextMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
+
+  const openAIModal = ({ chartData, chartType, title, targetLabel, analysisContext }) => {
+    setAiModalConfig({ chartData, chartType, title, targetLabel, analysisContext })
+    setShowAIModal(true)
+  }
+
+  const openAIContextMenu = (event, config) => {
+    event.preventDefault()
+    setAiModalConfig(config)
+    setMenuPosition({ x: event.clientX, y: event.clientY })
+    setShowAIContextMenu(true)
+  }
+
+  const handleAIContextSelect = ({ action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
+    setAiModalAction(action)
+    setAiModalAnalysisType(analysisType)
+    setAiModalOutputFormat(outputFormat)
+    setShowAIModal(true)
+    setShowAIContextMenu(false)
+  }
 
   useEffect(() => {
-    axios.get('/api/reconciliation/analytics')
-      .then(r => setData(r.data))
+    Promise.all([
+      axios.get('/api/reconciliation/analytics'),
+      axios.get('/api/reconciliation/analytics/aging'),
+    ])
+      .then(([r1, r2]) => {
+        setData(r1.data)
+        setAgingData(r2.data)
+      })
       .catch(() => toast.error('Failed to fetch analytics'))
       .finally(() => setLoading(false))
   }, [])
@@ -237,7 +279,7 @@ const Analytics = () => {
     { key: 'category',  label: 'Category'   },
     { key: 'branch',    label: 'Branch'     },
     { key: 'division',  label: 'Division'   },
-    { key: 'monthly',   label: 'Monthly'    },
+    { key: 'aging',     label: 'Aging'      },
   ]
 
   return (
@@ -327,7 +369,18 @@ const Analytics = () => {
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Donut chart */}
-          <div className="bg-white rounded-xl shadow p-6">
+          <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+            onContextMenu={e => openAIContextMenu(e, {
+                chartData: {
+                  source: 'analytics_overall_status_donut',
+                  donutData,
+                  total: donutData.reduce((s, d) => s + d.value, 0)
+                },
+                chartType: 'donut',
+                title: 'AI Analysis - Overall Reconciliation Status',
+                targetLabel: 'Overall Reconciliation Status',
+                analysisContext: { page: 'Analytics', section: 'Overview' }
+              })}>
             <h3 className="text-lg font-semibold text-gray-800 mb-1">Overall Reconciliation Status</h3>
             {(() => {
               const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1
@@ -382,7 +435,17 @@ const Analytics = () => {
           </div>
 
           {/* Match type breakdown */}
-          <div className="bg-white rounded-xl shadow p-6">
+          <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+            onContextMenu={e => openAIContextMenu(e, {
+                chartData: {
+                  source: 'analytics_match_type_breakdown',
+                  matchBreakdown: data.approval_kpis
+                },
+                chartType: 'bar',
+                title: 'AI Analysis - Match Type Breakdown',
+                targetLabel: 'Match Type Breakdown',
+                analysisContext: { page: 'Analytics', section: 'Overview' }
+              })}>
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Match Type Breakdown</h3>
             <div className="space-y-4 mt-6">
               {[
@@ -425,7 +488,17 @@ const Analytics = () => {
 
       {/* ── Category Tab ─────────────────────────────────────────────────── */}
       {activeTab === 'category' && (
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+          onContextMenu={e => openAIContextMenu(e, {
+              chartData: {
+                source: 'analytics_category_breakdown',
+                categoryBreakdown: data.category_breakdown
+              },
+              chartType: 'stacked_bar',
+              title: 'AI Analysis - Category Breakdown',
+              targetLabel: 'Category Breakdown',
+              analysisContext: { page: 'Analytics', section: 'Category Breakdown' }
+            })}>
           <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
             <FiLayers className="text-[#8E288D]" /> Asset Reconciliation by Category
           </h3>
@@ -457,7 +530,17 @@ const Analytics = () => {
 
       {/* ── Branch/District Tab ───────────────────────────────────────────── */}
       {activeTab === 'branch' && (
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+          onContextMenu={e => openAIContextMenu(e, {
+              chartData: {
+                source: 'analytics_branch_breakdown',
+                districtBreakdown: data.district_breakdown
+              },
+              chartType: 'stacked_bar',
+              title: 'AI Analysis - Branch/District Performance',
+              targetLabel: 'Branch / District Performance',
+              analysisContext: { page: 'Analytics', section: 'Branch / District Performance' }
+            })}>
           <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
             <FiMapPin className="text-[#8E288D]" /> Branch / District Performance
           </h3>
@@ -489,7 +572,17 @@ const Analytics = () => {
 
       {/* ── Division/Department Tab ───────────────────────────────────────── */}
       {activeTab === 'division' && (
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+          onContextMenu={e => openAIContextMenu(e, {
+              chartData: {
+                source: 'analytics_division_breakdown',
+                departmentBreakdown: data.department_breakdown
+              },
+              chartType: 'stacked_bar',
+              title: 'AI Analysis - Division / Department Performance',
+              targetLabel: 'Division / Department Performance',
+              analysisContext: { page: 'Analytics', section: 'Division / Department Performance' }
+            })}>
           <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
             <FiBarChart2 className="text-[#8E288D]" /> Division / Department Performance
           </h3>
@@ -519,35 +612,127 @@ const Analytics = () => {
         </div>
       )}
 
-      {/* ── Monthly Tab ───────────────────────────────────────────────────── */}
-      {activeTab === 'monthly' && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
-            <FiTrendingUp className="text-[#8E288D]" /> Monthly Reconciliation Progress
-          </h3>
-          {data.monthly_trend?.length ? (
-            <ResponsiveContainer width="100%" height={360}>
-              <LineChart data={data.monthly_trend}
-                margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis yAxisId="left"  tick={{ fontSize: 11 }} />
-                <YAxis yAxisId="right" orientation="right" domain={[0, 100]}
-                  unit="%" tick={{ fontSize: 11 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '13px' }} />
-                <Line yAxisId="left"  type="monotone" dataKey="total"
-                  name="Total Records" stroke="#9ca3af" strokeWidth={2} dot={true} />
-                <Line yAxisId="left"  type="monotone" dataKey="matched"
-                  name="Matched" stroke={COLORS.matched} strokeWidth={2} dot={true} />
-                <Line yAxisId="right" type="monotone" dataKey="rate"
-                  name="Rate (%)" stroke={COLORS.ai_matched} strokeWidth={2}
-                  strokeDasharray="5 5" dot={true} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : <p className="text-gray-400 text-center py-8">No monthly data available yet</p>}
-        </div>
-      )}
+      {/* ── Aging Tab ────────────────────────────────────────────────────── */}
+      {activeTab === 'aging' && (() => {
+        if (!agingData) return (
+          <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400">
+            <FiLoader className="animate-spin mx-auto h-8 w-8 mb-2" />
+            <p>Loading aging data…</p>
+          </div>
+        )
+
+        const AGING_COLORS = {
+          reconciled:               '#10b981',
+          unreconciled:             '#ef4444',
+          pending:                  '#CFB53B',
+          surplus_assets:           '#8E288D',
+          exist_in_erp_not_physical:'#7A1E79',
+          duplicated:               '#1a1a1a',
+          unique:                   '#008080',
+        }
+        const AGING_LABELS = {
+          reconciled: 'Reconciled', unreconciled: 'Unreconciled',
+          pending: 'Pending', surplus_assets: 'Surplus Assets',
+          exist_in_erp_not_physical: 'ERP not Physical',
+          duplicated: 'Duplicated', unique: 'Unique',
+        }
+
+        const buckets = agingData.buckets || []
+        const agingTotal = buckets.reduce((s, d) => s + d.count, 0) || 1
+        const currentYear = agingData.current_year || new Date().getFullYear()
+
+        // Simple single-value bars (no stacking — global aging has no status breakdown)
+        const AGE_BAR_COLORS = ['#8E288D','#000','#CFB53B','#f97316','#ef4444','#b91c1c','#9ca3af']
+
+        return (
+          <div className="space-y-6">
+            {/* Age bucket bars */}
+            <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+              onContextMenu={e => openAIContextMenu(e, {
+                  chartData: {
+                    source: 'analytics_aging_analysis',
+                    agingBuckets: buckets
+                  },
+                  chartType: 'bar',
+                  title: 'AI Analysis - Aging Analysis',
+                  targetLabel: 'Aging Analysis',
+                  analysisContext: { page: 'Analytics', section: 'Aging Analysis' }
+                })}>
+              <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                📅 Asset Aging — ERP Records (vs {currentYear})
+              </h3>
+              <p className="text-xs text-gray-400 mb-4">
+                Based on year field in Finance data · {agingTotal.toLocaleString()} total records
+              </p>
+              {buckets.length ? (
+                <>
+                  <div className="space-y-3">
+                    {buckets.map((d, i) => {
+                      const sharePct = ((d.count / agingTotal) * 100).toFixed(1)
+                      const color = AGE_BAR_COLORS[Math.min(i, AGE_BAR_COLORS.length - 1)]
+                      return (
+                        <div key={d.bucket}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600 w-16 flex-shrink-0">{d.bucket}</span>
+                            <div className="flex-1 bg-gray-100 rounded-md h-8 overflow-hidden">
+                              <div className="h-full flex items-center justify-start rounded-md transition-all duration-700"
+                                style={{ width: `${sharePct}%`, backgroundColor: color }}
+                                title={`${d.bucket}: ${d.count.toLocaleString()} (${sharePct}%)`}>
+                                <span className="text-white text-xs font-semibold px-2 select-none">
+                                  {d.count.toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-xs font-medium text-gray-600 w-12 text-right">{sharePct}%</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-gray-100">
+                    {buckets.map((d, i) => {
+                      const color = AGE_BAR_COLORS[Math.min(i, AGE_BAR_COLORS.length - 1)]
+                      const sharePct = ((d.count / agingTotal) * 100).toFixed(1)
+                      return (
+                        <div key={d.bucket} className="flex items-center gap-1 text-xs text-gray-600">
+                          <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: color }} />
+                          {d.bucket}: <strong className="ml-0.5">{d.count.toLocaleString()}</strong>
+                          <span className="text-gray-400 ml-0.5">({sharePct}%)</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in Finance records</p>}
+            </div>
+
+            {/* Info note */}
+            <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-700">
+              💡 This shows system-wide aging across all reconciliations. For per-reconciliation aging with approval status breakdown (department &amp; branch), open the <strong>📊 Dashboard Report</strong> for a specific reconciliation.
+            </div>
+          </div>
+        )
+      })()}
+      <AIAnalysisModal
+        isOpen={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        reconciliationId={null}
+        chartData={aiModalConfig.chartData}
+        chartType={aiModalConfig.chartType}
+        title={aiModalConfig.title}
+        targetLabel={aiModalConfig.targetLabel}
+        analysisContext={aiModalConfig.analysisContext}
+        action={aiModalAction}
+        analysisType={aiModalAnalysisType}
+        outputFormat={aiModalOutputFormat}
+      />
+      <AIContextMenu
+        isOpen={showAIContextMenu}
+        x={menuPosition.x}
+        y={menuPosition.y}
+        onClose={() => setShowAIContextMenu(false)}
+        onSelect={handleAIContextSelect}
+      />
     </div>
   )
 }

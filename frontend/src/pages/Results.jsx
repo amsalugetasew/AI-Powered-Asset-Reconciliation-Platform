@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
-import { FiDownload, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiGrid, FiBarChart2, FiXCircle, FiDatabase, FiUsers, FiChevronLeft, FiChevronRight, FiCheck } from 'react-icons/fi'
+import { FiDownload, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiGrid, FiBarChart2, FiXCircle, FiDatabase, FiUsers, FiChevronLeft, FiChevronRight, FiCheck, FiZap } from 'react-icons/fi'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { logActivity } from '../services/activityService'
 import { useAuth } from '../context/AuthContext'
+import AIAnalysisModal from '../components/AIAnalysisModal'
+import AIContextMenu from '../components/AIContextMenu'
 
 // ── Paired column definitions (mirrored from ApprovalPage) ────────────────────
 const RESULT_COLUMN_PAIRS = [
@@ -57,9 +59,45 @@ const Results = () => {
   const [recordsStored, setRecordsStored] = useState(false)
   const [expandedCols, setExpandedCols] = useState({})
   const [tableCollapsed, setTableCollapsed] = useState(false)
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [aiModalAction, setAiModalAction] = useState('modal')
+  const [aiModalAnalysisType, setAiModalAnalysisType] = useState('summary')
+  const [aiModalOutputFormat, setAiModalOutputFormat] = useState('combined')
+  const [showAIContextMenu, setShowAIContextMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
+  const [aiModalConfig, setAiModalConfig] = useState({
+    chartData: null,
+    chartType: 'pie',
+    title: 'AI Analysis',
+    targetLabel: '',
+    analysisContext: {}
+  })
 
   const toggleCol = (label) =>
     setExpandedCols(prev => ({ ...prev, [label]: !prev[label] }))
+
+  const openAIModal = ({ chartData, chartType, title, targetLabel, analysisContext, action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
+    setAiModalConfig({ chartData, chartType, title, targetLabel, analysisContext })
+    setAiModalAction(action)
+    setAiModalAnalysisType(analysisType)
+    setAiModalOutputFormat(outputFormat)
+    setShowAIModal(true)
+  }
+
+  const openAIContextMenu = (event, config) => {
+    event.preventDefault()
+    setAiModalConfig(config)
+    setMenuPosition({ x: event.clientX, y: event.clientY })
+    setShowAIContextMenu(true)
+  }
+
+  const handleAIContextSelect = ({ action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
+    setAiModalAction(action)
+    setAiModalAnalysisType(analysisType)
+    setAiModalOutputFormat(outputFormat)
+    setShowAIModal(true)
+    setShowAIContextMenu(false)
+  }
 
   useEffect(() => {
     fetchReconciliation()
@@ -170,8 +208,8 @@ const Results = () => {
 
   // Overall distribution chart
   const chartData = [
-    { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
-    { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
+    { name: 'Rule Matched', value: stats.rule_matched, color: '#CFB53B' },
+    { name: 'AI Matched', value: stats.ai_matched, color: '#8E288D' },
     { name: 'Manual Review', value: stats.manual_review, color: '#101010' },
     { name: 'Unmatched', value: stats.customer_unmatched, color: 'hsla(0, 98%, 67%, 1.00)' }
   ]
@@ -236,6 +274,20 @@ const Results = () => {
         </div>
         <div className="mt-2 sm:mt-0 flex space-x-3">
           <button
+            onClick={() => openAIModal({
+              chartData,
+              chartType: 'pie',
+              title: `AI Analysis - Reconciliation #${id}`,
+              targetLabel: 'Asset Matching Distribution',
+              analysisContext: { source: 'Asset Matching Distribution Chart' }
+            })}
+            className="inline-flex items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium 
+            text-white bg-gradient-to-r from-[#8E288D] to-gray-800 text-white rounded-lg hover:from-gray-800 hover:to-[#8E288D]"
+          >
+            <FiZap className="w-5 h-5 mr-2" />
+            AI Insights
+          </button>
+          <button
             onClick={() => navigate(`/report/${id}`)}
             className="inline-flex items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium 
             text-white bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D]"
@@ -263,7 +315,29 @@ const Results = () => {
       </div>
 
       {/* Processed Records Table */}
-      <div className="mt-8 shadow rounded-xl overflow-hidden" style={{ background: '#fff' }}>
+      <div
+        className="mt-8 shadow rounded-xl overflow-hidden cursor-context-menu"
+        style={{ background: '#fff' }}
+        title="Right-click for AI insights"
+        onContextMenu={e => openAIContextMenu(e, {
+          chartData: {
+            source: 'processed_records_table',
+            total_rows: records.length,
+            columns: RESULT_COLUMN_PAIRS.map(p => p.label),
+            sample_rows: records.slice(0, 20).map(rec => {
+              const row = {}
+              RESULT_COLUMN_PAIRS.forEach(p => {
+                row[p.label] = rec[p.cKey] || rec[p.iKey]
+              })
+              return row
+            })
+          },
+          chartType: 'table',
+          title: `AI Analysis - Processed Records Table`,
+          targetLabel: 'Processed Records Table',
+          analysisContext: { source: 'Processed Records Table', table_name: 'Processed Records' }
+        })}
+      >
         {/* Table header bar — dark blue like reference */}
         <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)" }}>
           <h2 className="text-base font-semibold text-white tracking-wide">Processed Records</h2>
@@ -744,7 +818,17 @@ const Results = () => {
       <div className="mt-8 bg-white shadow rounded-lg p-6">
         {/* <h3 className="text-xl font-semibold text-gray-900 mb-6">Detailed Statistics</h3> */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="mt-0 bg-white shadow rounded-lg p-0">
+          <div
+            className="mt-0 bg-white shadow rounded-lg p-0 cursor-context-menu"
+            title="Right-click for AI insights"
+            onContextMenu={e => openAIContextMenu(e, {
+              chartData,
+              chartType: 'pie',
+              title: `AI Analysis - Asset Matching Distribution`,
+              targetLabel: 'Asset Matching Distribution Chart',
+              analysisContext: { source: 'Asset Matching Distribution Chart' }
+            })}
+          >
             <h3 className="text-md font-semibold text-center text-gray-900 border-gray-500 mb-0 pb-2 border-b-2">Asset Matching Distribution</h3>
             <ResponsiveContainer width="100%" height={350}>
               <PieChart>
@@ -837,6 +921,30 @@ const Results = () => {
           </div>
         </div>
       </div>
+
+      {/* AI Context Menu */}
+      <AIContextMenu
+        isOpen={showAIContextMenu}
+        x={menuPosition.x}
+        y={menuPosition.y}
+        onClose={() => setShowAIContextMenu(false)}
+        onSelect={handleAIContextSelect}
+      />
+
+      {/* AI Analysis Modal */}
+      <AIAnalysisModal
+        isOpen={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        reconciliationId={id}
+        chartData={aiModalConfig.chartData}
+        chartType={aiModalConfig.chartType}
+        title={aiModalConfig.title}
+        targetLabel={aiModalConfig.targetLabel}
+        analysisContext={aiModalConfig.analysisContext}
+        action={aiModalAction}
+        analysisType={aiModalAnalysisType}
+        outputFormat={aiModalOutputFormat}
+      />
     </div>
   )
 }

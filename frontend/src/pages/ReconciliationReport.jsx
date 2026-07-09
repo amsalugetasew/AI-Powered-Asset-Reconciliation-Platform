@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import AIAnalysisModal from '../components/AIAnalysisModal'
+import AIContextMenu from '../components/AIContextMenu'
 import {
   FiArrowLeft, FiDatabase, FiCheckCircle, FiXCircle, FiAlertTriangle, FiClock, FiTarget, FiCpu, FiCopy, FiRepeat,
   FiAlertCircle, FiLoader, FiPercent, FiLayers, FiMapPin, FiBarChart2
@@ -192,6 +194,42 @@ const ReconciliationReport = () => {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [barSize, setBarSize] = useState(40)
+  const [showAIModal, setShowAIModal] = useState(false)
+  const [showAIContextMenu, setShowAIContextMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
+  const [aiModalConfig, setAiModalConfig] = useState({
+    chartData: null,
+    chartType: 'chart',
+    title: 'AI Analysis',
+    targetLabel: '',
+    analysisContext: {}
+  })
+  const [aiModalAction, setAiModalAction] = useState('modal')
+  const [aiModalAnalysisType, setAiModalAnalysisType] = useState('summary')
+  const [aiModalOutputFormat, setAiModalOutputFormat] = useState('combined')
+
+  const openAIModal = ({ chartData, chartType, title, targetLabel, analysisContext, action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
+    setAiModalConfig({ chartData, chartType, title, targetLabel, analysisContext })
+    setAiModalAction(action)
+    setAiModalAnalysisType(analysisType)
+    setAiModalOutputFormat(outputFormat)
+    setShowAIModal(true)
+  }
+
+  const openAIContextMenu = (event, config) => {
+    event.preventDefault()
+    setAiModalConfig(config)
+    setMenuPosition({ x: event.clientX, y: event.clientY })
+    setShowAIContextMenu(true)
+  }
+
+  const handleAIContextSelect = ({ action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
+    setAiModalAction(action)
+    setAiModalAnalysisType(analysisType)
+    setAiModalOutputFormat(outputFormat)
+    setShowAIModal(true)
+    setShowAIContextMenu(false)
+  }
 
   useEffect(() => {
     Promise.all([
@@ -368,8 +406,22 @@ const ReconciliationReport = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           {/* Approval Status Donut */}
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-base font-semibold text-gray-800 mb-1">Approval Status Breakdown</h3>
+          <div className="bg-white rounded-xl shadow p-6 text-purple-600 cursor-context-menu" title="Right-click for AI insights"
+            onContextMenu={e => openAIContextMenu(e, {
+              chartData: {
+                source: 'report_approval_status_donut',
+                data: donut,
+                reconciliationId: parseInt(id)
+              },
+              chartType: 'donut',
+              title: 'AI Analysis - Approval Status Breakdown',
+              targetLabel: 'Approval Status Breakdown',
+              analysisContext: { page: 'Report', section: 'Approval Status Breakdown' }
+            })}>
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <h3 className="text-base font-semibold text-gray-800">Approval Status Breakdown</h3>
+              <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+            </div>
             {donut.length > 0 ? (() => {
               const donutTotal = donut.reduce((s, d) => s + d.value, 0) || 1
               return (
@@ -382,12 +434,12 @@ const ReconciliationReport = () => {
                       <Pie data={donut} cx="50%" cy="50%"
                         innerRadius={65} outerRadius={110}
                         paddingAngle={3} dataKey="value"
-                        label={({ name, value, percent }) =>
+                        label={({ value, percent }) =>
                           percent > 0.04
                             ? `${name.split(' ')[0]}: ${((value / donutTotal) * 100).toFixed(1)}%`
                             : ''
                         }
-                        labelLine={true}>
+                        labelLine={false}>
                         {donut.map((e, i) => <Cell key={i} fill={e.color} />)}
                       </Pie>
                       <Tooltip content={({ active, payload }) => {
@@ -419,8 +471,30 @@ const ReconciliationReport = () => {
           </div>
 
           {/* Match type progress */}
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-base font-semibold text-gray-800 mb-4">Match Type Breakdown</h3>
+          <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+            onContextMenu={e => openAIContextMenu(e, {
+              chartData: {
+                source: 'report_match_type_breakdown',
+                data: {
+                  exact_matched: kpis.exact_matched,
+                  ai_matched: kpis.ai_matched,
+                  near_match: kpis.near_match,
+                  customer_unmatched: kpis.customer_unmatched,
+                  customer_duplicates: kpis.customer_duplicates,
+                  internal_duplicates: kpis.internal_duplicates,
+                  total_records: kpis.physical_count
+                },
+                reconciliationId: parseInt(id)
+              },
+              chartType: 'bar',
+              title: 'AI Analysis - Match Type Breakdown',
+              targetLabel: 'Match Type Breakdown',
+              analysisContext: { page: 'Report', section: 'Match Type Breakdown' }
+            })}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-base font-semibold text-gray-800">Match Type Breakdown</h3>
+              <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+            </div>
             <div className="space-y-4">
               {[
                 { label: 'Exact Match', value: kpis.exact_matched, color: '#8E288D' },
@@ -465,10 +539,24 @@ const ReconciliationReport = () => {
 
       {/* ── By Category ──────────────────────────────────────────────────── */}
       {activeTab === 'category' && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <h3 className="text-base font-semibold text-gray-800 mb-5 flex items-center gap-2">
-            <FiLayers className="text-[#8E288D]" /> Reconciliation by Asset Category
-          </h3>
+        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+          onContextMenu={e => openAIContextMenu(e, {
+            chartData: {
+              source: 'report_category_breakdown',
+              data: category_breakdown,
+              reconciliationId: parseInt(id)
+            },
+            chartType: 'stacked_bar',
+            title: 'AI Analysis - Reconciliation by Asset Category',
+            targetLabel: 'Reconciliation by Asset Category',
+            analysisContext: { page: 'Report', section: 'Category Breakdown' }
+          })}>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <FiLayers className="text-[#8E288D]" /> Reconciliation by Asset Category
+            </h3>
+            <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+          </div>
           {category_breakdown.length ? (
             <>
               <div className="mb-2">
@@ -501,10 +589,24 @@ const ReconciliationReport = () => {
 
       {/* ── By Division/Department ────────────────────────────────────────── */}
       {activeTab === 'department' && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <h3 className="text-base font-semibold text-gray-800 mb-5 flex items-center gap-2">
-            <FiBarChart2 className="text-[#8E288D]" /> Reconciliation by Division / Department
-          </h3>
+        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+          onContextMenu={e => openAIContextMenu(e, {
+            chartData: {
+              source: 'report_division_department_breakdown',
+              data: department_breakdown,
+              reconciliationId: parseInt(id)
+            },
+            chartType: 'stacked_bar',
+            title: 'AI Analysis - Reconciliation by Division / Department',
+            targetLabel: 'Reconciliation by Division / Department',
+            analysisContext: { page: 'Report', section: 'Division / Department Breakdown' }
+          })}>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <FiBarChart2 className="text-[#8E288D]" /> Reconciliation by Division / Department
+            </h3>
+            <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+          </div>
           {department_breakdown.length ? (
             <>
               {(() => {
@@ -537,10 +639,24 @@ const ReconciliationReport = () => {
 
       {/* ── By District/Branch ───────────────────────────────────────────── */}
       {activeTab === 'district' && (
-        <div className="bg-white rounded-xl shadow p-6">
-          <h3 className="text-base font-semibold text-gray-800 mb-5 flex items-center gap-2">
-            <FiMapPin className="text-[#8E288D]" /> Reconciliation by Branch / District
-          </h3>
+        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+          onContextMenu={e => openAIContextMenu(e, {
+            chartData: {
+              source: 'report_branch_district_breakdown',
+              data: district_breakdown,
+              reconciliationId: parseInt(id)
+            },
+            chartType: 'stacked_bar',
+            title: 'AI Analysis - Reconciliation by Branch / District',
+            targetLabel: 'Reconciliation by Branch / District',
+            analysisContext: { page: 'Report', section: 'Branch / District Breakdown' }
+          })}>
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <FiMapPin className="text-[#8E288D]" /> Reconciliation by Branch / District
+            </h3>
+            <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+          </div>
           <div>
             {district_breakdown.length ? (
               <>
@@ -581,8 +697,22 @@ const ReconciliationReport = () => {
       {/* ── Dept. Reconcile ───────────────────────────────────────────────── */}
       {activeTab === 'dept_rec' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-base font-semibold text-gray-800 mb-4">Department Reconciliation Summary</h3>
+          <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+            onContextMenu={e => openAIContextMenu(e, {
+              chartData: {
+                source: 'report_department_reconcile_summary',
+                data: dept_rec_chart,
+                reconciliationId: parseInt(id)
+              },
+              chartType: 'donut',
+              title: 'AI Analysis - Department Reconciliation Summary',
+              targetLabel: 'Department Reconciliation Summary',
+              analysisContext: { page: 'Report', section: 'Department Reconciliation Summary' }
+            })}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-base font-semibold text-gray-800">Department Reconciliation Summary</h3>
+              <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+            </div>
             {dept_rec_chart.length ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
@@ -601,8 +731,22 @@ const ReconciliationReport = () => {
             ) : <p className="text-gray-400 text-center py-12">No data</p>}
           </div>
 
-          <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="text-base font-semibold text-gray-800 mb-4">Department Match Detail</h3>
+          <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+            onContextMenu={e => openAIContextMenu(e, {
+              chartData: {
+                source: 'report_department_match_detail',
+                data: dept_rec_chart,
+                reconciliationId: parseInt(id)
+              },
+              chartType: 'bar',
+              title: 'AI Analysis - Department Match Detail',
+              targetLabel: 'Department Match Detail',
+              analysisContext: { page: 'Report', section: 'Department Match Detail' }
+            })}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-base font-semibold text-gray-800">Department Match Detail</h3>
+              <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+            </div>
             <div className="space-y-3">
               {dept_rec_chart.map(item => (
                 <div key={item.name}>
@@ -678,10 +822,24 @@ const ReconciliationReport = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-2 gap-4">
               {/* Aging Bar Chart */}
-              <div className="bg-white rounded-xl shadow p-6">
-                <h3 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                  📅 Asset Aging — ERP Records (vs {current_year})
-                </h3>
+              <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+                onContextMenu={e => openAIContextMenu(e, {
+                  chartData: {
+                    source: 'report_aging_analysis',
+                    data: aging_chart,
+                    reconciliationId: parseInt(id)
+                  },
+                  chartType: 'bar',
+                  title: 'AI Analysis - Asset Aging',
+                  targetLabel: 'Asset Aging',
+                  analysisContext: { page: 'Report', section: 'Aging Analysis' }
+                })}>
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                    📅 Asset Aging — ERP Records (vs {current_year})
+                  </h3>
+                  <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+                </div>
                 <p className="text-xs text-gray-400 mb-2">
                   Based on the year field in ERP data. Stacked by approval status.
                 </p>
@@ -712,10 +870,24 @@ const ReconciliationReport = () => {
               </div>
 
               {/* Department stacked bar */}
-              <div className="bg-white rounded-xl shadow p-6">
-                <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  🏢 By Department — Approval Status
-                </h3>
+              <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+                onContextMenu={e => openAIContextMenu(e, {
+                  chartData: {
+                    source: 'report_aging_department_breakdown',
+                    data: department_chart,
+                    reconciliationId: parseInt(id)
+                  },
+                  chartType: 'stacked_bar',
+                  title: 'AI Analysis - Aging Department Breakdown',
+                  targetLabel: 'Aging Department Breakdown',
+                  analysisContext: { page: 'Report', section: 'Aging Department Breakdown' }
+                })}>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                    🏢 By Department — Approval Status
+                  </h3>
+                  <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+                </div>
                 {department_chart.length ? (
                   <>
                     <div className="mt-1">
@@ -743,10 +915,24 @@ const ReconciliationReport = () => {
               </div>
 
               {/* District/Branch stacked bar */}
-              <div className="bg-white rounded-xl shadow p-6">
-                <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  📍 By Branch / District — Approval Status
-                </h3>
+              <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+                onContextMenu={e => openAIContextMenu(e, {
+                  chartData: {
+                    source: 'report_aging_branch_breakdown',
+                    data: district_chart,
+                    reconciliationId: parseInt(id)
+                  },
+                  chartType: 'stacked_bar',
+                  title: 'AI Analysis - Aging Branch / District Breakdown',
+                  targetLabel: 'Aging Branch / District Breakdown',
+                  analysisContext: { page: 'Report', section: 'Aging Branch / District Breakdown' }
+                })}>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                    📍 By Branch / District — Approval Status
+                  </h3>
+                  <span className="text-xs text-gray-500 italic">Right-click for AI insights</span>
+                </div>
                 {district_chart.length ? (
                   <>
                     <div className="mt-1">
@@ -776,6 +962,26 @@ const ReconciliationReport = () => {
           </div>
         )
       })()}
+      <AIAnalysisModal
+        isOpen={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        reconciliationId={parseInt(id)}
+        chartData={aiModalConfig.chartData}
+        chartType={aiModalConfig.chartType}
+        title={aiModalConfig.title}
+        targetLabel={aiModalConfig.targetLabel}
+        analysisContext={aiModalConfig.analysisContext}
+        action={aiModalAction}
+        analysisType={aiModalAnalysisType}
+        outputFormat={aiModalOutputFormat}
+      />
+      <AIContextMenu
+        isOpen={showAIContextMenu}
+        x={menuPosition.x}
+        y={menuPosition.y}
+        onClose={() => setShowAIContextMenu(false)}
+        onSelect={handleAIContextSelect}
+      />
     </div>
   )
 }
