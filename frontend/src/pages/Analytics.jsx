@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import AIAnalysisModal from '../components/AIAnalysisModal'
@@ -703,7 +703,7 @@ const Analytics = () => {
                     })}
                   </div>
                 </>
-              ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in Finance records</p>}
+              ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in ERP records</p>}
             </div>
 
             {/* Info note */}

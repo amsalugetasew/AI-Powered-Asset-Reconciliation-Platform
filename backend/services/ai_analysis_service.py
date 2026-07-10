@@ -1,6 +1,9 @@
 """
 AI-powered analysis service for generating insights, recommendations, and analysis
 using OpenAI's GPT models or Groq's API (OpenAI-compatible).
+
+All prompts use chain-of-thought reasoning and are restricted to business/operational
+analysis only — no technical, development, or system-enhancement suggestions.
 """
 
 import json
@@ -10,35 +13,76 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# ── Shared system prompt ────────────────────────────────────────────────────
+# Applied to every AI call. Establishes the business-only CoT persona.
+SYSTEM_PROMPT = """You are a senior asset management business analyst with deep expertise in
+physical asset inventory, ERP reconciliation, financial controls, and operational auditing.
+
+THINKING APPROACH -- Chain-of-Thought:
+Before giving your final answer, think through the data step by step:
+  Step 1 -- Understand what the data shows (numbers, patterns, distributions)
+  Step 2 -- Identify what is notable, unusual, or important from a business perspective
+  Step 3 -- Connect observations to real-world business consequences (financial risk,
+            compliance exposure, operational efficiency, audit readiness)
+  Step 4 -- Draw conclusions and frame actionable business responses
+
+STRICT SCOPE RULES -- you MUST follow these at all times:
+  [ALLOWED] Answer ONLY about: asset reconciliation results, matching quality, unreconciled
+     assets, surplus/shortage assets, departmental or branch performance, aging of
+     assets, approval status, duplicates, and related operational/financial matters.
+  [NOT ALLOWED] Do NOT suggest: software improvements, system enhancements, IT changes,
+     database modifications, new features, code changes, API upgrades, UI/UX
+     improvements, or any technical development work.
+  [NOT ALLOWED] Do NOT say things like "the system should", "the application could",
+     "consider adding a feature", "improve the algorithm", or anything that
+     implies changing the software or technology stack.
+  [REDIRECT] If the user's question touches on technical/development topics, redirect
+     the response to the business/operational dimension of the question only.
+
+Your audience is business managers, finance officers, and auditors -- not developers."""
+
+
 class AIAnalysisService:
     """Service for generating AI-powered insights and analysis"""
-    
+
     def __init__(self, api_key: str = None):
         """Initialize OpenAI or Groq client"""
         if not api_key:
             import os
             api_key = os.getenv('OPENAI_API_KEY')
-        
+
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
-        
-        # Detect if it's a Groq key (starts with 'gsk_')
+
         if api_key.startswith('gsk_'):
-            # Use Groq API with OpenAI-compatible client
             self.client = OpenAI(
                 api_key=api_key,
                 base_url="https://api.groq.com/openai/v1"
             )
-            self.model = "llama-3.1-8b-instant"  # Fast, free, currently available
+            self.model = "llama-3.1-8b-instant"
             self.is_groq = True
             logger.info("Using Groq API for AI analysis (llama-3.1-8b-instant)")
         else:
-            # Use OpenAI API
             self.client = OpenAI(api_key=api_key)
             self.model = "gpt-3.5-turbo"
             self.is_groq = False
             logger.info("Using OpenAI API for AI analysis")
-    
+
+    def _call(self, user_prompt: str, max_tokens: int = 1500) -> Dict[str, Any]:
+        """Central call wrapper — always injects the business-only CoT system prompt."""
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": user_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=max_tokens
+        )
+        return response
+
+    # ── Chart Analysis ──────────────────────────────────────────────────────
+
     def analyze_chart_data(
         self,
         chart_data: Dict[str, Any],
@@ -46,176 +90,19 @@ class AIAnalysisService:
         analysis_type: str,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Generate AI analysis for chart data
-        
-        Args:
-            chart_data: Dictionary containing chart values and labels
-            chart_type: Type of chart (pie, bar, line, etc.)
-            analysis_type: Type of analysis (trend, comparative, anomaly, summary)
-            **kwargs: Additional context (reconciliation_id, filters, etc.)
-        
-        Returns:
-            Dictionary with analysis results
-        """
+        """Generate AI analysis for chart data using CoT prompting."""
         try:
             prompt = self._build_prompt(chart_data, chart_type, analysis_type, kwargs)
-            
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert data analyst specializing in asset reconciliation and financial analysis. Provide clear, actionable insights based on the data provided."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=1500
-            )
-            
-            analysis_text = response.choices[0].message.content
-            
+            response = self._call(prompt)
             return {
                 "success": True,
                 "analysis_type": analysis_type,
-                "content": analysis_text,
+                "content": response.choices[0].message.content,
                 "tokens_used": response.usage.total_tokens
             }
         except Exception as e:
             logger.error(f"Error in AI analysis: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "analysis_type": analysis_type
-            }
-    
-    def get_recommendations(
-        self,
-        chart_data: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Generate recommendations based on chart data
-        
-        Args:
-            chart_data: Chart data for analysis
-            context: Additional context (reconciliation status, filters, etc.)
-        
-        Returns:
-            Dictionary with recommendations
-        """
-        try:
-            context_str = json.dumps(context or {}, indent=2)
-            chart_str = json.dumps(chart_data, indent=2)
-            
-            prompt = f"""Analyze the following asset reconciliation data and provide 3-5 specific, actionable recommendations.
-
-Chart Data:
-{chart_str}
-
-Context:
-{context_str}
-
-For each recommendation:
-1. State the issue clearly
-2. Explain the business impact
-3. Suggest specific actions
-4. Estimate potential impact (if quantifiable)
-
-Format your response as numbered recommendations with clear structure."""
-            
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert asset management consultant. Provide practical, high-impact recommendations for improving asset reconciliation processes."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=1500
-            )
-            
-            recommendations = response.choices[0].message.content
-            
-            return {
-                "success": True,
-                "recommendations": recommendations,
-                "tokens_used": response.usage.total_tokens
-            }
-        except Exception as e:
-            logger.error(f"Error generating recommendations: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-
-    def chat_query(
-        self,
-        prompt: str,
-        chart_data: Optional[Dict[str, Any]] = None,
-        chart_type: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """
-        Process a user chat query using chart/reconciliation context.
-        """
-        try:
-            chart_info = json.dumps(chart_data or {}, indent=2)
-            context_info = json.dumps(context or {}, indent=2)
-            chart_type_info = chart_type or 'unknown'
-
-            prompt_body = f"""You are an expert asset reconciliation assistant.
-Analyze the following chart and reconciliation context, then answer the user's query clearly.
-
-Chart Type: {chart_type_info}
-Chart Data:
-{chart_info}
-
-Context:
-{context_info}
-
-User Query:
-{prompt}
-
-Respond with actionable, concise insight, recommendation, or analysis as appropriate."""
-
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert data analyst specializing in asset reconciliation, matching, and reporting. Answer the user's question based on the provided chart data and context."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt_body
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=1500
-            )
-
-            answer = response.choices[0].message.content
-            return {
-                "success": True,
-                "content": answer,
-                "tokens_used": response.usage.total_tokens
-            }
-        except Exception as e:
-            logger.error(f"Error processing chat query: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e), "analysis_type": analysis_type}
 
     def _build_prompt(
         self,
@@ -224,177 +111,266 @@ Respond with actionable, concise insight, recommendation, or analysis as appropr
         analysis_type: str,
         context: Dict[str, Any]
     ) -> str:
-        """Build analysis prompt based on type"""
-        
-        chart_json = json.dumps(chart_data, indent=2)
-        context_json = json.dumps(context, indent=2, default=str)
-        
-        prompts = {
-            "trend": self._trend_analysis_prompt(chart_json, chart_type, context_json),
-            "comparative": self._comparative_analysis_prompt(chart_json, chart_type, context_json),
-            "anomaly": self._anomaly_detection_prompt(chart_json, chart_type, context_json),
-            "summary": self._summary_observations_prompt(chart_json, chart_type, context_json)
+        chart_json   = json.dumps(chart_data,  indent=2)
+        context_json = json.dumps(context,     indent=2, default=str)
+        dispatch = {
+            "trend":       self._trend_prompt,
+            "comparative": self._comparative_prompt,
+            "anomaly":     self._anomaly_prompt,
+            "summary":     self._summary_prompt,
         }
-        
-        return prompts.get(analysis_type, prompts["summary"])
-    
-    def _trend_analysis_prompt(self, chart_json: str, chart_type: str, context: str) -> str:
-        return f"""Perform a trend analysis on the following {chart_type} chart data:
+        fn = dispatch.get(analysis_type, self._summary_prompt)
+        return fn(chart_json, chart_type, context_json)
 
+    def _cot_header(self, chart_json, chart_type, context_json):
+        """Shared chain-of-thought header injected into every analysis prompt."""
+        return f"""You are analyzing a {chart_type} chart from an asset reconciliation system.
+
+THINK STEP BY STEP before writing your answer:
+  • Step 1: Read the data carefully — what do the numbers actually show?
+  • Step 2: What patterns, concentrations, or imbalances stand out?
+  • Step 3: What does this mean for the organization operationally and financially?
+  • Step 4: What should decision-makers know or do?
+
+IMPORTANT: Your response must focus entirely on business and operational findings.
+Do NOT mention software, technology, development, system features, or IT improvements.
+
+Chart Data:
 {chart_json}
 
+Operational Context:
+{context_json}
+"""
+
+    def _trend_prompt(self, chart_json: str, chart_type: str, context_json: str) -> str:
+        return self._cot_header(chart_json, chart_type, context_json) + """
+Now provide your Trend Analysis covering:
+1. What direction is the data moving? (growth, decline, stable)
+2. Where are the most significant changes, and by how much?
+3. What operational or financial factors are likely driving these trends?
+4. Which departments, branches, or asset categories are most affected?
+5. What should management prioritize based on these trends?
+
+Use specific numbers and percentages. Keep the focus on operational impact."""
+
+    def _comparative_prompt(self, chart_json: str, chart_type: str, context_json: str) -> str:
+        return self._cot_header(chart_json, chart_type, context_json) + """
+Now provide your Comparative Analysis covering:
+1. Which categories/departments/branches are performing best vs worst?
+2. What is the gap between the highest and lowest performers?
+3. What does the distribution tell us about reconciliation quality across the organization?
+4. Are there outliers that need urgent management attention?
+5. What actions should be taken for the underperforming segments?
+
+Be specific with numbers and percentages. Focus on business consequences."""
+
+    def _anomaly_prompt(self, chart_json: str, chart_type: str, context_json: str) -> str:
+        return self._cot_header(chart_json, chart_type, context_json) + """
+Now provide your Anomaly & Risk Analysis covering:
+1. What values or patterns are unusual or unexpected?
+2. How large is the deviation from what would be expected?
+3. What is the potential financial or compliance risk of each anomaly?
+4. Which anomalies are most urgent for management to investigate?
+5. What immediate operational steps should be taken for each finding?
+
+Prioritize by business risk level (high / medium / low)."""
+
+    def _summary_prompt(self, chart_json: str, chart_type: str, context_json: str) -> str:
+        return self._cot_header(chart_json, chart_type, context_json) + """
+Now provide your Executive Summary covering:
+1. One-paragraph overall status of asset reconciliation (2–3 sentences)
+2. Top 3 key business findings with supporting numbers
+3. Most critical issues requiring management attention
+4. Overall reconciliation health score (Excellent / Good / Fair / Poor) and why
+5. Immediate next steps for the finance/operations team
+
+Write for a senior business audience. No technical language."""
+
+    # ── Recommendations ─────────────────────────────────────────────────────
+
+    def get_recommendations(
+        self,
+        chart_data: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Generate business recommendations based on chart data using CoT."""
+        try:
+            chart_str   = json.dumps(chart_data,    indent=2)
+            context_str = json.dumps(context or {}, indent=2)
+
+            prompt = f"""You are reviewing asset reconciliation data to provide management recommendations.
+
+THINK STEP BY STEP before writing:
+  • Step 1: What does the data reveal about the current state of asset reconciliation?
+  • Step 2: What are the most significant gaps, risks, or opportunities?
+  • Step 3: What business outcomes are at stake (audit risk, asset loss, compliance, efficiency)?
+  • Step 4: What specific actions would address each finding?
+
+IMPORTANT: Recommendations must be operational and financial in nature.
+Do NOT suggest software changes, IT improvements, system upgrades, or development work.
+
+Reconciliation Data:
+{chart_str}
+
 Context:
-{context}
+{context_str}
 
-Provide:
-1. Current trends and patterns
-2. Growth or decline rates (if applicable)
-3. Seasonal or cyclical patterns (if visible)
-4. Future projections or expectations
-5. Key factors driving these trends
+Provide 3–5 numbered business recommendations. For each:
+  • State the finding clearly
+  • Explain the business/financial impact
+  • Describe the specific operational action to take
+  • Estimate the benefit if the action is completed
 
-Use specific numbers and percentages where available. Be concise but comprehensive."""
-    
-    def _comparative_analysis_prompt(self, chart_json: str, chart_type: str, context: str) -> str:
-        return f"""Perform a comparative analysis on the following {chart_type} chart data:
+Write for finance managers and operations leadership."""
 
-{chart_json}
+            response = self._call(prompt)
+            return {
+                "success": True,
+                "recommendations": response.choices[0].message.content,
+                "tokens_used": response.usage.total_tokens
+            }
+        except Exception as e:
+            logger.error(f"Error generating recommendations: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    # ── Chat ────────────────────────────────────────────────────────────────
+
+    def chat_query(
+        self,
+        prompt: str,
+        chart_data: Optional[Dict[str, Any]] = None,
+        chart_type: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Answer a user chat query with CoT reasoning and full conversation context.
+        History is a list of {role, content} dicts (last 10 messages max).
+        """
+        try:
+            chart_info   = json.dumps(chart_data or {},  indent=2)
+            context_info = json.dumps(context  or {},    indent=2)
+            chart_label  = chart_type or 'reconciliation data'
+
+            # Build conversation messages with full history
+            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+            # Add prior conversation turns for context follow-up
+            if history:
+                for turn in history[:-1]:  # exclude last (current user msg)
+                    messages.append({"role": turn["role"], "content": turn["content"]})
+
+            # Build the current user message with CoT framing
+            user_msg = f"""Using the following reconciliation data as context, answer the question below.
+
+Chart Type: {chart_label}
+Data:
+{chart_info}
 
 Context:
-{context}
+{context_info}
 
-Provide:
-1. Comparison between categories/segments
-2. Variance analysis (highest vs lowest)
-3. Relative performance metrics
-4. Outliers or notable differences
-5. Benchmarking insights
+THINK STEP BY STEP:
+  • Step 1: What is the user actually asking about?
+  • Step 2: What does the data tell us that is relevant to this question?
+  • Step 3: What is the business meaning of that data?
+  • Step 4: What is the clearest, most useful answer for a business user?
 
-Be specific with numbers and percentages."""
-    
-    def _anomaly_detection_prompt(self, chart_json: str, chart_type: str, context: str) -> str:
-        return f"""Identify anomalies and outliers in the following {chart_type} chart data:
+IMPORTANT: Stay focused on business and operational analysis only.
+Do not suggest technical changes, software features, or development work.
 
-{chart_json}
+User Question:
+{prompt}
 
-Context:
-{context}
+Answer concisely and directly. Use numbers from the data where relevant."""
 
-Provide:
-1. Unusual values or patterns
-2. Outliers and their magnitude
-3. Potential causes of anomalies
-4. Risk assessment for identified issues
-5. Recommended actions to address anomalies
+            messages.append({"role": "user", "content": user_msg})
 
-Prioritize by impact/risk level."""
-    
-    def _summary_observations_prompt(self, chart_json: str, chart_type: str, context: str) -> str:
-        return f"""Provide a comprehensive summary and key observations for the following {chart_type} chart data:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=1500
+            )
 
-{chart_json}
+            return {
+                "success": True,
+                "content": response.choices[0].message.content,
+                "tokens_used": response.usage.total_tokens
+            }
+        except Exception as e:
+            logger.error(f"Error processing chat query: {str(e)}")
+            return {"success": False, "error": str(e)}
 
-Context:
-{context}
+    # ── Insights ────────────────────────────────────────────────────────────
 
-Include:
-1. Executive summary (2-3 sentences)
-2. Key findings and metrics
-3. Important observations
-4. Overall data quality assessment
-5. Immediate next steps
-
-Keep observations clear and actionable."""
-    
     def generate_insights(
         self,
         records: List[Dict[str, Any]],
         reconciliation_id: str
     ) -> Dict[str, Any]:
-        """
-        Generate high-level insights from reconciliation records
-        
-        Args:
-            records: List of reconciliation records
-            reconciliation_id: ID of the reconciliation
-        
-        Returns:
-            Dictionary with insights
-        """
+        """Generate high-level business insights from reconciliation records using CoT."""
         try:
-            # Calculate summary statistics
             total_records = len(records) if records else 0
-            
+
             if total_records == 0:
-                # Return basic insight without API call
                 summary = {
                     "total_records": 0,
                     "reconciled_count": 0,
                     "unreconciled_count": 0,
                     "reconciliation_rate": "N/A",
                 }
-                
                 return {
                     "success": True,
                     "summary": summary,
-                    "insights": "No detailed records available. Analysis based on reconciliation statistics.",
+                    "insights": "No records available for analysis at this time.",
                     "tokens_used": 0
                 }
-            
-            # Count reconciled statuses (anything that's not unreconciled, pending, or surplus)
-            reconciled = sum(1 for r in records 
-                           if r.get('approval_status') in ['reconciled', 'exist_in_erp_not_physical'])
-            unreconciled = sum(1 for r in records 
-                             if r.get('approval_status') in ['unreconciled', 'surplus_assets'])
-            
-            summary = {
-                "total_records": total_records,
-                "reconciled_count": reconciled,
-                "unreconciled_count": unreconciled,
-                "reconciliation_rate": f"{(reconciled/total_records)*100:.1f}%" if total_records > 0 else "0%",
-                "sample_records": records[:5]  # Include sample for context
-            }
-            
-            prompt = f"""As an asset reconciliation expert, analyze the following reconciliation summary and provide key insights:
 
+            reconciled   = sum(1 for r in records if r.get('approval_status') in
+                               ['reconciled', 'exist_in_erp_not_physical'])
+            unreconciled = sum(1 for r in records if r.get('approval_status') in
+                               ['unreconciled', 'surplus_assets'])
+
+            summary = {
+                "total_records":       total_records,
+                "reconciled_count":    reconciled,
+                "unreconciled_count":  unreconciled,
+                "reconciliation_rate": f"{(reconciled/total_records)*100:.1f}%" if total_records else "0%",
+                "sample_records":      records[:5]
+            }
+
+            prompt = f"""You are conducting a business health review of an asset reconciliation cycle.
+
+THINK STEP BY STEP:
+  • Step 1: Review the reconciliation statistics below
+  • Step 2: Identify what the numbers reveal about asset control quality
+  • Step 3: Assess the financial and compliance exposure from unreconciled assets
+  • Step 4: Determine what leadership needs to know and act on
+
+IMPORTANT: Your insights must focus on business operations, financial risk, and audit readiness.
+Do NOT mention software improvements, system changes, development work, or IT recommendations.
+
+Reconciliation Summary:
 {json.dumps(summary, indent=2, default=str)}
 
 Provide:
-1. Overall reconciliation health assessment
-2. Key bottlenecks or issues
-3. Success factors
-4. Risk areas requiring attention
-5. Recommendations for improvement
+1. Overall reconciliation health assessment (1 paragraph)
+2. Financial/compliance risks from unreconciled or surplus assets
+3. Departments or categories requiring urgent management attention
+4. Key success factors visible in the data
+5. 3 specific operational actions leadership should take this week
 
-Be specific and data-driven."""
-            
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a senior asset management strategist providing insights on reconciliation processes."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=1500
-            )
-            
-            insights = response.choices[0].message.content
-            
+Write for a CFO or Finance Director audience."""
+
+            response = self._call(prompt)
+
             return {
                 "success": True,
                 "summary": summary,
-                "insights": insights,
+                "insights": response.choices[0].message.content,
                 "tokens_used": response.usage.total_tokens
             }
         except Exception as e:
             logger.error(f"Error generating insights: {str(e)}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}

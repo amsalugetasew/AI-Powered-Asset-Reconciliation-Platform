@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -148,7 +148,7 @@ const Upload = () => {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Customer File Upload */}
+            {/* Physical File Upload */}
             <div className="bg-white shadow rounded-lg p-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Physical Asset File
@@ -281,7 +281,7 @@ const Upload = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Customer File Preview */}
+              {/* Physical File Preview */}
               {customerPreview && (
                 <div className="bg-white shadow rounded-lg p-6">
                   <div className="flex items-center mb-4">

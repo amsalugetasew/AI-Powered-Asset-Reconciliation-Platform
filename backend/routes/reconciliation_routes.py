@@ -37,10 +37,10 @@ def _auto_save_records(reconciliation_id, report_path):
         'Exact_Matched_By_Tag': 'Exact Match',
         'AI_Matched_Need_Manual_Review': 'AI Match',
         'Matched_Need_Manual_Review': 'Manual Review',
-        'Customer_Unmatched': 'Customer Unmatched',
-        'Finance_Unmatched': 'Finance Unmatched',
-        'Customer_Duplicates': 'Duplicate',
-        'Finance_Duplicates': 'Duplicate'
+        'Physical_Unmatched': 'Physical Unmatched',
+        'ERP_Unmatched': 'ERP Unmatched',
+        'Physical_Duplicates': 'Duplicate',
+        'ERP_Duplicates': 'Duplicate'
     }
 
     excel_file = pd.ExcelFile(report_path)
@@ -386,10 +386,10 @@ def download_enriched_report(reconciliation_id):
             'Exact_Matched_By_Tag':          'Exact Match',
             'AI_Matched_Need_Manual_Review':  'AI Match',
             'Matched_Need_Manual_Review':     'Manual Review',
-            'Customer_Unmatched':            'Customer Unmatched',
-            'Finance_Unmatched':             'Finance Unmatched',
-            'Customer_Duplicates':           'Duplicate',
-            'Finance_Duplicates':            'Duplicate',
+            'Physical_Unmatched':            'Physical Unmatched',
+            'ERP_Unmatched':                 'ERP Unmatched',
+            'Physical_Duplicates':           'Duplicate',
+            'ERP_Duplicates':                'Duplicate',
         }
 
         excel_file = pd.ExcelFile(reconciliation.report_path)
@@ -830,10 +830,10 @@ def approve_group():
                 'Exact_Matched_By_Tag': 'Exact Match',
                 'AI_Matched_Need_Manual_Review': 'AI Match',
                 'Matched_Need_Manual_Review': 'Manual Review',
-                'Customer_Unmatched': 'Customer Unmatched',
-                'Finance_Unmatched': 'Finance Unmatched',
-                'Customer_Duplicates': 'Duplicate',
-                'Finance_Duplicates': 'Duplicate'
+                'Physical_Unmatched': 'Physical Unmatched',
+                'ERP_Unmatched': 'ERP Unmatched',
+                'Physical_Duplicates': 'Duplicate',
+                'ERP_Duplicates': 'Duplicate'
             }
             
             for sheet_name, match_type in sheet_mapping.items():
@@ -869,8 +869,8 @@ def approve_group():
             records = ReconciliationRecord.query.filter(
                 ReconciliationRecord.reconciliation_id == reconciliation_id,
                 db.or_(
-                    ReconciliationRecord.match_category == 'Customer Unmatched',
-                    ReconciliationRecord.match_category == 'Finance Unmatched'
+                    ReconciliationRecord.match_category == 'Physical Unmatched',
+                    ReconciliationRecord.match_category == 'ERP Unmatched'
                 )
             ).all()
         else:
@@ -977,7 +977,7 @@ def get_approval_summary(reconciliation_id):
                 summary[match_category][key] = count
         
         # Group unmatched categories
-        if 'Customer Unmatched' in summary or 'Finance Unmatched' in summary:
+        if 'Physical Unmatched' in summary or 'ERP Unmatched' in summary:
             unmatched_summary = {
                 'total': 0, 'pending': 0, 'reconciled': 0,
                 'unreconciled': 0, 'not_reconciled': 0,
@@ -985,7 +985,7 @@ def get_approval_summary(reconciliation_id):
                 'exist_in_erp_not_physical': 0,
                 'duplicated': 0, 'unique': 0,
             }
-            for key in ['Customer Unmatched', 'Finance Unmatched']:
+            for key in ['Physical Unmatched', 'ERP Unmatched']:
                 if key in summary:
                     for field in unmatched_summary:
                         unmatched_summary[field] += summary[key].get(field, 0)
@@ -1089,8 +1089,8 @@ def get_records_from_file(reconciliation_id):
             'Exact_Matched_By_Tag': 'Exact Match',
             'AI_Matched_Need_Manual_Review': 'AI Match',
             'Matched_Need_Manual_Review': 'Manual Review',
-            'Customer_Unmatched': 'Customer Unmatched',
-            'Finance_Unmatched': 'Finance Unmatched',
+            'Physical_Unmatched': 'Physical Unmatched',
+            'ERP_Unmatched': 'ERP Unmatched',
         }
         
         all_records = []
@@ -1098,7 +1098,7 @@ def get_records_from_file(reconciliation_id):
         for sheet_name, match_type in sheet_mapping.items():
             # Skip if filtering by category and this isn't the category
             if category != 'all':
-                if category == 'Unmatched' and match_type not in ['Customer Unmatched', 'Finance Unmatched']:
+                if category == 'Unmatched' and match_type not in ['Physical Unmatched', 'ERP Unmatched']:
                     continue
                 elif category != 'Unmatched' and category != match_type:
                     continue
@@ -1213,11 +1213,11 @@ def get_records(reconciliation_id):
                 # Handle both Customer and Finance unmatched
                 query = query.filter(
                     db.or_(
-                        ReconciliationRecord.match_category == 'Customer Unmatched',
-                        ReconciliationRecord.match_category == 'Finance Unmatched'
+                        ReconciliationRecord.match_category == 'Physical Unmatched',
+                        ReconciliationRecord.match_category == 'ERP Unmatched'
                     )
                 )
-                print(f"Filtering for: Customer Unmatched OR Finance Unmatched")
+                print(f"Filtering for: Physical Unmatched OR ERP Unmatched")
             else:
                 query = query.filter_by(match_category=category)
                 print(f"Filtering for exact match: '{category}'")
@@ -1270,12 +1270,12 @@ def get_records(reconciliation_id):
                         return str(v).strip()
                 return None
 
-            is_unmatched = record.match_category in ('Customer Unmatched', 'Finance Unmatched')
-            is_internal_unmatched = record.match_category == 'Finance Unmatched'
+            is_unmatched = record.match_category in ('Physical Unmatched', 'ERP Unmatched')
+            is_internal_unmatched = record.match_category == 'ERP Unmatched'
 
             # ── customer side ──────────────────────────────────────────────────
             if is_unmatched and is_internal_unmatched:
-                # Finance Unmatched: raw cols are the internal side
+                # ERP Unmatched: raw cols are the internal side
                 c_old_tag    = None
                 c_new_tag    = None
                 c_year       = None
@@ -1300,7 +1300,7 @@ def get_records(reconciliation_id):
 
             # ── internal side ──────────────────────────────────────────────────
             if is_unmatched and not is_internal_unmatched:
-                # Customer Unmatched: no internal side
+                # Physical Unmatched: no internal side
                 i_old_tag    = None
                 i_new_tag    = None
                 i_year       = None
@@ -1312,7 +1312,7 @@ def get_records(reconciliation_id):
                 i_book_value = None
                 i_asset_no   = None
             elif is_unmatched and is_internal_unmatched:
-                # Finance Unmatched: raw cols ARE the internal side
+                # ERP Unmatched: raw cols ARE the internal side
                 i_old_tag    = _v(['old_tag_number', 'internal_old_tag'])
                 i_new_tag    = _v(['new_tag_number', 'internal_new_tag'])
                 i_year       = _v(['year', 'internal_year'])
@@ -1471,10 +1471,10 @@ def record_results(reconciliation_id):
             'Exact_Matched_By_Tag': 'Exact Match',
             'AI_Matched_Need_Manual_Review': 'AI Match',
             'Matched_Need_Manual_Review': 'Manual Review',
-            'Customer_Unmatched': 'Customer Unmatched',
-            'Finance_Unmatched': 'Finance Unmatched',
-            'Customer_Duplicates': 'Duplicate',
-            'Finance_Duplicates': 'Duplicate'
+            'Physical_Unmatched': 'Physical Unmatched',
+            'ERP_Unmatched': 'ERP Unmatched',
+            'Physical_Duplicates': 'Duplicate',
+            'ERP_Duplicates': 'Duplicate'
         }
         
         parsed_records_kwargs = []
@@ -1861,7 +1861,7 @@ def get_aging_analysis():
 
         # Only Finance-side records (internal) — unmatched, matched, duplicate
         FINANCE_CATEGORIES = ['Exact Match', 'AI Match', 'Manual Review',
-                              'Finance Unmatched', 'Duplicate']
+                              'ERP Unmatched', 'Duplicate']
 
         records = ReconciliationRecord.query.filter(
             ReconciliationRecord.reconciliation_id.in_(recon_ids),
@@ -1932,7 +1932,7 @@ def get_reconciliation_aging(reconciliation_id):
         current_year = date.today().year
 
         FINANCE_CATEGORIES = ['Exact Match', 'AI Match', 'Manual Review',
-                              'Finance Unmatched', 'Duplicate']
+                              'ERP Unmatched', 'Duplicate']
 
         all_records = ReconciliationRecord.query.filter(
             ReconciliationRecord.reconciliation_id == reconciliation_id,

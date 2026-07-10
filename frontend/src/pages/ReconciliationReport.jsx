@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -299,11 +299,13 @@ const ReconciliationReport = () => {
         </div>
         <div className="flex gap-2">
           <button onClick={() => navigate(`/results/${id}`)}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D]">
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700
+             rounded-lg hover:from-gray-400 hover:to-gray-300">
             View Records
           </button>
           <button onClick={() => navigate(`/approval/${id}`)}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-[#8E288D] to-[#000000] text-white rounded-lg hover:from-[#000000] hover:to-[#8E288D]">
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700
+             rounded-lg hover:from-gray-400 hover:to-gray-300">
             Approval
           </button>
         </div>
@@ -349,7 +351,7 @@ const ReconciliationReport = () => {
           gradient="bg-gradient-to-br from-white-500 to-white-600" borderColor="border-l-4 border-l-gray-100"
           shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]"
           textColor="text-black-500" />
-        <KpiCard label="Unreconciled" value={fmt(kpis.unreconciled)} icon={FiXCircle}
+        <KpiCard label="Unmatched" value={fmt(kpis.unreconciled)} icon={FiXCircle}
           shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" borderColor="border-l-4 border-l-gray-100"
           gradient="bg-gradient-to-br from-white-500 to-white-600" textColor='text-pink-700' />
         <KpiCard label="Shortage Assets" value={fmt(kpis.exist_erp_not_physical)} icon={FiAlertTriangle}
@@ -866,7 +868,7 @@ const ReconciliationReport = () => {
                       ))}
                     </div>
                   </>
-                ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in Finance records</p>}
+                ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in ERP records</p>}
               </div>
 
               {/* Department stacked bar */}

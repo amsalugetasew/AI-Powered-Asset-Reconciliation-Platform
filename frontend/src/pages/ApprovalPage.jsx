@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+﻿import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -136,8 +136,8 @@ const BulkDropdown = ({ category, onSelect, loading }) => {
 
   const UNMATCHED_SUBCATS = [
     { value: 'Unmatched', label: 'All Unmatched' },
-    { value: 'Customer Unmatched', label: 'Pysical Unmatched' },
-    { value: 'Finance Unmatched', label: 'ERP Unmatched' },
+    { value: 'Physical Unmatched', label: 'Pysical Unmatched' },
+    { value: 'ERP Unmatched', label: 'ERP Unmatched' },
   ]
 
   const optionsForCat = isDuplicate ? BULK_OPTIONS_DUPLICATE
@@ -377,9 +377,9 @@ const ApprovalPage = () => {
     }
     if (cat === 'all') {
       // Use only canonical keys — skip raw sub-keys that are already grouped
-      // 'Unmatched' = Customer Unmatched + Finance Unmatched (already combined by backend)
+      // 'Unmatched' = Physical Unmatched + ERP Unmatched (already combined by backend)
       // Skip 'Duplicate' — separate workflow
-      const SKIP_KEYS = new Set(['Customer Unmatched', 'Finance Unmatched', 'Duplicate'])
+      const SKIP_KEYS = new Set(['Physical Unmatched', 'ERP Unmatched', 'Duplicate'])
       return Object.entries(summary)
         .filter(([k]) => !SKIP_KEYS.has(k))
         .reduce((a, [, s]) => {
@@ -388,7 +388,7 @@ const ApprovalPage = () => {
         }, { ...empty })
     }
     if (cat === 'Unmatched') {
-      return ['Customer Unmatched', 'Finance Unmatched'].reduce((a, k) => {
+      return ['Physical Unmatched', 'ERP Unmatched'].reduce((a, k) => {
         const s = summary[k] || {}
         Object.keys(empty).forEach(f => { a[f] = (a[f] || 0) + (s[f] || 0) })
         return a
@@ -398,8 +398,8 @@ const ApprovalPage = () => {
   }
 
   // Customer / Finance unmatched split for display
-  const customerUnmatched = summary['Customer Unmatched'] || {}
-  const financeUnmatched = summary['Finance Unmatched'] || {}
+  const customerUnmatched = summary['Physical Unmatched'] || {}
+  const financeUnmatched = summary['ERP Unmatched'] || {}
 
   // For duplicate category separate summary
   const getDuplicateSummary = () => {
@@ -582,13 +582,13 @@ const ApprovalPage = () => {
           analysisContext: { page: 'Approval', section: 'Approval Records Table' }
         })}>
         {/* Dark navy header bar */}
-        <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)" }}>
-          <h2 className="text-base font-semibold text-white tracking-wide">Reconciliation Records</h2>
+        <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #c4c4c4 0%, #d4d4d4 100%)" }}>
+          <h2 className="text-base font-semibold text-gray-600 tracking-wide">Reconciliation Records</h2>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-blue-200">{totalRecords} records</span>
+            <span className="text-xs text-[#8E288D]">{totalRecords} records</span>
             <button
               onClick={() => setTableCollapsed(c => !c)}
-              className="text-white opacity-70 hover:opacity-100 font-bold text-lg leading-none px-1"
+              className="text-[#8E288D] opacity-70 hover:opacity-100 font-bold text-lg leading-none px-1"
               title={tableCollapsed ? 'Expand' : 'Collapse'}>
               {tableCollapsed ? '+' : '−'}
             </button>
@@ -638,8 +638,10 @@ const ApprovalPage = () => {
             <thead>
               {/* Row 1 — dark navy group headers */}
               <tr style={{ background: "#e7e7e7"}}>
-                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-white uppercase whitespace-nowrap sticky left-0 z-10"
-                  style={{color:'#1a3a5c', background: "#cfcdcd", letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
+                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-white uppercase 
+                whitespace-nowrap sticky left-0 z-10"
+                  style={{color:'#1a3a5c', background: "#cfcdcd", letterSpacing: '0.07em', 
+                  borderRight: '1px solid rgba(255,255,255,0.2)' }}>
                   Category
                 </th>
                 {COLUMN_PAIRS.map(p => (
@@ -733,14 +735,14 @@ const ApprovalPage = () => {
                         color: rec.category === 'Exact Match' ? '#1a3a5c' :
                                rec.category === 'AI Match' ? '#1a3a5c' :
                                rec.category === 'Manual Review' ? '#1a3a5c' :
-                               rec.category === 'Customer Unmatched' ? '#1a3a5c' :
-                               rec.category === 'Finance Unmatched' ? '#1a3a5c' :
+                               rec.category === 'Physical Unmatched' ? '#1a3a5c' :
+                               rec.category === 'ERP Unmatched' ? '#1a3a5c' :
                                rec.category === 'Duplicate' ? '#1a3a5c' : '#1a3a5c',
                         background: rec.category === 'Exact Match' ? '#f1f1f1' :
                                     rec.category === 'AI Match' ? '#f1f1f1' :
                                     rec.category === 'Manual Review' ? '#f1f1f1' :
-                                    rec.category === 'Customer Unmatched' ? '#f1f1f1' :
-                                    rec.category === 'Finance Unmatched' ? '#f1f1f1' :
+                                    rec.category === 'Physical Unmatched' ? '#f1f1f1' :
+                                    rec.category === 'ERP Unmatched' ? '#f1f1f1' :
                                     rec.category === 'Duplicate' ? '#f1f1f1' : '#f1f1f1',
                       }}>
                       {rec.category}

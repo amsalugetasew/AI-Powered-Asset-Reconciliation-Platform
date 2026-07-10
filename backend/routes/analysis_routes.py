@@ -159,7 +159,8 @@ def chat():
             prompt=prompt_text,
             chart_data=data.get('chart_data'),
             chart_type=data.get('chart_type'),
-            context=data.get('context')
+            context=data.get('context'),
+            history=data.get('history', [])
         )
 
         return jsonify(chat_response), 200

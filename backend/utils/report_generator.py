@@ -49,8 +49,8 @@ class ReportGenerator:
             
             summary_data = {
                 'Metric': [
-                    '=== CUSTOMER RECORDS ===',
-                    'Total Customer Records Uploaded',
+                    '=== PHYSICAL RECORDS ===',
+                    'Total Physical Records Uploaded',
                     '  ├─ Unique Records',
                     '  │  ├─ Exact Matches',
                     '  │  ├─ AI-Assisted Matches',
@@ -58,8 +58,8 @@ class ReportGenerator:
                     '  │  └─ Unmatched',
                     '  └─ Duplicates (Standalone)',
                     '',
-                    '=== INTERNAL RECORDS ===',
-                    'Total Internal Records Uploaded',
+                    '=== ERP RECORDS ===',
+                    'Total ERP Records Uploaded',
                     '  ├─ Unique Records',
                     '  │  ├─ Exact Matches',
                     '  │  ├─ AI-Assisted Matches',
@@ -180,17 +180,17 @@ class ReportGenerator:
             # Sheet 4: Manual Review
             _write_large_df(manual_review_df, 'Matched_Need_Manual_Review', 'No records requiring manual review')
             
-            # Sheet 5: Customer Unmatched
-            _write_large_df(customer_unmatched_df, 'Customer_Unmatched', 'No unmatched customer records')
+            # Sheet 5: Physical Unmatched
+            _write_large_df(customer_unmatched_df, 'Physical_Unmatched', 'No unmatched physical records')
             
-            # Sheet 6: Internal Unmatched
-            _write_large_df(internal_unmatched_df, 'Finance_Unmatched', 'No unmatched internal records')
+            # Sheet 6: ERP Unmatched
+            _write_large_df(internal_unmatched_df, 'ERP_Unmatched', 'No unmatched ERP records')
             
-            # Sheet 7: Customer Duplicates
-            _write_large_df(customer_duplicates_df, 'Customer_Duplicates', 'No duplicate customer records')
+            # Sheet 7: Physical Duplicates
+            _write_large_df(customer_duplicates_df, 'Physical_Duplicates', 'No duplicate physical records')
             
-            # Sheet 8: Internal Duplicates
-            _write_large_df(internal_duplicates_df, 'Finance_Duplicates', 'No duplicate Finance records')
+            # Sheet 8: ERP Duplicates
+            _write_large_df(internal_duplicates_df, 'ERP_Duplicates', 'No duplicate ERP records')
         
         print(f"  ✓ Report generated successfully: {filepath}")
         return filepath

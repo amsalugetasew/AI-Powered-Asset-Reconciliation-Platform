@@ -256,7 +256,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
           <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl 
@@ -383,7 +383,7 @@ const Dashboard = () => {
                 <p className="text-xs font-semibold text-gray-500 mt-0.5">Unmatched Assets</p>
               </div>
               <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-                <FiSearch className="h-6 w-6" />
+                <FiXCircle className="h-6 w-6" />
               </div>
             </div>
           </div>

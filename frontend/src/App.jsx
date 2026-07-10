@@ -91,7 +91,7 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="audit" element={
-              <RoleProtectedRoute requiredRole="manager">
+              <RoleProtectedRoute requiredRole="admin">
                 <AuditTrail />
               </RoleProtectedRoute>
             } />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -214,7 +214,7 @@ const Results = () => {
     { name: 'Unmatched', value: stats.customer_unmatched, color: 'hsla(0, 98%, 67%, 1.00)' }
   ]
 
-  // Customer records breakdown
+  // Physical records breakdown
   const customerReconciled = stats.rule_matched + stats.ai_matched
   const customerData = [
     { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
@@ -223,7 +223,7 @@ const Results = () => {
     { name: 'Not Reconciled', value: stats.customer_unmatched, color: '#ef4444' }
   ]
 
-  // Internal records breakdown (assuming similar distribution)
+  // ERP records breakdown (assuming similar distribution)
   const internalReconciled = stats.rule_matched + stats.ai_matched
   const internalData = [
     { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
@@ -237,17 +237,17 @@ const Results = () => {
     {
       category: 'Total Records',
       Customer: stats.total_customer_records,
-      Internal: stats.total_internal_records
+      ERP: stats.total_internal_records
     },
     {
       category: 'Reconciled',
       Customer: customerReconciled,
-      Internal: internalReconciled
+      ERP: internalReconciled
     },
     {
       category: 'Not Reconciled',
       Customer: stats.customer_unmatched,
-      Internal: stats.internal_unmatched
+      ERP: stats.internal_unmatched
     }
   ]
 
@@ -282,7 +282,7 @@ const Results = () => {
               analysisContext: { source: 'Asset Matching Distribution Chart' }
             })}
             className="inline-flex items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium 
-            text-white bg-gradient-to-r from-[#8E288D] to-gray-800 text-white rounded-lg hover:from-gray-800 hover:to-[#8E288D]"
+             bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg hover:from-gray-400 hover:to-300"
           >
             <FiZap className="w-5 h-5 mr-2" />
             AI Insights
@@ -290,7 +290,7 @@ const Results = () => {
           <button
             onClick={() => navigate(`/report/${id}`)}
             className="inline-flex items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium 
-            text-white bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D]"
+            bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg hover:from-gray-400 hover:to-300"
           >
             <FiBarChart2 className="w-5 h-5 mr-2" />
             Dashboard Report
@@ -298,7 +298,8 @@ const Results = () => {
           <button
             onClick={() => navigate(`/approval/${id}`)}
             className="inline-flex items-center px-4 py-3 border 
-            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#8E288D] to-[#000000] text-white rounded-lg hover:from-[#000000] hover:to-[#8E288D]"
+            border-transparent rounded-md shadow-sm text-sm font-medium 
+            bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg hover:from-gray-400 hover:to-300"
           >
             <FiCheck className="mr-2" />
             {hasRole('manager') ? 'Review & Approve' : 'View Approval Status'}
@@ -306,7 +307,8 @@ const Results = () => {
           <button
             onClick={handleDownload}
             className="inline-flex items-center px-4 py-3 border 
-            border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-[#CFB53B] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#CFB53B]"
+            border-transparent rounded-md shadow-sm text-sm font-medium 
+            bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg hover:from-gray-400 hover:to-300"
           >
             <FiDownload className="mr-2" />
             Download
@@ -339,13 +341,13 @@ const Results = () => {
         })}
       >
         {/* Table header bar — dark blue like reference */}
-        <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)" }}>
-          <h2 className="text-base font-semibold text-white tracking-wide">Processed Records</h2>
+        <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #c4c4c4 0%, #d4d4d4 100%)" }}>
+          <h2 className="text-base font-semibold text-gray-600 tracking-wide">Processed Records</h2>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-blue-200">{totalRecords} records</span>
+            <span className="text-xs text-[#8E288D]">{totalRecords} records</span>
             <button
               onClick={() => setTableCollapsed(c => !c)}
-              className="text-white opacity-70 hover:opacity-100 font-bold text-lg leading-none px-1"
+              className="text-[#8E288D] opacity-70 hover:opacity-100 font-bold text-lg leading-none px-1"
               title={tableCollapsed ? 'Expand' : 'Collapse'}>
               {tableCollapsed ? '+' : '−'}
             </button>
@@ -381,8 +383,8 @@ const Results = () => {
                   {/* Row 1 — dark blue group headers like reference */}
                   <tr style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)" }}>
                     <th rowSpan={2}
-                      className="px-4 py-3 text-left text-xs font-bold text-white uppercase whitespace-nowrap sticky left-0 z-10"
-                      style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)", letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
+                      className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap sticky left-0 z-10"
+                      style={{ background: "#cfcdcd", letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.2)' }}>
                       Category
                     </th>
                     {RESULT_COLUMN_PAIRS.map(p => (
@@ -466,14 +468,14 @@ const Results = () => {
                             color: rec.category === 'Exact Match' ? '#1a3a5c' :
                                    rec.category === 'AI Match' ? '#1a3a5c' :
                                    rec.category === 'Manual Review' ? '#1a3a5c' :
-                                   rec.category === 'Customer Unmatched' ? '#1a3a5c' :
-                                   rec.category === 'Finance Unmatched' ? '#1a3a5c' :
+                                   rec.category === 'Physical Unmatched' ? '#1a3a5c' :
+                                   rec.category === 'ERP Unmatched' ? '#1a3a5c' :
                                    rec.category === 'Duplicate' ? '#1a3a5c' : '#1a3a5c',
                             background: rec.category === 'Exact Match' ? '#fff' :
                                         rec.category === 'AI Match' ? '#fff' :
                                         rec.category === 'Manual Review' ? '#fff' :
-                                        rec.category === 'Customer Unmatched' ? '#fff' :
-                                        rec.category === 'Finance Unmatched' ? '#fff' :
+                                        rec.category === 'Physical Unmatched' ? '#fff' :
+                                        rec.category === 'ERP Unmatched' ? '#fff' :
                                         rec.category === 'Duplicate' ? '#fce7f3' : '#f1f5f9',
                           }}>
                           {rec.category}
@@ -686,7 +688,7 @@ const Results = () => {
 
       {/* Comparison Bar Chart */}
       {/* <div className="mt-8 bg-white shadow rounded-lg p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-6">Customer vs Internal Records Comparison</h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-6">Customer vs ERP Records Comparison</h3>
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={comparisonData}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -698,22 +700,22 @@ const Results = () => {
             />
             <Legend wrapperStyle={{ fontSize: '14px', fontWeight: '500' }} />
             <Bar dataKey="Customer" fill="#8E288D" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="Internal" fill="#008080" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="ERP" fill="#008080" radius={[8, 8, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div> */}
 
       {/* Detailed Breakdown Charts */}
       {/* <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6"> */}
-      {/* Customer Records Breakdown */}
+      {/* Physical Records Breakdown */}
       {/* <div className="bg-white shadow rounded-lg p-6">
           <div className="flex items-center mb-4">
             <FiUsers className="h-6 w-6 text-purple-600 mr-2" />
-            <h3 className="text-lg font-semibold text-gray-900">Customer Records Breakdown</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Physical Records Breakdown</h3>
           </div>
           <div className="mb-4 p-4 bg-purple-50 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Total Customer Records:</span>
+              <span className="text-sm font-medium text-gray-700">Total Physical Records:</span>
               <span className="text-2xl font-bold text-purple-600">{stats.total_customer_records}</span>
             </div>
           </div> */}
@@ -756,15 +758,15 @@ const Results = () => {
           </div>
         </div> */}
 
-      {/* Internal Records Breakdown */}
+      {/* ERP Records Breakdown */}
       {/* <div className="bg-white shadow rounded-lg p-6">
           <div className="flex items-center mb-4">
             <FiDatabase className="h-6 w-6 text-teal-600 mr-2" />
-            <h3 className="text-lg font-semibold text-gray-900">Finance Records Breakdown</h3>
+            <h3 className="text-lg font-semibold text-gray-900">ERP Records Breakdown</h3>
           </div>
           <div className="mb-4 p-4 bg-teal-50 rounded-lg">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Total Finance Records:</span>
+              <span className="text-sm font-medium text-gray-700">Total ERP Records:</span>
               <span className="text-2xl font-bold text-teal-600">{stats.total_internal_records}</span>
             </div>
           </div> */}
