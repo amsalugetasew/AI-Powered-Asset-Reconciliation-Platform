@@ -310,7 +310,8 @@ Candidates:
         
         prompt += f"""
 RULES:
-1. Match if descriptions refer to SAME item type (e.g., "TV"="TELEVISION", "CHAIR"="CHAIR")
+1. Maily focus on sematics of descriptions, departments, divisions
+2. Match if descriptions refer to SAME item type (e.g., "TV"="TELEVISION", "CHAIR"="CHAIR")
 2. Different item types = NO match (e.g., "CHAIR" ≠ "PRINTER")
 3. Similar category/department strengthens match
 4. Confidence ≥0.20 for weak matches, ≥0.60 for strong matches

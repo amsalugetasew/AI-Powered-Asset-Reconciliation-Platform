@@ -114,6 +114,18 @@ def upload_files():
         db.session.add(reconciliation)
         db.session.commit()
         
+        # Audit: files uploaded
+        AuditService.log_operation(
+            user_id=user_id,
+            operation_type='UPLOAD_FILES',
+            resource_type='reconciliation',
+            resource_id=reconciliation.id,
+            details={
+                'customer_file': customer_filename,
+                'internal_file': internal_filename
+            }
+        )
+
         return jsonify({
             'message': 'Files uploaded successfully',
             'reconciliation_id': reconciliation.id,
@@ -194,6 +206,22 @@ def process_reconciliation(reconciliation_id):
             import traceback
             print(f"Warning: auto-save records failed: {save_err}")
             traceback.print_exc()
+
+        # Audit: reconciliation processed
+        AuditService.log_operation(
+            user_id=user_id,
+            operation_type='PROCESS_RECONCILIATION',
+            resource_type='reconciliation',
+            resource_id=reconciliation_id,
+            details={
+                'total_customer_records': statistics.get('total_customer_records', 0),
+                'total_internal_records': statistics.get('total_internal_records', 0),
+                'rule_matched':  statistics.get('rule_matched', 0),
+                'ai_matched':    statistics.get('ai_matched', 0),
+                'manual_review': statistics.get('manual_review', 0),
+                'customer_unmatched': statistics.get('customer_unmatched', 0),
+            }
+        )
         
         return jsonify({
             'message': 'Reconciliation completed successfully',
@@ -307,6 +335,15 @@ def download_report(reconciliation_id):
         if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
             return jsonify({'error': 'Report not found'}), 404
         
+        # Audit: report downloaded
+        AuditService.log_operation(
+            user_id=user_id,
+            operation_type='DOWNLOAD_REPORT',
+            resource_type='reconciliation',
+            resource_id=reconciliation_id,
+            details={'report_path': os.path.basename(reconciliation.report_path)}
+        )
+
         return send_file(
             reconciliation.report_path,
             as_attachment=True,
@@ -438,6 +475,15 @@ def download_enriched_report(reconciliation_id):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename  = f'reconciliation_enriched_{reconciliation_id}_{timestamp}.xlsx'
 
+        # Audit: enriched report downloaded
+        AuditService.log_operation(
+            user_id=user_id,
+            operation_type='DOWNLOAD_ENRICHED_REPORT',
+            resource_type='reconciliation',
+            resource_id=reconciliation_id,
+            details={'filename': filename}
+        )
+
         return send_file(
             output_buf,
             as_attachment=True,
@@ -542,23 +588,33 @@ def get_analytics():
         ).all()
 
         # ── category breakdown ─────────────────────────────────────────────────
+        STATUS_LIST_GLOBAL = ['pending','reconciled','unreconciled','surplus_assets',
+                               'exist_in_erp_not_physical','duplicated','unique']
+
         cat_stats = {}
         for rec in all_records:
             j = rec.full_record_json or {}
             cat = (_pick(j, 'customer_category', 'internal_category', 'category') or
                    rec.match_category or 'Unknown')
             if cat not in cat_stats:
-                cat_stats[cat] = {'total': 0, 'reconciled': 0}
+                cat_stats[cat] = {s: 0 for s in STATUS_LIST_GLOBAL}
+                cat_stats[cat]['total'] = 0
             cat_stats[cat]['total'] += 1
-            if rec.approval_status == 'reconciled':
-                cat_stats[cat]['reconciled'] += 1
+            cat_stats[cat][rec.approval_status or 'pending'] = \
+                cat_stats[cat].get(rec.approval_status or 'pending', 0) + 1
 
         category_breakdown = sorted([
             {
-                'name':        k,
-                'total':       v['total'],
-                'reconciled':  v['reconciled'],
-                'rate':        round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+                'name':                     k,
+                'total':                    v['total'],
+                'reconciled':               v.get('reconciled', 0),
+                'unreconciled':             v.get('unreconciled', 0),
+                'surplus_assets':           v.get('surplus_assets', 0),
+                'exist_in_erp_not_physical':v.get('exist_in_erp_not_physical', 0),
+                'duplicated':               v.get('duplicated', 0),
+                'unique':                   v.get('unique', 0),
+                'pending':                  v.get('pending', 0),
+                'rate': round(v.get('reconciled', 0) / v['total'] * 100, 1) if v['total'] else 0
             }
             for k, v in cat_stats.items() if k not in ('Unknown',)
         ], key=lambda x: -x['rate'])[:15]
@@ -570,17 +626,24 @@ def get_analytics():
             dept = _pick(j, 'customer_department', 'internal_department', 'department') or 'Unknown'
             if dept == 'Unknown': continue
             if dept not in dept_stats:
-                dept_stats[dept] = {'total': 0, 'reconciled': 0}
+                dept_stats[dept] = {s: 0 for s in STATUS_LIST_GLOBAL}
+                dept_stats[dept]['total'] = 0
             dept_stats[dept]['total'] += 1
-            if rec.approval_status == 'reconciled':
-                dept_stats[dept]['reconciled'] += 1
+            dept_stats[dept][rec.approval_status or 'pending'] = \
+                dept_stats[dept].get(rec.approval_status or 'pending', 0) + 1
 
         department_breakdown = sorted([
             {
-                'name':       k,
-                'total':      v['total'],
-                'reconciled': v['reconciled'],
-                'rate':       round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+                'name':                     k,
+                'total':                    v['total'],
+                'reconciled':               v.get('reconciled', 0),
+                'unreconciled':             v.get('unreconciled', 0),
+                'surplus_assets':           v.get('surplus_assets', 0),
+                'exist_in_erp_not_physical':v.get('exist_in_erp_not_physical', 0),
+                'duplicated':               v.get('duplicated', 0),
+                'unique':                   v.get('unique', 0),
+                'pending':                  v.get('pending', 0),
+                'rate': round(v.get('reconciled', 0) / v['total'] * 100, 1) if v['total'] else 0
             }
             for k, v in dept_stats.items()
         ], key=lambda x: -x['rate'])[:15]
@@ -592,17 +655,24 @@ def get_analytics():
             dist = _pick(j, 'customer_district', 'internal_district', 'district') or 'Unknown'
             if dist == 'Unknown': continue
             if dist not in dist_stats:
-                dist_stats[dist] = {'total': 0, 'reconciled': 0}
+                dist_stats[dist] = {s: 0 for s in STATUS_LIST_GLOBAL}
+                dist_stats[dist]['total'] = 0
             dist_stats[dist]['total'] += 1
-            if rec.approval_status == 'reconciled':
-                dist_stats[dist]['reconciled'] += 1
+            dist_stats[dist][rec.approval_status or 'pending'] = \
+                dist_stats[dist].get(rec.approval_status or 'pending', 0) + 1
 
         district_breakdown = sorted([
             {
-                'name':       k,
-                'total':      v['total'],
-                'reconciled': v['reconciled'],
-                'rate':       round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+                'name':                     k,
+                'total':                    v['total'],
+                'reconciled':               v.get('reconciled', 0),
+                'unreconciled':             v.get('unreconciled', 0),
+                'surplus_assets':           v.get('surplus_assets', 0),
+                'exist_in_erp_not_physical':v.get('exist_in_erp_not_physical', 0),
+                'duplicated':               v.get('duplicated', 0),
+                'unique':                   v.get('unique', 0),
+                'pending':                  v.get('pending', 0),
+                'rate': round(v.get('reconciled', 0) / v['total'] * 100, 1) if v['total'] else 0
             }
             for k, v in dist_stats.items()
         ], key=lambda x: -x['rate'])[:15]
@@ -1715,13 +1785,16 @@ def get_reconciliation_analytics(reconciliation_id):
 
         category_breakdown = sorted([
             {
-                'name':        k,
-                'total':       v['total'],
-                'reconciled':  v['reconciled'],
-                'unreconciled':v['unreconciled'],
-                'surplus':     v['surplus_assets'],
-                'pending':     v['pending'],
-                'rate':        round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+                'name':                     k,
+                'total':                    v['total'],
+                'reconciled':               v.get('reconciled', 0),
+                'unreconciled':             v.get('unreconciled', 0),
+                'surplus_assets':           v.get('surplus_assets', 0),
+                'exist_in_erp_not_physical':v.get('exist_in_erp_not_physical', 0),
+                'duplicated':               v.get('duplicated', 0),
+                'unique':                   v.get('unique', 0),
+                'pending':                  v.get('pending', 0),
+                'rate': round(v.get('reconciled', 0) / v['total'] * 100, 1) if v['total'] else 0
             }
             for k, v in cat_stats.items() if k != 'Unknown'
         ], key=lambda x: -x['rate'])[:15]
@@ -1733,19 +1806,24 @@ def get_reconciliation_analytics(reconciliation_id):
             dept = _pick(j, 'customer_department', 'internal_department', 'department') or 'Unknown'
             if dept == 'Unknown': continue
             if dept not in dept_stats:
-                dept_stats[dept] = {'total': 0, 'reconciled': 0, 'unreconciled': 0, 'pending': 0}
+                dept_stats[dept] = {s: 0 for s in STATUS_LIST}
+                dept_stats[dept]['total'] = 0
             dept_stats[dept]['total'] += 1
             dept_stats[dept][rec.approval_status or 'pending'] = \
                 dept_stats[dept].get(rec.approval_status or 'pending', 0) + 1
 
         department_breakdown = sorted([
             {
-                'name':        k,
-                'total':       v['total'],
-                'reconciled':  v['reconciled'],
-                'unreconciled':v.get('unreconciled', 0),
-                'pending':     v.get('pending', 0),
-                'rate':        round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+                'name':                     k,
+                'total':                    v['total'],
+                'reconciled':               v.get('reconciled', 0),
+                'unreconciled':             v.get('unreconciled', 0),
+                'surplus_assets':           v.get('surplus_assets', 0),
+                'exist_in_erp_not_physical':v.get('exist_in_erp_not_physical', 0),
+                'duplicated':               v.get('duplicated', 0),
+                'unique':                   v.get('unique', 0),
+                'pending':                  v.get('pending', 0),
+                'rate': round(v.get('reconciled', 0) / v['total'] * 100, 1) if v['total'] else 0
             }
             for k, v in dept_stats.items()
         ], key=lambda x: -x['rate'])[:15]
@@ -1757,19 +1835,24 @@ def get_reconciliation_analytics(reconciliation_id):
             dist = _pick(j, 'customer_district', 'internal_district', 'district') or 'Unknown'
             if dist == 'Unknown': continue
             if dist not in dist_stats:
-                dist_stats[dist] = {'total': 0, 'reconciled': 0, 'unreconciled': 0, 'pending': 0}
+                dist_stats[dist] = {s: 0 for s in STATUS_LIST}
+                dist_stats[dist]['total'] = 0
             dist_stats[dist]['total'] += 1
             dist_stats[dist][rec.approval_status or 'pending'] = \
                 dist_stats[dist].get(rec.approval_status or 'pending', 0) + 1
 
         district_breakdown = sorted([
             {
-                'name':        k,
-                'total':       v['total'],
-                'reconciled':  v['reconciled'],
-                'unreconciled':v.get('unreconciled', 0),
-                'pending':     v.get('pending', 0),
-                'rate':        round(v['reconciled'] / v['total'] * 100, 1) if v['total'] else 0
+                'name':                     k,
+                'total':                    v['total'],
+                'reconciled':               v.get('reconciled', 0),
+                'unreconciled':             v.get('unreconciled', 0),
+                'surplus_assets':           v.get('surplus_assets', 0),
+                'exist_in_erp_not_physical':v.get('exist_in_erp_not_physical', 0),
+                'duplicated':               v.get('duplicated', 0),
+                'unique':                   v.get('unique', 0),
+                'pending':                  v.get('pending', 0),
+                'rate': round(v.get('reconciled', 0) / v['total'] * 100, 1) if v['total'] else 0
             }
             for k, v in dist_stats.items()
         ], key=lambda x: -x['rate'])[:15]
@@ -1868,14 +1951,14 @@ def get_aging_analysis():
             ReconciliationRecord.match_category.in_(FINANCE_CATEGORIES)
         ).all()
 
-        buckets = {
-            '< 1 yr':   0,
-            '1 – 3 yr': 0,
-            '3 – 5 yr': 0,
-            '5 – 10 yr':0,
-            '10 – 20 yr':0,
-            '> 20 yr':  0,
-            'Unknown':  0,
+        buckets_map = {
+            '< 1 yr':    {s: 0 for s in ['reconciled','unreconciled','pending','surplus_assets','exist_in_erp_not_physical','duplicated','unique']},
+            '1 – 3 yr':  {s: 0 for s in ['reconciled','unreconciled','pending','surplus_assets','exist_in_erp_not_physical','duplicated','unique']},
+            '3 – 5 yr':  {s: 0 for s in ['reconciled','unreconciled','pending','surplus_assets','exist_in_erp_not_physical','duplicated','unique']},
+            '5 – 10 yr': {s: 0 for s in ['reconciled','unreconciled','pending','surplus_assets','exist_in_erp_not_physical','duplicated','unique']},
+            '10 – 20 yr':{s: 0 for s in ['reconciled','unreconciled','pending','surplus_assets','exist_in_erp_not_physical','duplicated','unique']},
+            '> 20 yr':   {s: 0 for s in ['reconciled','unreconciled','pending','surplus_assets','exist_in_erp_not_physical','duplicated','unique']},
+            'Unknown':   {s: 0 for s in ['reconciled','unreconciled','pending','surplus_assets','exist_in_erp_not_physical','duplicated','unique']},
         }
 
         for rec in records:
@@ -1885,22 +1968,31 @@ def get_aging_analysis():
             try:
                 asset_year = int(float(str(raw_year).strip()))
                 age = current_year - asset_year
-                if age < 1:          buckets['< 1 yr']    += 1
-                elif age < 4:        buckets['1 – 3 yr']  += 1
-                elif age < 6:        buckets['3 – 5 yr']  += 1
-                elif age < 11:       buckets['5 – 10 yr'] += 1
-                elif age < 21:       buckets['10 – 20 yr']+= 1
-                else:                buckets['> 20 yr']   += 1
+                if age < 1:          bucket_key = '< 1 yr'
+                elif age < 4:        bucket_key = '1 – 3 yr'
+                elif age < 6:        bucket_key = '3 – 5 yr'
+                elif age < 11:       bucket_key = '5 – 10 yr'
+                elif age < 21:       bucket_key = '10 – 20 yr'
+                else:                bucket_key = '> 20 yr'
             except (ValueError, TypeError):
-                buckets['Unknown'] += 1
+                bucket_key = 'Unknown'
 
-        result = [
-            {'bucket': k, 'count': v}
-            for k, v in buckets.items() if v > 0
-        ]
+            status = rec.approval_status or 'pending'
+            buckets_map[bucket_key][status] = buckets_map[bucket_key].get(status, 0) + 1
+
+        BUCKET_ORDER = ['< 1 yr','1 – 3 yr','3 – 5 yr','5 – 10 yr','10 – 20 yr','> 20 yr','Unknown']
+        result = []
+        simple_buckets = []
+        for b in BUCKET_ORDER:
+            row = dict({'bucket': b}, **buckets_map[b])
+            row['total'] = sum(buckets_map[b].values())
+            if row['total'] > 0:
+                result.append(row)
+                simple_buckets.append({'bucket': b, 'count': row['total']})
 
         return jsonify({
-            'buckets': result,
+            'buckets': simple_buckets,       # backward-compat for Dashboard aging chart
+            'stacked_buckets': result,        # new: stacked by approval status
             'current_year': current_year,
             'total_records': len(records)
         }), 200
@@ -2027,5 +2119,83 @@ def get_reconciliation_aging(reconciliation_id):
         }), 200
 
     except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Delete reconciliation ─────────────────────────────────────────────────────
+@reconciliation_bp.route('/<int:reconciliation_id>', methods=['DELETE'])
+@jwt_required()
+def delete_reconciliation(reconciliation_id):
+    """
+    Delete a reconciliation and all associated data:
+    - ReconciliationRecord rows (cascade)
+    - The Excel report file from disk
+    - The uploaded source files from disk
+    - The Reconciliation row itself
+    Managers/Admins can delete any; Officers can only delete their own.
+    """
+    try:
+        user_id   = int(get_jwt_identity())
+        user_role = get_user_role()
+
+        recon = Reconciliation.query.get(reconciliation_id)
+        if not recon:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+
+        if user_role == 'officer' and recon.user_id != user_id:
+            return jsonify({'error': 'Access denied'}), 403
+
+        # ── Delete files from disk ──────────────────────────────────────
+        deleted_files = []
+
+        # Report (Excel)
+        if recon.report_path and os.path.exists(recon.report_path):
+            try:
+                os.remove(recon.report_path)
+                deleted_files.append(recon.report_path)
+            except OSError as e:
+                print(f"Warning: could not delete report file: {e}")
+
+        # Uploaded source files
+        for fname in [recon.customer_file, recon.internal_file]:
+            if fname:
+                full = os.path.join(Config.UPLOAD_FOLDER, fname)
+                if os.path.exists(full):
+                    try:
+                        os.remove(full)
+                        deleted_files.append(full)
+                    except OSError as e:
+                        print(f"Warning: could not delete upload file: {e}")
+
+        # ── Delete DB rows (records cascade via FK) ─────────────────────
+        ReconciliationRecord.query.filter_by(
+            reconciliation_id=reconciliation_id
+        ).delete()
+
+        db.session.delete(recon)
+        db.session.commit()
+
+        # Audit: reconciliation deleted
+        AuditService.log_operation(
+            user_id=user_id,
+            operation_type='DELETE_RECONCILIATION',
+            resource_type='reconciliation',
+            resource_id=reconciliation_id,
+            details={
+                'customer_file': recon.customer_file,
+                'internal_file': recon.internal_file,
+                'deleted_files_count': len(deleted_files),
+                'deleted_by_role': user_role
+            }
+        )
+
+        return jsonify({
+            'message': f'Reconciliation #{reconciliation_id} deleted successfully',
+            'deleted_files': deleted_files,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500

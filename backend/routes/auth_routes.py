@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_jwt
 from models import db, User
+from services.audit_service import AuditService
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -32,6 +33,15 @@ def register():
         db.session.add(user)
         db.session.commit()
         
+        # Audit: self-registration
+        AuditService.log_operation(
+            user_id=user.id,
+            operation_type='USER_REGISTER',
+            resource_type='user',
+            resource_id=user.id,
+            details={'username': user.username, 'email': user.email, 'role': user.role}
+        )
+
         # Generate access token with string identity and role claim
         additional_claims = {'role': user.role}
         access_token = create_access_token(
@@ -63,8 +73,24 @@ def login():
         user = User.query.filter_by(username=data['username']).first()
         
         if not user or not user.check_password(data['password']):
+            # Audit: failed login attempt
+            AuditService.log_operation(
+                user_id=0,
+                operation_type='LOGIN_FAILED',
+                resource_type='auth',
+                details={'attempted_username': data.get('username', ''), 'ip': request.remote_addr}
+            )
             return jsonify({'error': 'Invalid username or password'}), 401
         
+        # Audit: successful login
+        AuditService.log_operation(
+            user_id=user.id,
+            operation_type='USER_LOGIN',
+            resource_type='auth',
+            resource_id=user.id,
+            details={'username': user.username, 'role': user.role, 'ip': request.remote_addr}
+        )
+
         # Generate access token with string identity and role claim
         additional_claims = {'role': user.role}
         access_token = create_access_token(
@@ -101,6 +127,18 @@ def get_current_user():
 @jwt_required()
 def logout():
     """Logout user (client-side token removal)"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        AuditService.log_operation(
+            user_id=user_id,
+            operation_type='USER_LOGOUT',
+            resource_type='auth',
+            resource_id=user_id,
+            details={'username': user.username if user else 'unknown'}
+        )
+    except Exception:
+        pass
     return jsonify({'message': 'Logout successful'}), 200
 
 @auth_bp.route('/debug-token', methods=['GET'])

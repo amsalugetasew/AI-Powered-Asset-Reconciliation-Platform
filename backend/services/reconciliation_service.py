@@ -310,10 +310,10 @@ class ReconciliationService:
             rule_matched_df=rule_matched_df,
             ai_matched_df=ai_matched_df,
             manual_review_df=manual_review_df,
-            customer_unmatched_df=remaining_customer,
-            internal_unmatched_df=remaining_internal,
-            customer_duplicates_df=customer_duplicates,
-            internal_duplicates_df=internal_duplicates,
+            physical_unmatched_df=remaining_customer,
+            erp_unmatched_df=remaining_internal,
+            physical_duplicates_df=customer_duplicates,
+            erp_duplicates_df=internal_duplicates,
             reconciliation_id=reconciliation_id,
             output_dir=self.config.REPORTS_FOLDER
         )

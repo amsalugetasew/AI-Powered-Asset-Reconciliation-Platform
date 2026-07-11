@@ -9,10 +9,10 @@ class ReportGenerator:
     def generate_excel_report(rule_matched_df: pd.DataFrame,
                             ai_matched_df: pd.DataFrame,
                             manual_review_df: pd.DataFrame,
-                            customer_unmatched_df: pd.DataFrame,
-                            internal_unmatched_df: pd.DataFrame,
-                            customer_duplicates_df: pd.DataFrame,
-                            internal_duplicates_df: pd.DataFrame,
+                            physical_unmatched_df: pd.DataFrame,
+                            erp_unmatched_df: pd.DataFrame,
+                            physical_duplicates_df: pd.DataFrame,
+                            erp_duplicates_df: pd.DataFrame,
                             reconciliation_id: int,
                             output_dir: str,
                             chunk_size: int = 50000) -> str:
@@ -41,11 +41,11 @@ class ReportGenerator:
             
             # Sheet 1: Summary
             # Calculate totals correctly: Unique records + Duplicates
-            customer_unique_records = len(customer_unmatched_df) + len(rule_matched_df) + len(ai_matched_df) + len(manual_review_df)
-            internal_unique_records = len(internal_unmatched_df) + len(rule_matched_df) + len(ai_matched_df) + len(manual_review_df)
+            physical_unique_records = len(physical_unmatched_df) + len(rule_matched_df) + len(ai_matched_df) + len(manual_review_df)
+            erp_unique_records = len(erp_unmatched_df) + len(rule_matched_df) + len(ai_matched_df) + len(manual_review_df)
             
-            total_customer_records = customer_unique_records + len(customer_duplicates_df)
-            total_internal_records = internal_unique_records + len(internal_duplicates_df)
+            total_physical_records = physical_unique_records + len(physical_duplicates_df)
+            total_erp_records = erp_unique_records + len(erp_duplicates_df)
             
             summary_data = {
                 'Metric': [
@@ -72,41 +72,41 @@ class ReportGenerator:
                     'Overall Match Rate (%)',
                     '',
                     '=== VERIFICATION ===',
-                    'Customer: Unique + Duplicates',
-                    'Internal: Unique + Duplicates'
+                    'Physical: Unique + Duplicates',
+                    'ERP: Unique + Duplicates'
                 ],
                 'Count': [
                     '',
-                    total_customer_records,
-                    customer_unique_records,
+                    total_physical_records,
+                    physical_unique_records,
                     len(rule_matched_df),
                     len(ai_matched_df),
                     len(manual_review_df),
-                    len(customer_unmatched_df),
-                    len(customer_duplicates_df),
+                    len(physical_unmatched_df),
+                    len(physical_duplicates_df),
                     '',
                     '',
-                    total_internal_records,
-                    internal_unique_records,
+                    total_erp_records,
+                    erp_unique_records,
                     len(rule_matched_df),
                     len(ai_matched_df),
                     len(manual_review_df),
-                    len(internal_unmatched_df),
-                    len(internal_duplicates_df),
+                    len(erp_unmatched_df),
+                    len(erp_duplicates_df),
                     '',
                     '',
                     len(rule_matched_df) + len(ai_matched_df),
                     0,  # Will be calculated below
                     '',
                     '',
-                    f"{customer_unique_records} + {len(customer_duplicates_df)} = {total_customer_records}",
-                    f"{internal_unique_records} + {len(internal_duplicates_df)} = {total_internal_records}"
+                    f"{physical_unique_records} + {len(physical_duplicates_df)} = {total_physical_records}",
+                    f"{erp_unique_records} + {len(erp_duplicates_df)} = {total_erp_records}"
                 ]
             }
             
             # Calculate match rate
             total_matched = len(rule_matched_df) + len(ai_matched_df)
-            match_rate = (total_matched / customer_unique_records * 100) if customer_unique_records > 0 else 0
+            match_rate = (total_matched / physical_unique_records * 100) if physical_unique_records > 0 else 0
             summary_data['Count'][20] = round(match_rate, 2)
             
             summary_df = pd.DataFrame(summary_data)
@@ -181,16 +181,16 @@ class ReportGenerator:
             _write_large_df(manual_review_df, 'Matched_Need_Manual_Review', 'No records requiring manual review')
             
             # Sheet 5: Physical Unmatched
-            _write_large_df(customer_unmatched_df, 'Physical_Unmatched', 'No unmatched physical records')
+            _write_large_df(physical_unmatched_df, 'Physical_Unmatched', 'No unmatched physical records')
             
             # Sheet 6: ERP Unmatched
-            _write_large_df(internal_unmatched_df, 'ERP_Unmatched', 'No unmatched ERP records')
+            _write_large_df(erp_unmatched_df, 'ERP_Unmatched', 'No unmatched ERP records')
             
             # Sheet 7: Physical Duplicates
-            _write_large_df(customer_duplicates_df, 'Physical_Duplicates', 'No duplicate physical records')
+            _write_large_df(physical_duplicates_df, 'Physical_Duplicates', 'No duplicate physical records')
             
             # Sheet 8: ERP Duplicates
-            _write_large_df(internal_duplicates_df, 'ERP_Duplicates', 'No duplicate ERP records')
+            _write_large_df(erp_duplicates_df, 'ERP_Duplicates', 'No duplicate ERP records')
         
         print(f"  ✓ Report generated successfully: {filepath}")
         return filepath

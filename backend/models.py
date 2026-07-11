@@ -44,6 +44,7 @@ class Reconciliation(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    requester = db.relationship('User', foreign_keys=[user_id], lazy='joined')
     customer_file = db.Column(db.String(255), nullable=False)
     internal_file = db.Column(db.String(255), nullable=False)
     status = db.Column(db.String(50), default='pending')  # pending, processing, completed, failed
@@ -69,6 +70,9 @@ class Reconciliation(db.Model):
         return {
             'id': self.id,
             'user_id': self.user_id,
+            'requester_username': self.requester.username if self.requester else None,
+            'requester_email':    self.requester.email    if self.requester else None,
+            'requester_role':     self.requester.role     if self.requester else None,
             'customer_file': self.customer_file,
             'internal_file': self.internal_file,
             'status': self.status,
