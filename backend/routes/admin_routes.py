@@ -192,6 +192,107 @@ def update_role(user_id):
         return jsonify({'error': str(e)}), 500
 
 
+@admin_bp.route('/users/<int:user_id>/deactivate', methods=['PUT'])
+@jwt_required()
+@require_admin
+def deactivate_user(user_id):
+    """Deactivate a user account (Admin only)."""
+    try:
+        admin_user = get_user_from_token()
+
+        if admin_user.id == user_id:
+            return jsonify({'error': 'Cannot deactivate your own account'}), 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        if not user.is_active:
+            return jsonify({'message': 'User is already deactivated', 'user': user.to_dict()}), 200
+
+        user.is_active = False
+        db.session.commit()
+
+        AuditService.log_operation(
+            user_id=admin_user.id,
+            operation_type='DEACTIVATE_USER',
+            resource_type='user',
+            resource_id=user.id,
+            details={'target_username': user.username}
+        )
+
+        return jsonify({'message': 'User deactivated successfully', 'user': user.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/users/<int:user_id>/activate', methods=['PUT'])
+@jwt_required()
+@require_admin
+def activate_user(user_id):
+    """Activate a user account (Admin only)."""
+    try:
+        admin_user = get_user_from_token()
+
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        if user.is_active:
+            return jsonify({'message': 'User is already active', 'user': user.to_dict()}), 200
+
+        user.is_active = True
+        db.session.commit()
+
+        AuditService.log_operation(
+            user_id=admin_user.id,
+            operation_type='ACTIVATE_USER',
+            resource_type='user',
+            resource_id=user.id,
+            details={'target_username': user.username}
+        )
+
+        return jsonify({'message': 'User activated successfully', 'user': user.to_dict()}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/users/<int:user_id>/reset-password', methods=['POST'])
+@jwt_required()
+@require_admin
+def reset_user_password(user_id):
+    """Reset a user's password (Admin only)."""
+    try:
+        admin_user = get_user_from_token()
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.get_json(silent=True) or {}
+        new_password = data.get('new_password') or 'TempPass123!'
+
+        if len(new_password) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+
+        user.set_password(new_password)
+        db.session.commit()
+
+        AuditService.log_operation(
+            user_id=admin_user.id,
+            operation_type='RESET_PASSWORD',
+            resource_type='user',
+            resource_id=user.id,
+            details={'target_username': user.username}
+        )
+
+        return jsonify({'message': 'Password reset successfully', 'temporary_password': new_password}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @admin_bp.route('/users/<int:user_id>', methods=['DELETE'])
 @jwt_required()
 @require_admin
@@ -225,8 +326,15 @@ def delete_user(user_id):
         # Store user info for audit log before deletion
         deleted_username = user.username
         deleted_role = user.role
-        
-        # Delete user (cascades to reconciliations and audit logs via model relationship)
+
+        # Remove dependent records explicitly to avoid foreign-key issues on databases
+        # that do not enforce cascade deletes for these relationships.
+        for reconciliation in list(user.reconciliations):
+            db.session.delete(reconciliation)
+
+        for audit_log in list(user.audit_logs):
+            db.session.delete(audit_log)
+
         db.session.delete(user)
         db.session.commit()
         

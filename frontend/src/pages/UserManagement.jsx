@@ -4,18 +4,25 @@ import { toast } from 'react-toastify'
 import { FiPlus, FiEdit2, FiTrash2, FiX, FiUser, FiMail, FiLock, FiShield } from 'react-icons/fi'
 import { RoleBadge } from '../components/RoleGuard'
 import { useAuth } from '../context/AuthContext'
-
+import { Eye, EyeOff } from "lucide-react";
 const UserManagement = () => {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showActionModal, setShowActionModal] = useState(false)
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
+  const [pendingAction, setPendingAction] = useState(null)
+  const [resetForm, setResetForm] = useState({ newPassword: '', confirmPassword: '' })
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
+    confirmPassword: '',
     role: 'officer'
   })
 
@@ -38,11 +45,19 @@ const UserManagement = () => {
 
   const handleCreateUser = async (e) => {
     e.preventDefault()
+
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
+
     try {
-      await axios.post('/api/admin/users', formData)
+      const payload = { ...formData }
+      delete payload.confirmPassword
+      await axios.post('/api/admin/users', payload)
       toast.success('User created successfully')
       setShowCreateModal(false)
-      setFormData({ username: '', email: '', password: '', role: 'officer' })
+      setFormData({ username: '', email: '', password: '', confirmPassword: '', role: 'officer' })
       fetchUsers()
     } catch (error) {
       console.error('Error creating user:', error)
@@ -77,6 +92,73 @@ const UserManagement = () => {
   const openDeleteModal = (user) => {
     setSelectedUser(user)
     setShowDeleteModal(true)
+  }
+
+  const handleUserAction = (user, action) => {
+    if (action === 'delete') {
+      openDeleteModal(user)
+      return
+    }
+
+    if (user.id === currentUser.id) {
+      toast.error('You cannot perform this action on your own account')
+      return
+    }
+
+    setSelectedUser(user)
+    setPendingAction(action)
+
+    if (action === 'reset-password') {
+      setResetForm({ newPassword: '', confirmPassword: '' })
+      setShowResetPasswordModal(true)
+      setShowActionModal(false)
+    } else {
+      setShowResetPasswordModal(false)
+      setShowActionModal(true)
+    }
+  }
+
+  const confirmPendingAction = async () => {
+    if (!selectedUser || !pendingAction) return
+
+    try {
+      if (pendingAction === 'deactivate') {
+        await axios.put(`/api/admin/users/${selectedUser.id}/deactivate`)
+        toast.success(`User ${selectedUser.username} deactivated successfully`)
+      } else if (pendingAction === 'activate') {
+        await axios.put(`/api/admin/users/${selectedUser.id}/activate`)
+        toast.success(`User ${selectedUser.username} activated successfully`)
+      }
+
+      setShowActionModal(false)
+      setSelectedUser(null)
+      setPendingAction(null)
+      fetchUsers()
+    } catch (error) {
+      console.error('Error performing user action:', error)
+      toast.error(error.response?.data?.error || 'Failed to complete action')
+    }
+  }
+
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault()
+    if (!selectedUser) return
+
+    if (resetForm.newPassword !== resetForm.confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
+
+    try {
+      await axios.post(`/api/admin/users/${selectedUser.id}/reset-password`, { new_password: resetForm.newPassword })
+      toast.success(`Password reset for ${selectedUser.username}`)
+      setShowResetPasswordModal(false)
+      setSelectedUser(null)
+      setResetForm({ newPassword: '', confirmPassword: '' })
+    } catch (error) {
+      console.error('Error resetting password:', error)
+      toast.error(error.response?.data?.error || 'Failed to reset password')
+    }
   }
 
   if (loading) {
@@ -167,17 +249,33 @@ const UserManagement = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {user.id !== currentUser.id ? (
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
-                        onClick={() => openDeleteModal(user)}
-                        className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                        onClick={() => handleUserAction(user, user.is_active ? 'deactivate' : 'activate')}
+                        className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 transition ${user.is_active ? 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700' : 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100'}`}
                       >
-                        <FiTrash2 className="h-4 w-4" />
-                        Delete
+                        <FiShield className="h-4 w-4" />
+                        {user.is_active ? 'Deactivate' : 'Activate'}
                       </button>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
+                      <button
+                        onClick={() => handleUserAction(user, 'reset-password')}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-gray-700 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                      >
+                        <FiLock className="h-4 w-4" />
+                        Reset Password
+                      </button>
+                      {user.id !== currentUser.id ? (
+                        <button
+                          onClick={() => handleUserAction(user, 'delete')}
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-red-600 transition hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/40"
+                        >
+                          <FiTrash2 className="h-4 w-4" />
+                          Delete
+                        </button>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -248,18 +346,47 @@ const UserManagement = () => {
                   required
                 />
               </div>
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   <FiLock className="inline h-4 w-4 mr-1" />
                   Password
                 </label>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8E288D]"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-0 text-slate-400 hover:text-slate-600"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <FiLock className="inline h-4 w-4 mr-1" />
+                  Confirm Password
+                </label>
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8E288D]"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-0 text-slate-400 hover:text-slate-600"
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -290,6 +417,96 @@ const UserManagement = () => {
                 >
                   Create User
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Action Confirmation Modal */}
+      {showActionModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${pendingAction === 'deactivate' ? 'bg-yellow-100' : 'bg-blue-100'}`}>
+                {pendingAction === 'deactivate' ? <FiShield className="h-6 w-6 text-yellow-600" /> : <FiLock className="h-6 w-6 text-blue-600" />}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  {pendingAction === 'deactivate' ? 'Deactivate User' : 'Reset Password'}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {pendingAction === 'deactivate'
+                    ? 'This will disable the user account.'
+                    : 'This will generate a temporary password for the user.'}
+                </p>
+              </div>
+            </div>
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to {pendingAction === 'deactivate' ? 'deactivate' : 'reset the password for'} <strong>{selectedUser.username}</strong>?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowActionModal(false)
+                  setSelectedUser(null)
+                  setPendingAction(null)
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmPendingAction}
+                className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors ${pendingAction === 'deactivate' || pendingAction === 'activate' ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+              >
+                {pendingAction === 'deactivate' ? 'Deactivate' : pendingAction === 'activate' ? 'Activate' : 'Reset Password'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {showResetPasswordModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Reset Password</h3>
+                <p className="text-sm text-gray-600">Set a new password for {selectedUser.username}</p>
+              </div>
+              <button onClick={() => { setShowResetPasswordModal(false); setSelectedUser(null); setResetForm({ newPassword: '', confirmPassword: '' }) }} className="text-gray-400 hover:text-gray-600">
+                <FiX className="h-6 w-6" />
+              </button>
+            </div>
+            <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={resetForm.newPassword}
+                  onChange={(e) => setResetForm({ ...resetForm, newPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8E288D]"
+                  required
+                />
+                <button type="button" onClick={() => setShowPassword((prev) => !prev)} className="absolute right-3 top-1/2 -translate-y-0 text-slate-400 hover:text-slate-600" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={resetForm.confirmPassword}
+                  onChange={(e) => setResetForm({ ...resetForm, confirmPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8E288D]"
+                  required
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => { setShowResetPasswordModal(false); setSelectedUser(null); setResetForm({ newPassword: '', confirmPassword: '' }) }} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-2 bg-[#8E288D] text-white rounded-lg hover:bg-[#75206f] transition-colors">Reset Password</button>
               </div>
             </form>
           </div>

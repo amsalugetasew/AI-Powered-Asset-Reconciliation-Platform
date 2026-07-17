@@ -2,6 +2,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import { logActivity } from '../services/activityService'
 import AIAnalysisModal from '../components/AIAnalysisModal'
 import AIContextMenu from '../components/AIContextMenu'
 import {
@@ -232,6 +233,7 @@ const ReconciliationReport = () => {
   }
 
   useEffect(() => {
+    logActivity(`/report/${id}`, `PAGE_VISIT_REPORT_${id}`)
     Promise.all([
       axios.get(`/api/reconciliation/analytics/single/${id}`),
       axios.get(`/api/reconciliation/analytics/aging/${id}`),
@@ -264,14 +266,38 @@ const ReconciliationReport = () => {
     { key: 'aging', label: 'Aging Analysis' },
   ]
 
-  // stacked bar data for category
+  // ── Shared status palette for ALL breakdown tabs ──────────────────────────
+  const STATUS_COLORS = {
+    reconciled:                  '#CFB53B',
+    unreconciled:                '#000000',
+    surplus_assets:              '#8E288D',
+    exist_in_erp_not_physical:   '#e64595ff',
+    duplicated:                  '#9C755F',
+    unique:                      '#14b8a6',
+    pending:                     '#4E79A7',
+  }
+  const STATUS_LABELS = {
+    reconciled:                  'Reconciled',
+    unreconciled:                'Unmatched',
+    surplus_assets:              'Surplus Assets',
+    exist_in_erp_not_physical:   'Shortage Asset',
+    duplicated:                  'Duplicated',
+    unique:                      'Unique',
+    pending:                     'Pending',
+  }
+  const ALL_STATUS_KEYS = Object.keys(STATUS_COLORS)
+
+  // stacked bar data for category — lowercase keys match backend now
   const stackedCatData = category_breakdown.map(c => ({
     name: c.name.length > 18 ? c.name.slice(0, 18) + '…' : c.name,
     fullName: c.name,
-    Reconciled: c.reconciled,
-    Unreconciled: c.unreconciled,
-    Pending: c.pending,
-    Surplus: c.surplus || 0,
+    reconciled:                 c.reconciled   || 0,
+    unreconciled:               c.unreconciled || 0,
+    surplus_assets:             c.surplus_assets || 0,
+    exist_in_erp_not_physical:  c.exist_in_erp_not_physical || 0,
+    duplicated:                 c.duplicated   || 0,
+    unique:                     c.unique       || 0,
+    pending:                    c.pending      || 0,
   }))
 
   return (
@@ -393,7 +419,7 @@ const ReconciliationReport = () => {
       {/* ── Tabs ─────────────────────────────────────────────────────────── */}
       <div className="flex gap-2 mb-5 flex-wrap">
         {tabs.map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
+          <button key={t.key} onClick={() => { setActiveTab(t.key); logActivity(`/report/${id}`, `TAB_SWITCH_${t.key.toUpperCase()}`) }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === t.key
               ? 'bg-[#8E288D] text-white shadow'
               : 'bg-white text-gray-600 border border-gray-200 hover:border-[#8E288D]'
@@ -563,20 +589,18 @@ const ReconciliationReport = () => {
             <>
               <div className="mb-2">
                 {(() => {
-                  const CAT_COLORS = { Reconciled:'#CFB53B', Unreconciled:'#000000', Surplus:'#8E288D', Pending:'#4E79A7' }
-                  const CAT_LABELS = { Reconciled:'Reconciled', Unreconciled:'Unmatched', Surplus:'Surplus Assets', Pending:'Pending' }
-                  const activeKeys = Object.keys(CAT_COLORS).filter(k => stackedCatData.some(r => (r[k]||0) > 0))
+                  const activeKeys = ALL_STATUS_KEYS.filter(k => stackedCatData.some(r => (r[k]||0) > 0))
                   return (
                     <>
                       {stackedCatData.map(row => (
                         <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
-                          colors={CAT_COLORS} labels={CAT_LABELS} rowLabel={row.fullName || row.name} />
+                          colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.fullName || row.name} />
                       ))}
                       <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
                         {activeKeys.map(s => (
                           <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
-                            <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: CAT_COLORS[s] }} />
-                            {CAT_LABELS[s]}
+                            <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                            {STATUS_LABELS[s]}
                           </div>
                         ))}
                       </div>
@@ -612,22 +636,18 @@ const ReconciliationReport = () => {
           {department_breakdown.length ? (
             <>
               {(() => {
-                const DEPT_COLORS = { reconciled:'#CFB53B', unreconciled:'#F28E2B', pending:'#4E79A7', 
-                    surplus_assets:'#8E288D', exist_in_erp_not_physical:'#B07AA1', duplicated:'#9C755F' }
-                const DEPT_LABELS = { reconciled:'Reconciled', unreconciled:'Unmatched', pending:'Pending', 
-                  surplus_assets:'Surplus Assets', exist_in_erp_not_physical:'Shortage/Loss Assets', duplicated:'Duplicated' }
-                const activeKeys = Object.keys(DEPT_COLORS).filter(k => department_breakdown.some(r => (r[k]||0) > 0))
+                const activeKeys = ALL_STATUS_KEYS.filter(k => department_breakdown.some(r => (r[k]||0) > 0))
                 return (
                   <>
                     {department_breakdown.map(row => (
                       <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
-                        colors={DEPT_COLORS} labels={DEPT_LABELS} rowLabel={row.name} />
+                        colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
                     ))}
                     <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
                       {activeKeys.map(s => (
                         <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: DEPT_COLORS[s] }} />
-                          {DEPT_LABELS[s]}
+                          <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                          {STATUS_LABELS[s]}
                         </div>
                       ))}
                     </div>
@@ -663,27 +683,18 @@ const ReconciliationReport = () => {
             {district_breakdown.length ? (
               <>
                 {(() => {
-          //         reconciled: "#4E79A7",
-          // unreconciled: "#E15759",
-          // pending: "#F28E2B",
-          // surplus_assets: "#59A14F",
-          // exist_in_erp_not_physical: "#B07AA1",
-          // duplicated: "#9C755F",
-                  const DIST_COLORS = { reconciled:'#CFB53B', unreconciled:'#000', pending:'#4E79A7', 
-                    surplus_assets:'#8E288D', exist_in_erp_not_physical:'#B07AA1', duplicated:'#9C755F' }
-                  const DIST_LABELS = { reconciled:'Reconciled', unreconciled:'Unreconciled', pending:'Pending', surplus_assets:'Surplus Assets', exist_in_erp_not_physical:'Shortage/Loss Assets', duplicated:'Duplicated' }
-                  const activeKeys = Object.keys(DIST_COLORS).filter(k => district_breakdown.some(r => (r[k]||0) > 0))
+                  const activeKeys = ALL_STATUS_KEYS.filter(k => district_breakdown.some(r => (r[k]||0) > 0))
                   return (
                     <>
                       {district_breakdown.map(row => (
                         <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
-                          colors={DIST_COLORS} labels={DIST_LABELS} rowLabel={row.name} />
+                          colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
                       ))}
                       <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
                         {activeKeys.map(s => (
                           <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
-                            <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: DIST_COLORS[s] }} />
-                            {DIST_LABELS[s]}
+                            <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                            {STATUS_LABELS[s]}
                           </div>
                         ))}
                       </div>
@@ -787,36 +798,16 @@ const ReconciliationReport = () => {
           </div>
         )
 
-        const STATUS_COLORS = {
-          // reconciled: '#8E288D',
-          // unreconciled: '#ef4444',
-          // pending: '#868477ff',
-          // surplus_assets: '#a4ad4dff',
-          // exist_in_erp_not_physical: '#7A1E79',
-          // duplicated: '#ee8a9bff',
-          reconciled: "#CFB53B",
-          unreconciled: "#000",
-          pending: "#4E79A7",
-          surplus_assets: "#ec7beaff",
-          exist_in_erp_not_physical: "#e64595ff",
-          duplicated: "#9C755F",
-        }
-        const STATUS_LABELS = {
-          reconciled: 'Reconciled', unreconciled: 'Unmatched',
-          pending: 'Pending', surplus_assets: 'Surplus Assets',
-          exist_in_erp_not_physical: 'Shortage Asset',
-          duplicated: 'Duplicated',
-        }
-
+        // Use shared STATUS_COLORS / STATUS_LABELS / ALL_STATUS_KEYS from component scope
         const { aging_chart = [], department_chart = [], district_chart = [], current_year } = agingData
 
-        const agingActiveStatuses = Object.keys(STATUS_COLORS).filter(s =>
+        const agingActiveStatuses = ALL_STATUS_KEYS.filter(s =>
           aging_chart.some(row => (row[s] || 0) > 0)
         )
-        const deptActiveStatuses = Object.keys(STATUS_COLORS).filter(s =>
+        const deptActiveStatuses = ALL_STATUS_KEYS.filter(s =>
           department_chart.some(row => (row[s] || 0) > 0)
         )
-        const distActiveStatuses = Object.keys(STATUS_COLORS).filter(s =>
+        const distActiveStatuses = ALL_STATUS_KEYS.filter(s =>
           district_chart.some(row => (row[s] || 0) > 0)
         )
 

@@ -2,6 +2,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import { logActivity } from '../services/activityService'
 import AIAnalysisModal from '../components/AIAnalysisModal'
 import AIContextMenu from '../components/AIContextMenu'
 import {
@@ -295,6 +296,7 @@ const ApprovalPage = () => {
 
   // ── fetch header ───────────────────────────────────────────────────────────
   useEffect(() => {
+    logActivity(`/approval/${id}`, `PAGE_VISIT_APPROVAL_${id}`)
     axios.get(`/api/reconciliation/${id}`)
       .then(r => setReconciliation(r.data.reconciliation))
       .catch(() => { toast.error('Failed to load reconciliation'); navigate('/') })
@@ -338,6 +340,7 @@ const ApprovalPage = () => {
         record_id: recordId,
         approval_decision: decision,
       })
+      logActivity(`/approval/${id}`, `APPROVE_RECORD_${recordId}_AS_${decision.toUpperCase()}`)
       toast.success(`Marked as "${STATUS_MAP[decision]?.label || decision}"`)
       await fetchRecords()
       await fetchSummary()
@@ -358,6 +361,7 @@ const ApprovalPage = () => {
         category,
         approval_decision: decision,
       })
+      logActivity(`/approval/${id}`, `BULK_APPROVE_${category.toUpperCase()}_AS_${decision.toUpperCase()}`)
       toast.success(`All "${category}" → "${STATUS_MAP[decision]?.label || decision}"`)
       await fetchRecords()
       await fetchSummary()

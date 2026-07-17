@@ -8,13 +8,14 @@ import AIAnalysisModal from '../components/AIAnalysisModal'
 import AIContextMenu from '../components/AIContextMenu'
 import {
   FiUpload, FiDownload, FiClock, FiCheckCircle, FiXCircle, FiLoader,
-  FiFileText, FiFilter, FiSearch, FiCheck, FiCopy, FiTarget
+  FiFileText, FiFilter, FiSearch, FiCheck, FiCopy, FiTarget,
+  FiTrash2, FiChevronLeft, FiChevronRight, FiUser
 } from 'react-icons/fi'
 
-// ── Age bucket colours (green → red as assets age) ────────────────────────────
+// ── Age bucket colours ─────────────────────────────────────────────────────────
 const AGE_COLORS = ['#CFB53B', '#8E288D', '#4E79A7', '#f97316', '#000', '#CFB53B', '#8E288D']
 
-// ── useSegmentTooltip — hover state for aging bars ────────────────────────────
+// ── useSegmentTooltip ─────────────────────────────────────────────────────────
 const useSegmentTooltip = () => {
   const [tip, setTip] = React.useState(null)
   const show = (e, data) => {
@@ -46,7 +47,7 @@ const useSegmentTooltip = () => {
   return { show, hide, TooltipEl }
 }
 
-// ── AgingChart — horizontal bars for asset aging ─────────────────────────────
+// ── AgingChart ────────────────────────────────────────────────────────────────
 const AgingChart = ({ agingData, agingYear }) => {
   const { show, hide, TooltipEl } = useSegmentTooltip()
   const totalCount = agingData.reduce((s, d) => s + d.count, 0) || 1
@@ -102,7 +103,6 @@ const AgingChart = ({ agingData, agingYear }) => {
   )
 }
 
-
 const Dashboard = () => {
   const [reconciliations, setReconciliations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -117,15 +117,15 @@ const Dashboard = () => {
   const [showAIContextMenu, setShowAIContextMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
   const [aiModalConfig, setAiModalConfig] = useState({
-    chartData: null,
-    chartType: 'pie',
-    title: 'AI Analysis',
-    targetLabel: '',
-    analysisContext: {}
+    chartData: null, chartType: 'pie', title: 'AI Analysis', targetLabel: '', analysisContext: {}
   })
   const [aiModalAction, setAiModalAction] = useState('modal')
   const [aiModalAnalysisType, setAiModalAnalysisType] = useState('summary')
   const [aiModalOutputFormat, setAiModalOutputFormat] = useState('combined')
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 3
   const navigate = useNavigate()
   const { hasRole } = useAuth()
 
@@ -155,7 +155,7 @@ const Dashboard = () => {
       setAgingData(r.data.buckets || [])
       setAgingYear(r.data.current_year || new Date().getFullYear())
     } catch {
-      // non-fatal — chart just won't show
+      // non-fatal
     }
   }
 
@@ -176,14 +176,10 @@ const Dashboard = () => {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'completed':
-        return <FiCheckCircle className="text-[#8E288D]" />
-      case 'failed':
-        return <FiXCircle className="text-pink-500" />
-      case 'processing':
-        return <FiLoader className="text-[#F59E0B] animate-spin" />
-      default:
-        return <FiClock className="text-yellow-500" />
+      case 'completed': return <FiCheckCircle className="text-[#8E288D]" />
+      case 'failed':    return <FiXCircle className="text-pink-500" />
+      case 'processing': return <FiLoader className="text-[#F59E0B] animate-spin" />
+      default:          return <FiClock className="text-yellow-500" />
     }
   }
 
@@ -191,7 +187,7 @@ const Dashboard = () => {
     const colors = {
       completed: 'bg-purple-100 text-[#8E288D] border-purple-200',
       failed: 'bg-pink-100 text-pink-800 border-pink-200',
-      processing: 'bg-yellow-100 text-[[#F59E0B] border-[#f59e0b]',
+      processing: 'bg-yellow-100 text-[#F59E0B] border-[#f59e0b]',
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200'
     }
     return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'
@@ -223,9 +219,7 @@ const Dashboard = () => {
   const handleDownload = async (id) => {
     try {
       logActivity(window.location.pathname, `DOWNLOAD_REPORT_ID_${id}`)
-      const response = await axios.get(`/api/reconciliation/download-enriched/${id}`, {
-        responseType: 'blob'
-      })
+      const response = await axios.get(`/api/reconciliation/download-enriched/${id}`, { responseType: 'blob' })
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
       link.href = url
@@ -239,12 +233,43 @@ const Dashboard = () => {
     }
   }
 
+  const handleDelete = async (id) => {
+    setDeleting(true)
+    try {
+      await axios.delete(`/api/reconciliation/${id}`)
+      logActivity('/', `DELETE_RECONCILIATION_ID_${id}`)
+      toast.success('Reconciliation deleted successfully')
+      setDeleteConfirmId(null)
+      // refresh list and reset page if needed
+      const updated = reconciliations.filter(r => r.id !== id)
+      setReconciliations(updated)
+      const filtered = updated.filter(recon => {
+        const matchesSearch = recon.customer_file.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          recon.internal_file.toLowerCase().includes(searchTerm.toLowerCase())
+        const matchesFilter = filterStatus === 'all' || recon.status === filterStatus
+        return matchesSearch && matchesFilter
+      })
+      const newTotalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+      if (currentPage > newTotalPages) setCurrentPage(Math.max(1, newTotalPages))
+    } catch (error) {
+      toast.error('Failed to delete reconciliation')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const filteredReconciliations = reconciliations.filter(recon => {
     const matchesSearch = recon.customer_file.toLowerCase().includes(searchTerm.toLowerCase()) ||
       recon.internal_file.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesFilter = filterStatus === 'all' || recon.status === filterStatus
     return matchesSearch && matchesFilter
   })
+
+  const totalPages = Math.max(1, Math.ceil(filteredReconciliations.length / ITEMS_PER_PAGE))
+  const paginatedReconciliations = filteredReconciliations.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
 
   if (loading) {
     return (
@@ -256,13 +281,48 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4">
+
+      {/* ── Delete Confirm Modal ───────────────────────────────────────────── */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 rounded-full">
+                <FiTrash2 className="h-5 w-5 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-800">Delete Reconciliation</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">
+              Are you sure you want to delete <span className="font-semibold">Reconciliation #{deleteConfirmId}</span>?
+            </p>
+            <p className="text-xs text-red-500 mb-6">
+              This will permanently remove all records, the Excel report, and uploaded source files. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirmId)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+              >
+                {deleting ? <FiLoader className="animate-spin h-4 w-4" /> : <FiTrash2 className="h-4 w-4" />}
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl 
-          shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(142,40,141,0.4)] 
-          hover:shadow-[0_8px_25px_rgba(142,40,141,0.6)] 
-           p-5 text-[#8E288D] transform hover:scale-105 transition-all duration-300">
+          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(142,40,141,0.4)] hover:shadow-[0_8px_25px_rgba(142,40,141,0.6)] p-5 text-[#8E288D] transform hover:scale-105 transition-all duration-300">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[#8E288D] text-xs font-medium">Total Jobs</p>
@@ -274,10 +334,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl 
-          shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(0,128,128,0.4)] 
-          hover:shadow-[0_8px_25px_rgba(0,128,128,0.6)] p-5 
-          text-[#008080] transform hover:scale-105 transition-transform">
+          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(0,128,128,0.4)] hover:shadow-[0_8px_25px_rgba(0,128,128,0.6)] p-5 text-[#008080] transform hover:scale-105 transition-transform">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[#008080] text-xs font-medium">Completed</p>
@@ -289,42 +346,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl shadow-xl 
-        hover:shadow-2xl shadow-[0_4px_15px_rgba(245,158,11,0.4)] 
-          hover:shadow-[0_8px_25px_rgba(245,158,11,0.6)]
-        p-5 text-[#F59E0B] transform hover:scale-105 transition-transform">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[#F59E0B] text-xs font-medium">Processing</p>
-              <p className="text-3xl font-bold mt-1">{stats.processing}</p>
-            </div>
-            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-              <FiLoader className="h-6 w-6" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-white-500 to-white-600 rounded-xl shadow-xl 
-        hover:shadow-2xl shadow-[0_4px_15px_rgba(107,114,128,0.4)] 
-          hover:shadow-[0_8px_25px_rgba(107,114,128,0.6)] 
-        p-5 text-[#6B7280] transform hover:scale-105 transition-transform">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[#6B7280] text-xs font-medium">Pending</p>
-              <p className="text-3xl font-bold mt-1">{stats.pending}</p>
-              <p className="text-xs font-semibold text-gray-500 mt-0.5">Waiting Approval</p>
-            </div>
-            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-              <FiClock className="h-6 w-6" />
-            </div>
-          </div>
-        </div> */}
-
-          <div className="bg-gradient-to-br from-white-500 to-white-600 
-          rounded-xl shadow-xl 
-          hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
-          hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
-          p-5 text-gray-800 transform hover:scale-105 transition-transform">
+          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] p-5 text-gray-800 transform hover:scale-105 transition-transform">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-700 text-xs font-medium">Tag Matched</p>
@@ -337,32 +359,11 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* <div className="bg-gradient-to-br from-white-500 to-white-600 
-          rounded-xl shadow-xl 
-          hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
-          hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
-          p-5 text-gray-800 transform hover:scale-105 transition-transform">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-700 text-xs font-medium">AI Matched</p>
-              <p className="text-3xl font-bold mt-1">{(stats.aiMatched || 0).toLocaleString()}</p>
-              <p className="text-xs font-semibold text-gray-500 mt-0.5">By Desc. / Dep.</p>
-            </div>
-            <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-              <FiCpu className="h-6 w-6" />
-            </div>
-          </div>
-        </div> */}
-
-          <div className="bg-gradient-to-br from-white-500 to-white-600 
-          rounded-xl shadow-xl 
-          hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
-          hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
-          p-5 text-gray-800 transform hover:scale-105 transition-transform">
+          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] p-5 text-gray-800 transform hover:scale-105 transition-transform">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-700 text-xs font-medium">Near Match</p>
-                <p className="text-3xl font-bold mt-1">{(stats.nearMatch + stats.aiMatched || 0).toLocaleString()}</p>
+                <p className="text-3xl font-bold mt-1">{((stats.nearMatch || 0) + (stats.aiMatched || 0)).toLocaleString()}</p>
                 <p className="text-xs font-semibold text-gray-500 mt-0.5">AI+Fuzzy / Require Review</p>
               </div>
               <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
@@ -371,11 +372,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-white-500 to-white-600 
-          rounded-xl shadow-xl 
-          hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] 
-          hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] 
-          p-5 text-gray-800 transform hover:scale-105 transition-transform">
+          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] p-5 text-gray-800 transform hover:scale-105 transition-transform">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-700 text-xs font-medium">Unmatch</p>
@@ -388,11 +385,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-white-500 to-white-600 
-        rounded-xl shadow-xl 
-        hover:shadow-2xl shadow-[0_4px_15px_rgba(236,72,153,0.4)] 
-          hover:shadow-[0_8px_25px_rgba(236,72,153,0.6)]  
-        p-5 text-pink-500 transform hover:scale-105 transition-transform">
+          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(236,72,153,0.4)] hover:shadow-[0_8px_25px_rgba(236,72,153,0.6)] p-5 text-pink-500 transform hover:scale-105 transition-transform">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-pink-500 text-xs font-medium">Duplicates</p>
@@ -405,27 +398,23 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* Aging Chart */}
         <div
           className="cursor-context-menu"
           title="Right-click for AI insights"
           onContextMenu={e => openAIContextMenu(e, {
-              chartData: {
-                source: 'dashboard_aging_analysis',
-                agingData,
-                year: agingYear
-              },
-              chartType: 'bar',
-              title: 'AI Analysis - Dashboard Aging Chart',
-              targetLabel: 'Dashboard Aging Chart',
-              analysisContext: { page: 'Dashboard', section: 'Aging Analysis' }
-            })}
+            chartData: { source: 'dashboard_aging_analysis', agingData, year: agingYear },
+            chartType: 'bar',
+            title: 'AI Analysis - Dashboard Aging Chart',
+            targetLabel: 'Dashboard Aging Chart',
+            analysisContext: { page: 'Dashboard', section: 'Aging Analysis' }
+          })}
         >
-          {/* Aging Analysis Chart */}
-          {agingData.length > 0 && (
-            <AgingChart agingData={agingData} agingYear={agingYear} />
-          )}
+          {agingData.length > 0 && <AgingChart agingData={agingData} agingYear={agingYear} />}
         </div>
       </div>
+
       {/* Action Bar */}
       <div className="bg-white rounded-xl shadow-md p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
@@ -435,17 +424,12 @@ const Dashboard = () => {
           </div>
           <Link
             to="/upload"
-            className="inline-flex items-center justify-center 
-            px-6 py-3 bg-gradient-to-r from-[#8E288D] to-[#CFB53B]  
-            text-white rounded-lg hover:from-[#D4AF37] hover:to-[#7A1E79]
-            transition-all shadow-md hover:shadow-lg transform hover:scale-105"
+            className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#D4AF37] hover:to-[#7A1E79] transition-all shadow-md hover:shadow-lg transform hover:scale-105"
           >
             <FiUpload className="mr-2 h-5 w-5" />
             New Reconciliation
           </Link>
         </div>
-
-        {/* Search and Filter */}
         <div className="mt-6 flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#8E288D] h-5 w-5" />
@@ -453,7 +437,7 @@ const Dashboard = () => {
               type="text"
               placeholder="Search by filename..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
@@ -461,7 +445,7 @@ const Dashboard = () => {
             <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1) }}
               className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none bg-white"
             >
               <option value="all">All Status</option>
@@ -497,120 +481,192 @@ const Dashboard = () => {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {filteredReconciliations.map((recon) => (
-            <div
-              key={recon.id}
-              className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden"
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3">
-                      <span className="text-2xl font-bold text-gray-800">#{recon.id}</span>
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadge(recon.status)}`}>
-                        {getStatusIcon(recon.status)}
-                        <span className="ml-1 capitalize">{recon.status}</span>
-                      </span>
+        <>
+          <div className="grid grid-cols-1 gap-6">
+            {paginatedReconciliations.map((recon) => (
+              <div key={recon.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden">
+                <div className="p-6">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-2xl font-bold text-gray-800">#{recon.id}</span>
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadge(recon.status)}`}>
+                          {getStatusIcon(recon.status)}
+                          <span className="ml-1 capitalize">{recon.status}</span>
+                        </span>
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <FiFileText className="mr-2 h-4 w-4" />
+                          <span className="font-medium">Physical:</span>
+                          <span className="ml-2">{recon.customer_file}</span>
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <FiFileText className="mr-2 h-4 w-4" />
+                          <span className="font-medium">ERP:</span>
+                          <span className="ml-2">{recon.internal_file}</span>
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <FiUser className="mr-2 h-4 w-4" />
+                          <span className="font-medium">Requester:</span>
+                          {recon.requester_role && (
+                            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-semibold capitalize ${
+                              recon.requester_role === 'admin'   ? 'bg-red-100 text-red-700' :
+                              recon.requester_role === 'manager' ? 'bg-purple-100 text-[#8E288D]' :
+                                                                   'bg-blue-100 text-blue-700'
+                            }`}>
+                              {recon.requester_role}
+                            </span>
+                          )}
+                          <span className="ml-2">{recon.requester_username || '—'}</span>
+                          {recon.requester_email && (
+                            <span className="ml-2 text-gray-400">({recon.requester_email})</span>
+                          )}
+                        </div>
+                        <div className="flex items-center text-sm text-gray-500">
+                          <FiClock className="mr-2 h-4 w-4" />
+                          {new Date(recon.created_at).toLocaleString()}
+                        </div>
+                      </div>
                     </div>
-                    <div className="mt-4 space-y-2">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <FiFileText className="mr-2 h-4 w-4" />
-                        <span className="font-medium">Physical:</span>
-                        <span className="ml-2">{recon.customer_file}</span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600">
-                        <FiFileText className="mr-2 h-4 w-4" />
-                        <span className="font-medium">ERP:</span>
-                        <span className="ml-2">{recon.internal_file}</span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-500">
-                        <FiClock className="mr-2 h-4 w-4" />
-                        {new Date(recon.created_at).toLocaleString()}
-                      </div>
+
+                    <div className="ml-6 flex flex-col space-y-2">
+                      {recon.status === 'completed' && (
+                        <>
+                          <button
+                            onClick={() => { logActivity(window.location.pathname, `VIEW_RESULTS_ID_${recon.id}`); navigate(`/results/${recon.id}`) }}
+                            className="px-4 py-2 bg-gradient-to-r from-[#CFB53B] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#CFB53B] transition-colors text-sm font-medium"
+                          >
+                            View Results
+                          </button>
+                          <button
+                            onClick={() => { logActivity(`/`, `VIEW_REPORT_DASHBOARD_ID_${recon.id}`); navigate(`/report/${recon.id}`) }}
+                            className="px-4 py-2 bg-gradient-to-r from-[#000] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#000] transition-colors text-sm font-medium flex items-center justify-center"
+                          >
+                            📊 Dashboard
+                          </button>
+                          <button
+                            onClick={() => { logActivity(window.location.pathname, `VIEW_APPROVAL_ID_${recon.id}`); navigate(`/approval/${recon.id}`) }}
+                            className="px-4 py-2 bg-gradient-to-r from-[#CFB53B] to-[#000000] text-white rounded-lg hover:from-[#000000] hover:to-[#CFB53B] transition-colors text-sm font-medium flex items-center justify-center"
+                          >
+                            <FiCheck className="mr-2 h-4 w-4" />
+                            {hasRole('manager') ? 'Review & Approve' : 'Approval Status'}
+                          </button>
+                        </>
+                      )}
+                      {/* Delete button — always visible */}
+                      <button
+                        onClick={() => setDeleteConfirmId(recon.id)}
+                        className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-800 text-white rounded-lg hover:from-red-700 hover:to-red-900 transition-colors text-sm font-medium flex items-center justify-center"
+                      >
+                        <FiTrash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </button>
+                      {recon.status === 'completed' && (
+                        <button
+                          onClick={() => handleDownload(recon.id)}
+                          className="px-4 py-2 bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] transition-colors text-sm font-medium flex items-center justify-center"
+                        >
+                          <FiDownload className="mr-2 h-4 w-4" />
+                          Download
+                        </button>
+                      )}
                     </div>
                   </div>
 
                   {recon.status === 'completed' && (
-                    <div className="ml-6 flex flex-col space-y-2">
-                      <button
-                        onClick={() => {
-                          logActivity(window.location.pathname, `VIEW_RESULTS_ID_${recon.id}`)
-                          navigate(`/results/${recon.id}`)
-                        }}
-                        className="px-4 py-2 bg-gradient-to-r from-[#CFB53B] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#CFB53B] transition-colors text-sm font-medium"
-                      >
-                        View Results
-                      </button>
-                      <button
-                        onClick={() => navigate(`/report/${recon.id}`)}
-                        className="px-4 py-2 bg-gradient-to-r from-[#000] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#000] transition-colors text-sm font-medium flex items-center justify-center"
-                      >
-                        📊 Dashboard
-                      </button>
-                      <button
-                        onClick={() => {
-                          logActivity(window.location.pathname, `VIEW_APPROVAL_ID_${recon.id}`)
-                          navigate(`/approval/${recon.id}`)
-                        }}
-                        className="px-4 py-2 bg-gradient-to-r from-[#CFB53B] to-[#000000] text-white rounded-lg hover:from-[#000000] hover:to-[#CFB53B] transition-colors
-                         text-sm font-medium flex items-center justify-center"
-                      >
-                        <FiCheck className="mr-2 h-4 w-4" />
-                        {hasRole('manager') ? 'Review & Approve' : 'Approval Status'}
-                      </button>
-                      <button
-                        onClick={() => handleDownload(recon.id)}
-                        className="px-4 py-2 bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] transition-colors text-sm font-medium flex items-center justify-center"
-                      >
-                        <FiDownload className="mr-2 h-4 w-4" />
-                        Download
-                      </button>
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-[#8E288D]">{recon.statistics.rule_matched}</p>
+                          <p className="text-xs text-gray-600 mt-1">Exact Match</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-[#8E288D]">{recon.statistics.ai_matched}</p>
+                          <p className="text-xs text-gray-600 mt-1">AI Match</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-[#CFB53B]">{recon.statistics.manual_review}</p>
+                          <p className="text-xs text-gray-600 mt-1">Near Match</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-pink-600">{recon.statistics.customer_unmatched}</p>
+                          <p className="text-xs text-gray-600 mt-1">Unmatched</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-orange-500">{recon.statistics.customer_duplicates || 0}</p>
+                          <p className="text-xs text-gray-600 mt-1">Physical Dup.</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-orange-700">{recon.statistics.internal_duplicates || 0}</p>
+                          <p className="text-xs text-gray-600 mt-1">ERP Dup.</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-[#8E288D]">
+                            {recon.statistics.total_customer_records > 0
+                              ? ((recon.statistics.rule_matched + recon.statistics.ai_matched) / recon.statistics.total_customer_records * 100).toFixed(1)
+                              : '0.0'}%
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">Match Rate</p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
+              </div>
+            ))}
+          </div>
 
-                {recon.status === 'completed' && (
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-[#8E288D]">{recon.statistics.rule_matched}</p>
-                        <p className="text-xs text-gray-600 mt-1">Exact Match</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-[#8E288D]">{recon.statistics.ai_matched}</p>
-                        <p className="text-xs text-gray-600 mt-1">AI Match</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-[#CFB53B]">{recon.statistics.manual_review}</p>
-                        <p className="text-xs text-gray-600 mt-1">Near Match</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-pink-600">{recon.statistics.customer_unmatched}</p>
-                        <p className="text-xs text-gray-600 mt-1">Unmatched</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-orange-500">{recon.statistics.customer_duplicates || 0}</p>
-                        <p className="text-xs text-gray-600 mt-1">Physical Duplicate</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-orange-700">{recon.statistics.internal_duplicates || 0}</p>
-                        <p className="text-xs text-gray-600 mt-1">ERP Duplicate</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-[#8E288D]">
-                          {((recon.statistics.rule_matched + recon.statistics.ai_matched) / recon.statistics.total_customer_records * 100).toFixed(1)}%
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">Match Rate</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="bg-white rounded-xl shadow-md px-6 py-4 flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                Showing <span className="font-semibold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span>–
+                <span className="font-semibold">{Math.min(currentPage * ITEMS_PER_PAGE, filteredReconciliations.length)}</span> of{' '}
+                <span className="font-semibold">{filteredReconciliations.length}</span> reconciliations
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                >
+                  <FiChevronLeft className="h-4 w-4 text-gray-600" />
+                </button>
+                {[...Array(totalPages)].map((_, i) => {
+                  const pn = i + 1
+                  if (pn === 1 || pn === totalPages || (pn >= currentPage - 1 && pn <= currentPage + 1)) {
+                    return (
+                      <button
+                        key={pn}
+                        onClick={() => setCurrentPage(pn)}
+                        className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                          currentPage === pn
+                            ? 'border-[#8E288D] text-white bg-[#8E288D]'
+                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pn}
+                      </button>
+                    )
+                  } else if (pn === currentPage - 2 || pn === currentPage + 2) {
+                    return <span key={pn} className="text-gray-400 text-sm px-1">…</span>
+                  }
+                  return null
+                })}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
+                >
+                  <FiChevronRight className="h-4 w-4 text-gray-600" />
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
+
       <AIAnalysisModal
         isOpen={showAIModal}
         onClose={() => setShowAIModal(false)}

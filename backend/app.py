@@ -5,6 +5,7 @@ from config import config
 from models import db
 from flask_migrate import Migrate
 from dotenv import load_dotenv
+from sqlalchemy import inspect, text
 import os
 import logging
 
@@ -82,6 +83,16 @@ def create_app(config_name='default'):
     # Create database tables is handled by Flask-Migrate/Alembic now, but keeping for safety if tables don't exist
     with app.app_context():
         db.create_all()
+
+        inspector = inspect(db.engine)
+        if 'users' in inspector.get_table_names():
+            user_columns = {column['name'] for column in inspector.get_columns('users')}
+            if 'profile_picture' not in user_columns:
+                with db.engine.begin() as connection:
+                    connection.execute(text('ALTER TABLE users ADD COLUMN profile_picture TEXT'))
+            if 'is_active' not in user_columns:
+                with db.engine.begin() as connection:
+                    connection.execute(text('ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1'))
     
         # Health check endpoint
         @app.route('/api/health', methods=['GET'])

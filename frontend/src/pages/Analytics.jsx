@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { toast } from 'react-toastify'
+import { logActivity } from '../services/activityService'
 import AIAnalysisModal from '../components/AIAnalysisModal'
 import AIContextMenu from '../components/AIContextMenu'
 import {
@@ -114,25 +115,37 @@ const useSegmentTooltip = () => {
   return { show, hide, Tooltip }
 }
 
-// ── HorizontalStackedBar — 100% stacked bar with live tooltip ─────────────────
-const HorizontalStackedBar = ({ row, statuses, colors, labels, rowLabel }) => {
+// ── HorizontalStackedBar — stacked bar with live tooltip ──────────────────────
+// grandTotal: if provided, bar width is % of grandTotal (cross-row comparison)
+//             if omitted, bar width is 100% of row total (within-row breakdown)
+const HorizontalStackedBar = ({ row, statuses, colors, labels, rowLabel, grandTotal }) => {
   const { show, hide, Tooltip } = useSegmentTooltip()
   const rowTotal = statuses.reduce((s, k) => s + (row[k] || 0), 0)
   if (rowTotal === 0) return null
+  // widthBase: the denominator used for the overall bar width
+  const widthBase = grandTotal || rowTotal
+  // barWidth: how wide the whole bar is relative to the container
+  const barWidthPct = grandTotal ? ((rowTotal / grandTotal) * 100).toFixed(2) : 100
   return (
     <div className="mb-4">
       {Tooltip}
-      <div className="flex w-full rounded-md overflow-hidden h-9 shadow-sm">
+      <div className="flex w-full rounded-md overflow-hidden h-9 shadow-sm"
+        style={{ width: `${barWidthPct}%`, minWidth: '4px' }}>
         {statuses.map(s => {
           const val = row[s] || 0
           if (val === 0) return null
+          // Each segment is % of its own rowTotal (so segments always fill the bar)
           const wp = ((val / rowTotal) * 100).toFixed(2)
+          // Tooltip shows % of grandTotal if available, else % of rowTotal
+          const pctDisplay = grandTotal
+            ? ((val / grandTotal) * 100).toFixed(1)
+            : wp
           const showLabel = parseFloat(wp) > 8
           return (
             <div key={s}
               style={{ width: `${wp}%`, backgroundColor: colors[s] }}
               className="flex items-center justify-center overflow-hidden cursor-default transition-opacity hover:opacity-90"
-              onMouseEnter={e => show(e, { label: rowLabel, name: labels[s] || s, value: val, pct: wp, color: colors[s] })}
+              onMouseEnter={e => show(e, { label: rowLabel, name: labels[s] || s, value: val, pct: pctDisplay, color: colors[s] })}
               onMouseLeave={hide}
             >
               {showLabel && (
@@ -145,7 +158,8 @@ const HorizontalStackedBar = ({ row, statuses, colors, labels, rowLabel }) => {
         })}
       </div>
       <p className="text-xs text-gray-500 mt-0.5 pl-1 truncate" title={row.full_name || rowLabel}>
-        {rowLabel} <span className="text-gray-400">({rowTotal.toLocaleString()})</span>
+        {rowLabel}
+        <span className="text-gray-400 ml-1">({rowTotal.toLocaleString()}{grandTotal ? ` · ${((rowTotal/grandTotal)*100).toFixed(1)}% of all` : ''})</span>
       </p>
     </div>
   )
@@ -235,6 +249,7 @@ const Analytics = () => {
   }
 
   useEffect(() => {
+    logActivity('/analytics', 'PAGE_VISIT_ANALYTICS')
     Promise.all([
       axios.get('/api/reconciliation/analytics'),
       axios.get('/api/reconciliation/analytics/aging'),
@@ -284,11 +299,22 @@ const Analytics = () => {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 pb-12">
-      <div className="mb-6 flex">
-        <h1 className="text-3xl font-semibold text-gray-900 mr-3">Analytics Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-3">
-          {data.scope === 'all' ? 'System-wide · all requested reconciliations' : 'Your reconciliations only'}
-        </p>
+      <div className="mb-6 flex flex-wrap items-start gap-3">
+        <h1 className="text-3xl font-semibold text-gray-900">Analytics Dashboard</h1>
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#8E288D] text-white">
+            📊 {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''} combined
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+            {data.scope === 'all' ? '🌐 System-wide — all reconciliations' : '👤 Your reconciliations only'}
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
+            🗄️ {(Object.values(kpi).filter(v => typeof v === 'number').reduce((s, v) => 0, 0), 
+              (kpi.reconciled || 0) + (kpi.unreconciled || 0) + (kpi.surplus_assets || 0) +
+              (kpi.exist_erp_not_physical || 0) + (kpi.duplicated || 0) + (kpi.unique || 0) + (kpi.pending || 0)
+            ).toLocaleString()} total records
+          </span>
+        </div>
       </div>
 
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
@@ -354,7 +380,7 @@ const Analytics = () => {
       {/* ── Tabs ─────────────────────────────────────────────────────────── */}
       <div className="flex gap-2 mb-6 flex-wrap">
         {tabs.map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
+          <button key={t.key} onClick={() => { setActiveTab(t.key); logActivity('/analytics', `TAB_SWITCH_${t.key.toUpperCase()}`) }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === t.key
                 ? 'bg-[#8E288D] text-white shadow'
@@ -499,9 +525,13 @@ const Analytics = () => {
               targetLabel: 'Category Breakdown',
               analysisContext: { page: 'Analytics', section: 'Category Breakdown' }
             })}>
-          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
             <FiLayers className="text-[#8E288D]" /> Asset Reconciliation by Category
           </h3>
+          <p className="text-xs text-gray-400 mb-5">
+            Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''} ·{' '}
+            {((kpi.reconciled||0)+(kpi.unreconciled||0)+(kpi.surplus_assets||0)+(kpi.exist_erp_not_physical||0)+(kpi.duplicated||0)+(kpi.unique||0)+(kpi.pending||0)).toLocaleString()} total records
+          </p>
           {data.category_breakdown?.length ? (
             (() => {
               const activeKeys = Object.keys(STATUS_COLORS).filter(k =>
@@ -541,9 +571,12 @@ const Analytics = () => {
               targetLabel: 'Branch / District Performance',
               analysisContext: { page: 'Analytics', section: 'Branch / District Performance' }
             })}>
-          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
             <FiMapPin className="text-[#8E288D]" /> Branch / District Performance
           </h3>
+          <p className="text-xs text-gray-400 mb-5">
+            Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''}
+          </p>
           {data.district_breakdown?.length ? (
             (() => {
               const activeKeys = Object.keys(STATUS_COLORS).filter(k =>
@@ -583,9 +616,12 @@ const Analytics = () => {
               targetLabel: 'Division / Department Performance',
               analysisContext: { page: 'Analytics', section: 'Division / Department Performance' }
             })}>
-          <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
             <FiBarChart2 className="text-[#8E288D]" /> Division / Department Performance
           </h3>
+          <p className="text-xs text-gray-400 mb-5">
+            Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''}
+          </p>
           {data.department_breakdown?.length ? (
             (() => {
               const activeKeys = Object.keys(STATUS_COLORS).filter(k =>
@@ -622,36 +658,44 @@ const Analytics = () => {
         )
 
         const AGING_COLORS = {
-          reconciled:               '#10b981',
-          unreconciled:             '#ef4444',
-          pending:                  '#CFB53B',
+          reconciled:               '#CFB53B',
+          unreconciled:             '#000000',
+          pending:                  '#4E79A7',
           surplus_assets:           '#8E288D',
-          exist_in_erp_not_physical:'#7A1E79',
-          duplicated:               '#1a1a1a',
+          exist_in_erp_not_physical:'#e64595ff',
+          duplicated:               '#9C755F',
           unique:                   '#008080',
         }
         const AGING_LABELS = {
-          reconciled: 'Reconciled', unreconciled: 'Unreconciled',
+          reconciled: 'Reconciled', unreconciled: 'Unmatched',
           pending: 'Pending', surplus_assets: 'Surplus Assets',
-          exist_in_erp_not_physical: 'ERP not Physical',
+          exist_in_erp_not_physical: 'Shortage Asset',
           duplicated: 'Duplicated', unique: 'Unique',
         }
+        const AGING_STATUS_KEYS = Object.keys(AGING_COLORS)
 
+        const stackedBuckets = agingData.stacked_buckets || []
         const buckets = agingData.buckets || []
         const agingTotal = buckets.reduce((s, d) => s + d.count, 0) || 1
         const currentYear = agingData.current_year || new Date().getFullYear()
 
-        // Simple single-value bars (no stacking — global aging has no status breakdown)
-        const AGE_BAR_COLORS = ['#8E288D','#000','#CFB53B','#f97316','#ef4444','#b91c1c','#9ca3af']
+        // Grand total across ALL buckets — bar widths scale relative to this
+        const agingGrandTotal = stackedBuckets.reduce((s, row) =>
+          s + AGING_STATUS_KEYS.reduce((rs, k) => rs + (row[k] || 0), 0), 0
+        ) || agingTotal
+
+        const agingActiveKeys = AGING_STATUS_KEYS.filter(k =>
+          stackedBuckets.some(row => (row[k] || 0) > 0)
+        )
 
         return (
           <div className="space-y-6">
-            {/* Age bucket bars */}
+            {/* Stacked age bucket bars */}
             <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
               onContextMenu={e => openAIContextMenu(e, {
                   chartData: {
                     source: 'analytics_aging_analysis',
-                    agingBuckets: buckets
+                    agingBuckets: stackedBuckets.length ? stackedBuckets : buckets
                   },
                   chartType: 'bar',
                   title: 'AI Analysis - Aging Analysis',
@@ -664,51 +708,56 @@ const Analytics = () => {
               <p className="text-xs text-gray-400 mb-4">
                 Based on year field in Finance data · {agingTotal.toLocaleString()} total records
               </p>
-              {buckets.length ? (
+              {stackedBuckets.length ? (
                 <>
-                  <div className="space-y-3">
-                    {buckets.map((d, i) => {
-                      const sharePct = ((d.count / agingTotal) * 100).toFixed(1)
-                      const color = AGE_BAR_COLORS[Math.min(i, AGE_BAR_COLORS.length - 1)]
-                      return (
-                        <div key={d.bucket}>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600 w-16 flex-shrink-0">{d.bucket}</span>
-                            <div className="flex-1 bg-gray-100 rounded-md h-8 overflow-hidden">
-                              <div className="h-full flex items-center justify-start rounded-md transition-all duration-700"
-                                style={{ width: `${sharePct}%`, backgroundColor: color }}
-                                title={`${d.bucket}: ${d.count.toLocaleString()} (${sharePct}%)`}>
-                                <span className="text-white text-xs font-semibold px-2 select-none">
-                                  {d.count.toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
-                            <span className="text-xs font-medium text-gray-600 w-12 text-right">{sharePct}%</span>
-                          </div>
-                        </div>
-                      )
-                    })}
+                  <div className="space-y-1">
+                    {stackedBuckets.map(row => (
+                      <HorizontalStackedBar
+                        key={row.bucket}
+                        row={row}
+                        statuses={agingActiveKeys}
+                        colors={AGING_COLORS}
+                        labels={AGING_LABELS}
+                        rowLabel={row.bucket}
+                        grandTotal={agingGrandTotal}
+                      />
+                    ))}
                   </div>
-                  <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-gray-100">
-                    {buckets.map((d, i) => {
-                      const color = AGE_BAR_COLORS[Math.min(i, AGE_BAR_COLORS.length - 1)]
-                      const sharePct = ((d.count / agingTotal) * 100).toFixed(1)
-                      return (
-                        <div key={d.bucket} className="flex items-center gap-1 text-xs text-gray-600">
-                          <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: color }} />
-                          {d.bucket}: <strong className="ml-0.5">{d.count.toLocaleString()}</strong>
-                          <span className="text-gray-400 ml-0.5">({sharePct}%)</span>
-                        </div>
-                      )
-                    })}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4 pt-3 border-t border-gray-100">
+                    {agingActiveKeys.map(s => (
+                      <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: AGING_COLORS[s] }} />
+                        {AGING_LABELS[s]}
+                      </div>
+                    ))}
                   </div>
                 </>
+              ) : buckets.length ? (
+                /* fallback: simple bars if stacked data not yet available */
+                <div className="space-y-3">
+                  {buckets.map((d, i) => {
+                    const sharePct = ((d.count / agingTotal) * 100).toFixed(1)
+                    const color = ['#8E288D','#000','#CFB53B','#f97316','#ef4444','#b91c1c','#9ca3af'][Math.min(i, 6)]
+                    return (
+                      <div key={d.bucket} className="flex items-center gap-2">
+                        <span className="text-xs text-gray-600 w-16 flex-shrink-0">{d.bucket}</span>
+                        <div className="flex-1 bg-gray-100 rounded-md h-8 overflow-hidden">
+                          <div className="h-full flex items-center rounded-md transition-all duration-700"
+                            style={{ width: `${sharePct}%`, backgroundColor: color }}>
+                            <span className="text-white text-xs font-semibold px-2 select-none">{d.count.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-medium text-gray-600 w-12 text-right">{sharePct}%</span>
+                      </div>
+                    )
+                  })}
+                </div>
               ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in ERP records</p>}
             </div>
 
             {/* Info note */}
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-700">
-              💡 This shows system-wide aging across all reconciliations. For per-reconciliation aging with approval status breakdown (department &amp; branch), open the <strong>📊 Dashboard Report</strong> for a specific reconciliation.
+              💡 This shows system-wide aging across all reconciliations. For per-reconciliation aging with department &amp; branch breakdown, open the <strong>📊 Dashboard Report</strong> for a specific reconciliation.
             </div>
           </div>
         )
