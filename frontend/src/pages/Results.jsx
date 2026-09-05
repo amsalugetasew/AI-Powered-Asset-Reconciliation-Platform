@@ -273,7 +273,7 @@ const Results = () => {
           </p>
         </div>
         <div className="mt-2 sm:mt-0 flex space-x-3">
-          <button
+          {/* <button
             onClick={() => openAIModal({
               chartData,
               chartType: 'pie',
@@ -286,7 +286,7 @@ const Results = () => {
           >
             <FiZap className="w-5 h-5 mr-2" />
             AI Insights
-          </button>
+          </button> */}
           <button
             onClick={() => navigate(`/report/${id}`)}
             className="inline-flex items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium 

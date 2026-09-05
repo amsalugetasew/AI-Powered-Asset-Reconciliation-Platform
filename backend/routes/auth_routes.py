@@ -25,7 +25,10 @@ def register():
         # Create new user
         user = User(
             username=data['username'],
-            email=data['email']
+            email=data['email'],
+            full_name=data.get('full_name', '').strip() or None,
+            employee_id=data.get('employee_id', '').strip() or None,
+            department=data.get('department', '').strip() or None,
         )
         user.set_password(data['password'])
         # Default role is 'officer' (set in model)
@@ -69,8 +72,10 @@ def login():
         if not data or not data.get('username') or not data.get('password'):
             return jsonify({'error': 'Missing username or password'}), 400
         
-        # Find user
+        # Find user by username OR email
         user = User.query.filter_by(username=data['username']).first()
+        if not user:
+            user = User.query.filter_by(email=data['username']).first()
         
         if not user or not user.check_password(data['password']):
             # Audit: failed login attempt

@@ -9,110 +9,354 @@ import AIContextMenu from '../components/AIContextMenu'
 import {
   FiUpload, FiDownload, FiClock, FiCheckCircle, FiXCircle, FiLoader,
   FiFileText, FiFilter, FiSearch, FiCheck, FiCopy, FiTarget,
-  FiTrash2, FiChevronLeft, FiChevronRight, FiUser
+  FiTrash2, FiChevronLeft, FiChevronRight, FiUser, FiBarChart2, FiEye,
+  FiRefreshCw, FiAlertTriangle, FiPlus
 } from 'react-icons/fi'
 
-// ── Age bucket colours ─────────────────────────────────────────────────────────
-const AGE_COLORS = ['#CFB53B', '#8E288D', '#4E79A7', '#f97316', '#000', '#CFB53B', '#8E288D']
+// ── Palette for charts ─────────────────────────────────────────────────────────
+// Bucket order: < 1yr, 1-3yr, 3-5yr, 5-10yr, 10-20yr, >20yr, Unknown
+const AGING_BUCKET_CONFIG = [
+  { key: '< 1 yr',    label: '< 1 yr',    color: '#22c55e' },  // green  – fresh
+  { key: '1 – 3 yr',  label: '1 – 3 yr',  color: '#8E288D' },  // blue
+  { key: '3 – 5 yr',  label: '3 – 5 yr',  color: '#f59e0b' },  // brand purple
+  { key: '5 – 10 yr', label: '5 – 10 yr', color: '#CFB53B' },  // amber
+  { key: '10 – 20 yr',label: '10 – 20 yr',color: '#f08eee' },  // red – aging
+  { key: '> 20 yr',   label: '> 20 yr',   color: '#bbb38d' },  // gray – very old
+  { key: 'Unknown',   label: 'Unknown',   color: '#000000' },  // light gray
+]
 
-// ── useSegmentTooltip ─────────────────────────────────────────────────────────
-const useSegmentTooltip = () => {
-  const [tip, setTip] = React.useState(null)
-  const show = (e, data) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setTip({ x: rect.left + rect.width / 2, y: rect.top - 8, ...data })
-  }
-  const hide = () => setTip(null)
-  const TooltipEl = tip ? (
-    <div className="fixed z-50 pointer-events-none"
-      style={{ left: tip.x, top: tip.y, transform: 'translate(-50%,-100%)' }}>
-      <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
-        <p className="font-bold border-b border-gray-600 pb-1 mb-1">{tip.label}</p>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: tip.color }} />
-          <span>Assets</span>
-        </div>
-        <div className="flex justify-between gap-4 mt-1">
-          <span className="text-gray-300">Count</span>
-          <span className="font-semibold">{tip.count.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between gap-4">
-          <span className="text-gray-300">Share</span>
-          <span className="font-semibold">{tip.pct}%</span>
-        </div>
-      </div>
-      <div className="flex justify-center"><div className="w-2 h-2 bg-gray-900 rotate-45 -mt-1" /></div>
-    </div>
-  ) : null
-  return { show, hide, TooltipEl }
-}
+// ── Category Distribution Bar Component ─────────────────────────────────────
+// Each bar = Reconciled (approved: reconciled+surplus+shortage+duplicate) vs Unresolved (unreconciled+pending)
+// Purple bar = Reconciled, gray track = Unresolved
+const CategoryDistributionChart = ({ categoryData, monthLabel }) => {
+  const [hovered, setHovered] = React.useState(null)
 
-// ── AgingChart ────────────────────────────────────────────────────────────────
-const AgingChart = ({ agingData, agingYear }) => {
-  const { show, hide, TooltipEl } = useSegmentTooltip()
-  const totalCount = agingData.reduce((s, d) => s + d.count, 0) || 1
+  const hasData = categoryData && categoryData.length > 0
+
+  const items = hasData
+    ? categoryData.slice(0, 10).map(cat => {
+        const resolved = (cat.reconciled || 0)
+          + (cat.surplus_assets || 0)
+          + (cat.exist_in_erp_not_physical || 0)
+          + (cat.duplicated || 0)
+          + (cat.unique || 0)
+        const unresolved = (cat.unreconciled || 0) + (cat.pending || 0)
+        const total      = resolved + unresolved
+        const resolvedPct = total > 0 ? Math.round((resolved / total) * 100) : 0
+        return {
+          name:         cat.name || 'Unknown',
+          resolved,
+          unresolved,
+          total,
+          resolvedPct,
+        }
+      })
+    : [
+        { name: 'Furniture & Fitting',  resolved: 190, unresolved: 10,  total: 200, resolvedPct: 95 },
+        { name: 'Hardware',             resolved: 144, unresolved: 56,  total: 200, resolvedPct: 72 },
+        { name: 'Office Equipment',     resolved: 104, unresolved: 96,  total: 200, resolvedPct: 52 },
+        { name: 'ATM & POS',            resolved: 60,  unresolved: 140, total: 200, resolvedPct: 30 },
+        { name: 'Motor Vehicle',        resolved: 46,  unresolved: 154, total: 200, resolvedPct: 23 },
+        { name: 'Premises',             resolved: 38,  unresolved: 162, total: 200, resolvedPct: 19 },
+        { name: 'Hardware Expense',     resolved: 30,  unresolved: 170, total: 200, resolvedPct: 15 },
+        { name: 'Equipment Expense',    resolved: 20,  unresolved: 180, total: 200, resolvedPct: 10 },
+      ]
+
   return (
-    <div className="bg-white rounded-xl shadow-md p-6">
-      {TooltipEl}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-gray-800">Asset Aging Analysis</h2>
-        <p className="text-xs text-gray-500">
-          ERP records vs {agingYear} · {totalCount.toLocaleString()} total
-        </p>
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 h-full flex flex-col gap-4">
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">
+            Category Distribution
+            {monthLabel && <span className="text-xs font-normal text-[#8E288D] ml-1.5">({monthLabel})</span>}
+          </h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            Reconciled vs Unresolved per asset category
+          </p>
+        </div>
+        {!hasData && (
+          <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0">
+            Sample data
+          </span>
+        )}
       </div>
-      <div className="space-y-3">
-        {agingData.map((d, i) => {
-          const sharePct = ((d.count / totalCount) * 100).toFixed(1)
-          const color = AGE_COLORS[Math.min(i, AGE_COLORS.length - 1)]
+
+      {/* Bars */}
+      <div className="flex items-end justify-between gap-2 flex-1 pb-7 relative">
+        {items.map((item) => {
+          const isHov = hovered === item.name
           return (
-            <div key={d.bucket}>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-600 w-16 flex-shrink-0">{d.bucket}</span>
-                <div className="flex-1 bg-gray-100 rounded-md h-8 overflow-hidden relative">
-                  <div
-                    className="h-full flex items-center justify-start rounded-md transition-all duration-700 cursor-default"
-                    style={{ width: `${sharePct}%`, backgroundColor: color }}
-                    onMouseEnter={e => show(e, { label: d.bucket, count: d.count, pct: sharePct, color })}
-                    onMouseLeave={hide}
-                  >
-                    <span className="text-white text-xs font-semibold px-2 select-none">
-                      {d.count.toLocaleString()}
-                    </span>
-                  </div>
+            <div
+              key={item.name}
+              className="flex-1 flex flex-col items-center justify-end h-full group relative cursor-pointer"
+              onMouseEnter={() => setHovered(item.name)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              {/* Percentage label above bar */}
+              <span
+                className="text-[11px] font-bold mb-1.5 transition-all duration-150"
+                style={{ color: '#8E288D', opacity: isHov ? 1 : 0.8 }}
+              >
+                {item.resolvedPct}%
+              </span>
+
+              {/* Bar column */}
+              <div
+                className="w-full max-w-[40px] rounded-t-md overflow-hidden flex flex-col-reverse"
+                style={{
+                  height: '100%',
+                  backgroundColor: '#f3f0f4',  // unresolved track (light purple-gray)
+                }}
+              >
+                {/* Reconciled (purple) — fills from bottom */}
+                <div
+                  className="w-full rounded-t-md transition-all duration-700 ease-out"
+                  style={{
+                    height: `${Math.max(2, item.resolvedPct)}%`,
+                    backgroundColor: '#8E288D',
+                    opacity: isHov ? 1 : 0.85,
+                    boxShadow: isHov ? '0 -2px 8px rgba(142,40,141,0.4)' : 'none',
+                  }}
+                />
+              </div>
+
+              {/* Tooltip on hover */}
+              {isHov && (
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 bg-gray-900 text-white text-[11px] rounded-lg px-3 py-2 shadow-xl whitespace-nowrap pointer-events-none">
+                  <p className="font-bold mb-1">{item.name}</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-[#8E288D] mr-1" />Reconciled: <span className="font-semibold">{item.resolved.toLocaleString()}</span> ({item.resolvedPct}%)</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-[#f3f0f4] border border-gray-400 mr-1" />Unresolved: <span className="font-semibold">{item.unresolved.toLocaleString()}</span> ({100 - item.resolvedPct}%)</p>
+                  <p className="text-gray-400 mt-0.5">Total: {item.total.toLocaleString()}</p>
                 </div>
-                <span className="text-xs font-medium text-gray-600 w-12 text-right">{sharePct}%</span>
+              )}
+
+              {/* X-axis label */}
+              <div className="absolute top-full mt-2 left-1/2 w-20 origin-top-left -rotate-45">
+                <p className="text-[9.5px] font-medium text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap truncate">
+                  {item.name}
+                </p>
               </div>
             </div>
           )
         })}
       </div>
-      <div className="flex flex-wrap gap-3 mt-4 pt-3 border-t border-gray-100">
-        {agingData.map((d, i) => {
-          const color = AGE_COLORS[Math.min(i, AGE_COLORS.length - 1)]
-          const sharePct = ((d.count / totalCount) * 100).toFixed(1)
-          return (
-            <div key={d.bucket} className="flex items-center gap-1 text-xs text-gray-600">
-              <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: color }} />
-              {d.bucket}: <strong className="ml-0.5">{d.count.toLocaleString()}</strong>
-              <span className="text-gray-400 ml-0.5">({sharePct}%)</span>
-            </div>
-          )
-        })}
+
+      {/* Legend */}
+      <div className="flex items-center gap-5 pt-2 border-t border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#8E288D' }} />
+          <span className="text-xs font-semibold" style={{ color: '#8E288D' }}>Reconciled</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm flex-shrink-0 bg-[#f3f0f4] border border-gray-300" />
+          <span className="text-xs font-semibold text-gray-400">Unresolved</span>
+        </div>
       </div>
+
     </div>
   )
 }
 
+// ── Asset Aging Ring/Donut Chart (Current Month ERP Data Only) ────────────────
+const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount }) => {
+  const [hovered, setHovered] = React.useState(null)
+  const [tooltip, setTooltip]  = React.useState({ visible: false, x: 0, y: 0, item: null })
+
+  // Enforce bucket order — only include buckets that have data or exist in config
+  const orderedData = AGING_BUCKET_CONFIG
+    .map(cfg => {
+      const found = (agingData || []).find(d => d.bucket === cfg.key)
+      return { ...cfg, count: found ? (found.count || 0) : 0 }
+    })
+    .filter(d => d.count > 0)  // hide zero buckets
+
+  const hasData = orderedData.length > 0
+
+  // Fall back placeholder when no data
+  const displayData = hasData ? orderedData : [
+    { key: 'No data', label: 'No data yet', color: '#e5e7eb', count: 1 }
+  ]
+
+  const totalAssets = hasData
+    ? orderedData.reduce((s, d) => s + d.count, 0)
+    : (totalERPCount || 0)
+
+  // SVG donut parameters
+  const size        = 200
+  const sw          = 28           // stroke width
+  const radius      = (size - sw) / 2
+  const cx          = size / 2
+  const cy          = size / 2
+  const circ        = 2 * Math.PI * radius
+  const gapAngle    = hasData ? 0.03 : 0  // small gap between segments (radians)
+  const gapArc      = hasData ? (gapAngle * radius) : 0
+
+  // Build segments
+  let offsetAcc = 0
+  const segments = displayData.map(item => {
+    const pct       = totalAssets > 0 ? item.count / totalAssets : 1
+    const arcLen    = Math.max(0, pct * circ - gapArc)
+    const dash      = `${arcLen} ${circ}`
+    const offset    = -offsetAcc
+    offsetAcc      += pct * circ
+    return { ...item, pct, dash, offset }
+  })
+
+  const handleMouseMove = (e, item) => {
+    const rect = e.currentTarget.closest('svg').getBoundingClientRect()
+    setTooltip({
+      visible: true,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      item,
+    })
+    setHovered(item.key)
+  }
+  const handleMouseLeave = () => {
+    setTooltip(t => ({ ...t, visible: false }))
+    setHovered(null)
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 h-full flex flex-col gap-4">
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xs font-bold tracking-wider text-gray-800 dark:text-gray-100 uppercase">
+            Asset Aging Analysis
+          </h2>
+          <p className="text-[10px] text-gray-400 mt-0.5">ERP assets by acquisition age</p>
+        </div>
+        <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/50 px-2 py-0.5 rounded-md">
+          {monthLabel || `FY ${agingYear || new Date().getFullYear()}`}
+        </span>
+      </div>
+
+      {/* Donut + center */}
+      <div className="flex items-center justify-center relative select-none">
+        <svg
+          width={size}
+          height={size}
+          className="transform -rotate-90 overflow-visible"
+        >
+          {/* Track */}
+          <circle cx={cx} cy={cy} r={radius}
+            fill="transparent"
+            stroke="#f3f4f6"
+            strokeWidth={sw}
+          />
+
+          {/* Segments */}
+          {segments.map(seg => (
+            <circle
+              key={seg.key}
+              cx={cx} cy={cy} r={radius}
+              fill="transparent"
+              stroke={seg.color}
+              strokeWidth={hovered === seg.key ? sw + 5 : sw}
+              strokeDasharray={seg.dash}
+              strokeDashoffset={seg.offset}
+              strokeLinecap="butt"
+              className="transition-all duration-200 cursor-pointer"
+              style={{ opacity: hovered && hovered !== seg.key ? 0.45 : 1 }}
+              onMouseMove={e => handleMouseMove(e, seg)}
+              onMouseLeave={handleMouseLeave}
+            />
+          ))}
+        </svg>
+
+        {/* Center text */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+          {hovered ? (
+            <>
+              <span className="text-xl font-black text-gray-800 dark:text-white leading-tight">
+                {(segments.find(s => s.key === hovered)?.count || 0).toLocaleString()}
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 leading-tight mt-0.5">
+                {hovered}
+              </span>
+              <span className="text-[11px] font-bold text-gray-500 mt-0.5">
+                {((segments.find(s => s.key === hovered)?.pct || 0) * 100).toFixed(1)}%
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">
+                {totalAssets.toLocaleString()}
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mt-0.5">
+                Total ERP Assets
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* SVG tooltip */}
+        {tooltip.visible && tooltip.item && (
+          <div
+            className="absolute z-20 pointer-events-none bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl whitespace-nowrap"
+            style={{
+              left: tooltip.x + 12,
+              top:  tooltip.y - 36,
+              transform: tooltip.x > size * 0.65 ? 'translateX(-110%)' : 'none',
+            }}
+          >
+            <p className="font-bold">{tooltip.item.label}</p>
+            <p className="mt-0.5">
+              <span className="text-white font-semibold">{tooltip.item.count.toLocaleString()}</span>
+              <span className="text-gray-400 ml-1">assets</span>
+              <span className="text-gray-400 mx-1">·</span>
+              <span className="font-semibold" style={{ color: tooltip.item.color }}>
+                {(tooltip.item.pct * 100).toFixed(1)}%
+              </span>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Legend — single row, titles only */}
+      <div className="border-t border-gray-100 dark:border-gray-800 pt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
+        {displayData.map(item => {
+          const isHov = hovered === item.key
+          return (
+            <div
+              key={item.key}
+              className={`flex items-center gap-1.5 cursor-pointer rounded-md px-1.5 py-0.5 transition-colors ${isHov ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
+              onMouseEnter={() => setHovered(item.key)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              <span className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: item.color }} />
+              <span className="text-[11px] font-semibold whitespace-nowrap"
+                style={{ color: item.color }}>
+                {item.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+    </div>
+  )
+}
+
+// ── Main Dashboard Component ──────────────────────────────────────────────────
 const Dashboard = () => {
   const [reconciliations, setReconciliations] = useState([])
+  const [analyticsData, setAnalyticsData] = useState(null)
+  const [agingData, setAgingData] = useState([])
+  const [agingYear, setAgingYear] = useState(new Date().getFullYear())
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
-  const [agingData, setAgingData] = useState([])
-  const [agingYear, setAgingYear] = useState(new Date().getFullYear())
-  const [stats, setStats] = useState({
-    total: 0, completed: 0, processing: 0, pending: 0, nearMatch: 0, duplicates: 0
-  })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+
+  // AI Insights State
   const [showAIModal, setShowAIModal] = useState(false)
   const [showAIContextMenu, setShowAIContextMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
@@ -122,84 +366,133 @@ const Dashboard = () => {
   const [aiModalAction, setAiModalAction] = useState('modal')
   const [aiModalAnalysisType, setAiModalAnalysisType] = useState('summary')
   const [aiModalOutputFormat, setAiModalOutputFormat] = useState('combined')
-  const [deleteConfirmId, setDeleteConfirmId] = useState(null)
-  const [deleting, setDeleting] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
-  const ITEMS_PER_PAGE = 3
+
+  const ITEMS_PER_PAGE = 5
   const navigate = useNavigate()
-  const { hasRole } = useAuth()
+  const { user, userRole, hasRole } = useAuth()
 
   useEffect(() => {
-    fetchReconciliations()
-    fetchAging()
+    fetchDashboardData()
   }, [])
 
-  useEffect(() => {
-    calculateStats()
-  }, [reconciliations])
-
-  const fetchReconciliations = async () => {
+  const fetchDashboardData = async () => {
+    setLoading(true)
     try {
-      const response = await axios.get('/api/reconciliation/list')
-      setReconciliations(response.data.reconciliations)
+      const [reconRes, agingRes, analyticsRes] = await Promise.allSettled([
+        axios.get('/api/reconciliation/list'),
+        axios.get('/api/reconciliation/analytics/aging'),
+        axios.get('/api/reconciliation/analytics')
+      ])
+
+      if (reconRes.status === 'fulfilled') {
+        setReconciliations(reconRes.value.data.reconciliations || [])
+      }
+      if (agingRes.status === 'fulfilled') {
+        setAgingData(agingRes.value.data.buckets || [])
+        setAgingYear(agingRes.value.data.current_year || new Date().getFullYear())
+      }
+      if (analyticsRes.status === 'fulfilled') {
+        setAnalyticsData(analyticsRes.value.data || null)
+      }
     } catch (error) {
-      toast.error('Failed to fetch reconciliations')
+      toast.error('Failed to load dashboard data')
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchAging = async () => {
-    try {
-      const r = await axios.get('/api/reconciliation/analytics/aging')
-      setAgingData(r.data.buckets || [])
-      setAgingYear(r.data.current_year || new Date().getFullYear())
-    } catch {
-      // non-fatal
+  // ── Scope reconciliations strictly based on user's access privileges ──
+  // admin/manager: see all records from all users (server already returns all)
+  // officer: strictly filter to only their own — fallback to false so no accidental leakage
+  const scopedReconciliations = reconciliations.filter(r => {
+    if (userRole === 'admin' || userRole === 'manager') return true
+    // Officer scope: match by user_id first (most reliable)
+    if (user?.id && r.user_id != null) {
+      return Number(r.user_id) === Number(user.id)
     }
-  }
-
-  const calculateStats = () => {
-    const completed = reconciliations.filter(r => r.status === 'completed')
-    setStats({
-      total: reconciliations.length,
-      completed: completed.length,
-      processing: reconciliations.filter(r => r.status === 'processing').length,
-      pending: reconciliations.filter(r => r.status === 'pending').length,
-      unMatch: completed.reduce((s, r) => s + (r.statistics?.customer_unmatched || 0), 0),
-      nearMatch: completed.reduce((s, r) => s + (r.statistics?.manual_review || 0), 0),
-      exactMatch: completed.reduce((s, r) => s + (r.statistics?.rule_matched || 0), 0),
-      aiMatched: completed.reduce((s, r) => s + (r.statistics?.ai_matched || 0), 0),
-      duplicates: completed.reduce((s, r) => s + (r.statistics?.customer_duplicates || 0) + (r.statistics?.internal_duplicates || 0), 0),
-    })
-  }
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'completed': return <FiCheckCircle className="text-[#8E288D]" />
-      case 'failed':    return <FiXCircle className="text-pink-500" />
-      case 'processing': return <FiLoader className="text-[#F59E0B] animate-spin" />
-      default:          return <FiClock className="text-yellow-500" />
+    // Secondary: match by username if user.id not yet hydrated
+    if (user?.username && r.requester_username) {
+      return r.requester_username.toLowerCase() === user.username.toLowerCase()
     }
-  }
+    // Default false — never show unverifiable records to an officer
+    return false
+  })
 
-  const getStatusBadge = (status) => {
-    const colors = {
-      completed: 'bg-purple-100 text-[#8E288D] border-purple-200',
-      failed: 'bg-pink-100 text-pink-800 border-pink-200',
-      processing: 'bg-yellow-100 text-[#F59E0B] border-[#f59e0b]',
-      pending: 'bg-yellow-100 text-yellow-800 border-yellow-200'
-    }
-    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'
-  }
+  // ── Calculate dynamic KPIs strictly for CURRENT MONTH uploaded records & user's scope ──
+  const now = new Date()
+  const currentMonth = now.getMonth()
+  const currentYear = now.getFullYear()
 
-  const openAIModal = ({ chartData, chartType, title, targetLabel, analysisContext, action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
-    setAiModalConfig({ chartData, chartType, title, targetLabel, analysisContext })
-    setAiModalAction(action)
-    setAiModalAnalysisType(analysisType)
-    setAiModalOutputFormat(outputFormat)
-    setShowAIModal(true)
-  }
+  // Filter reconciliations belonging to the current month in user's access scope
+  const currentMonthReconciliations = scopedReconciliations.filter(r => {
+    if (!r.created_at) return false
+    const d = new Date(r.created_at)
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+  })
+
+  // If no records in current calendar month, scope to latest upload month in user's dataset or current month
+  const activeMonthReconciliations = currentMonthReconciliations.length > 0
+    ? currentMonthReconciliations
+    : scopedReconciliations.filter(r => {
+        if (!scopedReconciliations.length) return false
+        const latestTimestamp = Math.max(...scopedReconciliations.map(x => new Date(x.created_at).getTime()))
+        const latestDate = new Date(latestTimestamp)
+        const d = new Date(r.created_at)
+        return d.getMonth() === latestDate.getMonth() && d.getFullYear() === latestDate.getFullYear()
+      })
+
+  const activeMonthDate = activeMonthReconciliations.length > 0 && activeMonthReconciliations[0]?.created_at
+    ? new Date(activeMonthReconciliations[0].created_at)
+    : now
+
+  const activeMonthLabel = activeMonthDate.toLocaleString('en-US', { month: 'short', year: 'numeric' })
+
+  // Total uploaded records in current month for user's scope
+  const totalPhysicalRecords = activeMonthReconciliations.reduce(
+    (s, r) => s + (r.statistics?.total_customer_records || r.total_customer_records || 0), 0
+  )
+  const totalERPRecords = activeMonthReconciliations.reduce(
+    (s, r) => s + (r.statistics?.total_internal_records || r.total_internal_records || 0), 0
+  )
+
+  // Pull approval_kpis from analyticsData (server-computed, role-scoped)
+  // Falls back to 0 while data loads
+  const kpi = analyticsData?.approval_kpis || {}
+
+  // 1. Reconciled = all approved statuses: reconciled + surplus_assets + shortage + duplicated + unique
+  const reconciledCount = (kpi.reconciled || 0)
+    + (kpi.surplus_assets || 0)
+    + (kpi.exist_erp_not_physical || 0)
+    + (kpi.duplicated || 0)
+    + (kpi.unique || 0)
+
+  // Use server ERP/physical totals when available, fall back to job-level aggregates
+  const erpTotal      = kpi.total_erp_assets   || totalERPRecords
+  const physicalTotal = kpi.physical_count      || totalPhysicalRecords
+
+  // 2. Unresolved = unreconciled + pending
+  const unresolvedCount = (kpi.unreconciled || 0) + (kpi.pending || 0)
+
+  // 3. Surplus = physical records not in ERP (from approval_kpis)
+  const surplusCount = kpi.surplus_assets || activeMonthReconciliations.reduce(
+    (s, r) => s + (r.statistics?.customer_unmatched || 0), 0
+  )
+
+  // 4. Reconciliation Rate = reconciled / total ERP assets
+  const matchRate = erpTotal > 0
+    ? ((reconciledCount / erpTotal) * 100).toFixed(1)
+    : '0.0'
+
+  const reconciledRate = matchRate
+
+  const unresolvedRate = erpTotal > 0
+    ? ((unresolvedCount / erpTotal) * 100).toFixed(1)
+    : '0.0'
+
+  // Surplus Rate: surplus / total physical records
+  const surplusRate = physicalTotal > 0
+    ? ((surplusCount / physicalTotal) * 100).toFixed(1)
+    : '0.0'
 
   const openAIContextMenu = (event, config) => {
     event.preventDefault()
@@ -240,12 +533,12 @@ const Dashboard = () => {
       logActivity('/', `DELETE_RECONCILIATION_ID_${id}`)
       toast.success('Reconciliation deleted successfully')
       setDeleteConfirmId(null)
-      // refresh list and reset page if needed
+
       const updated = reconciliations.filter(r => r.id !== id)
       setReconciliations(updated)
       const filtered = updated.filter(recon => {
-        const matchesSearch = recon.customer_file.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          recon.internal_file.toLowerCase().includes(searchTerm.toLowerCase())
+        const matchesSearch = (recon.customer_file || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (recon.internal_file || '').toLowerCase().includes(searchTerm.toLowerCase())
         const matchesFilter = filterStatus === 'all' || recon.status === filterStatus
         return matchesSearch && matchesFilter
       })
@@ -258,9 +551,10 @@ const Dashboard = () => {
     }
   }
 
-  const filteredReconciliations = reconciliations.filter(recon => {
-    const matchesSearch = recon.customer_file.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      recon.internal_file.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filter and pagination for table scoped to user's access privilege
+  const filteredReconciliations = scopedReconciliations.filter(recon => {
+    const matchesSearch = (recon.customer_file || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (recon.internal_file || '').toLowerCase().includes(searchTerm.toLowerCase())
     const matchesFilter = filterStatus === 'all' || recon.status === filterStatus
     return matchesSearch && matchesFilter
   })
@@ -271,402 +565,485 @@ const Dashboard = () => {
     currentPage * ITEMS_PER_PAGE
   )
 
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400 border border-green-200 dark:border-green-800">
+            Completed
+          </span>
+        )
+      case 'processing':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+            <FiLoader className="animate-spin mr-1 h-3 w-3" /> Processing
+          </span>
+        )
+      case 'failed':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-800">
+            Failed Validation
+          </span>
+        )
+      default:
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800">
+            Needs Review
+          </span>
+        )
+    }
+  }
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <FiLoader className="animate-spin h-12 w-12 text-[#8E288D]" />
+      <div className="flex justify-center items-center h-80">
+        <FiLoader className="animate-spin h-10 w-10 text-[#701460]" />
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
+      {/* ── Scope indicator bar ──────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-xl px-4 py-2.5 border border-gray-100 dark:border-gray-800 shadow-sm">
+        <div className="flex items-center gap-2 text-xs">
+          <span className="font-semibold text-gray-600 dark:text-gray-300">Data Scope:</span>
+          {(userRole === 'admin' || userRole === 'manager') ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold bg-purple-50 text-[#701460] dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              <FiUser className="h-3 w-3" />
+              All Officers
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+              <FiUser className="h-3 w-3" />
+              My Uploads Only
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-gray-400 dark:text-gray-500">
+          Showing: <span className="font-semibold text-gray-600 dark:text-gray-300">{activeMonthLabel}</span>
+          &nbsp;·&nbsp; ERP: <span className="font-semibold text-gray-700 dark:text-gray-200">{erpTotal.toLocaleString()}</span>
+          &nbsp;·&nbsp; Physical: <span className="font-semibold text-gray-700 dark:text-gray-200">{physicalTotal.toLocaleString()}</span>
+          &nbsp;·&nbsp; Jobs: <span className="font-semibold text-gray-700 dark:text-gray-200">{activeMonthReconciliations.length}</span>
+        </span>
+      </div>
 
-      {/* ── Delete Confirm Modal ───────────────────────────────────────────── */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-red-100 rounded-full">
-                <FiTrash2 className="h-5 w-5 text-red-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-800">Delete Reconciliation</h3>
+      {/* ── Top 4 KPI Metric Cards ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Reconciled */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+              <FiCheck className="h-3 w-3 mr-0.5" />
+              Reconciled ({activeMonthLabel})
+            </span>
+          </div>
+          <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-3 tracking-tight">
+            {reconciledCount.toLocaleString()}
+          </p>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-gray-800 text-xs">
+            <span className="text-gray-400 truncate">
+              {reconciledCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 text-[11px] ml-1 flex-shrink-0">
+              {reconciledRate}%
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Unresolved (Unreconciled) */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+              <FiAlertTriangle className="h-3 w-3 mr-0.5" />
+              Unresolved ({activeMonthLabel})
+            </span>
+          </div>
+          <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-3 tracking-tight">
+            {unresolvedCount.toLocaleString()}
+          </p>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-gray-800 text-xs">
+            <span className="text-gray-400 truncate">
+              {unresolvedCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-bold text-rose-700 bg-rose-50 dark:bg-rose-950/50 text-[11px] ml-1 flex-shrink-0">
+              {unresolvedRate}%
+            </span>
+          </div>
+        </div>
+
+        {/* Card 3: Surplus Assets (Physical not in ERP) */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800" title="Assets found in Physical/Customer records but not in ERP">
+              <FiPlus className="h-3 w-3 mr-0.5" />
+              Surplus Assets ({activeMonthLabel})
+            </span>
+          </div>
+          <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-3 tracking-tight">
+            {surplusCount.toLocaleString()}
+          </p>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-gray-800 text-xs">
+            <span className="text-gray-400 truncate" title="Physical records not found in ERP">
+              {surplusCount.toLocaleString()} / {physicalTotal.toLocaleString()} Physical Records
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-bold text-amber-700 bg-amber-50 dark:bg-amber-950/50 text-[11px] ml-1 flex-shrink-0">
+              {surplusRate}%
+            </span>
+          </div>
+        </div>
+
+        {/* Card 4: Match Rate (Total Matches / Total ERP Records) */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-purple-50 text-[#701460] dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+              <FiTarget className="h-3 w-3 mr-0.5" />
+              Match Rate ({activeMonthLabel})
+            </span>
+          </div>
+          <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-3 tracking-tight">
+            {matchRate}%
+          </p>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-gray-800 text-xs">
+            <span className="text-gray-400 truncate">
+              {reconciledCount.toLocaleString()} Matches of {erpTotal.toLocaleString()} ERP Records
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 text-[11px] ml-1 flex-shrink-0">
+              ERP Match Rate
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Middle Visualizations: Category Split & Asset Aging ───────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div
+          className="lg:col-span-2 cursor-context-menu"
+          title="Right-click for AI category insights"
+          onContextMenu={e => openAIContextMenu(e, {
+            chartData: { source: 'category_distribution', categories: analyticsData?.category_breakdown },
+            chartType: 'bar',
+            title: 'AI Analysis - Category Distribution',
+            targetLabel: 'Category Distribution Chart',
+            analysisContext: { page: 'Dashboard', section: 'Category Distribution' }
+          })}
+        >
+          <CategoryDistributionChart
+            categoryData={analyticsData?.category_breakdown}
+            monthLabel={activeMonthLabel}
+          />
+        </div>
+
+        <div
+          className="cursor-context-menu"
+          title="Right-click for AI aging insights"
+          onContextMenu={e => openAIContextMenu(e, {
+            chartData: { source: 'asset_aging', agingData, year: agingYear },
+            chartType: 'pie',
+            title: 'AI Analysis - Asset Aging',
+            targetLabel: 'Asset Aging Ring Chart',
+            analysisContext: { page: 'Dashboard', section: 'Aging Analysis' }
+          })}
+        >
+          <DonutAgingChart
+            agingData={agingData}
+            agingYear={agingYear}
+            monthLabel={activeMonthLabel}
+            totalERPCount={erpTotal}
+          />
+        </div>
+      </div>
+
+      {/* ── Bottom Section: Recent Reconciliation Reports Table ───────────── */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+        {/* Table Header & Action Controls */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-gray-100 dark:border-gray-800">
+          <div>
+            <div className="flex items-center space-x-2">
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                Recent Reconciliation Reports
+              </h2>
+              <Link
+                to="/analytics"
+                className="text-xs font-semibold text-[#701460] dark:text-purple-400 hover:underline"
+              >
+                See All Reports
+              </Link>
             </div>
-            <p className="text-sm text-gray-600 mb-2">
-              Are you sure you want to delete <span className="font-semibold">Reconciliation #{deleteConfirmId}</span>?
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              Recent automated and manual branch reconciliation executions
             </p>
-            <p className="text-xs text-red-500 mb-6">
-              This will permanently remove all records, the Excel report, and uploaded source files. This action cannot be undone.
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Search Input */}
+            <div className="relative">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-3.5 w-3.5" />
+              <input
+                type="text"
+                placeholder="Search jobs..."
+                value={searchTerm}
+                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }}
+                className="pl-8 pr-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#701460]/40 w-44"
+              />
+            </div>
+
+            {/* Filter dropdown */}
+            <div className="relative">
+              <FiFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-3.5 w-3.5" />
+              <select
+                value={filterStatus}
+                onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1) }}
+                className="pl-8 pr-7 py-1.5 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#701460]/40 appearance-none cursor-pointer"
+              >
+                <option value="all">Status: All</option>
+                <option value="completed">Completed</option>
+                <option value="processing">Processing</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+
+            {/* New Reconciliation Button */}
+            <Link
+              to="/upload"
+              className="inline-flex items-center px-4 py-1.5 text-xs font-semibold text-white bg-[#701460] hover:bg-[#5c104e] rounded-lg shadow-sm transition-all transform hover:scale-[1.02]"
+            >
+              <FiPlus className="mr-1.5 h-3.5 w-3.5" />
+              New Reconciliation
+            </Link>
+          </div>
+        </div>
+
+        {/* Table Content */}
+        {filteredReconciliations.length === 0 ? (
+          <div className="py-12 text-center">
+            <FiFileText className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">No reconciliations found</h3>
+            <p className="text-xs text-gray-400 mt-1">
+              {searchTerm || filterStatus !== 'all' ? 'Try adjusting search or status filter' : 'Upload files to start reconciliation'}
             </p>
-            <div className="flex gap-3">
+          </div>
+        ) : (
+          <div className="overflow-x-auto mt-2">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100 dark:border-gray-800 text-[12px] font-bold uppercase tracking-wider text-[#8E288D] dark:text-gray-200 text-center">
+                  <th className="py-3 px-3">Requested By</th>
+                  <th className="py-3 px-3">RECONCILIATION DATE</th>
+                  <th className="py-3 px-3">RECORDS ANALYZED</th>
+                  <th className="py-3 px-3">CURRENT STATUS</th>
+                  <th className="py-3 px-3">MATCH RATE FOR APROVAL</th>
+                  <th className="py-3 px-3 text-center">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-800 text-xs">
+                {paginatedReconciliations.map((recon) => {
+                  const totalRecords = recon.statistics?.total_customer_records || recon.total_customer_records || 0
+                  const ruleMatched = recon.statistics?.rule_matched || 0
+                  const aiMatched = recon.statistics?.ai_matched || 0
+                  const matchRateVal = totalRecords > 0
+                    ? Math.round(((ruleMatched + aiMatched) / totalRecords) * 100)
+                    : 0
+
+                  const jobTitle = recon.customer_file
+                    ? recon.customer_file.replace(/\.[^/.]+$/, '').replace(/_/g, ' ')
+                    : `Reconciliation #${recon.id}`
+
+                  return (
+                    <tr key={recon.id} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/50 transition-colors text-center">
+                      {/* Name & Type */}
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-950/60 text-[#701460] dark:text-purple-300 flex items-center justify-center flex-shrink-0">
+                            <FiRefreshCw className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="text-[12px] text-gray-700 dark:text-gray-500">
+                              <span className='font-bold'>Requester:</span> <span className='text-[#8E288D]'> {user?.full_name || user?.username || 'User'} : {user?.email || user?.username || 'User'}</span>
+                            </p>
+                            <p className="text-gray-800 dark:text-gray-100 capitalize">
+                              <span className='font-bold'>File:</span>
+                              {jobTitle}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Execution Date */}
+                      <td className="py-3.5 px-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                        {new Date(recon.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: '2-digit',
+                          year: 'numeric'
+                        })} • {new Date(recon.created_at).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+
+                      {/* Records Analyzed */}
+                      <td className="py-3.5 px-3 font-semibold text-gray-700 dark:text-gray-200">
+                        {totalRecords.toLocaleString()} assets
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-3">
+                        {getStatusBadge(recon.status)}
+                      </td>
+
+                      {/* Match Rate */}
+                      <td className="py-3.5 px-3 font-bold text-gray-800 dark:text-gray-100">
+                        {matchRateVal}%
+                      </td>
+
+                      {/* Action Buttons: View, Dashboard, Review & Approve, Download, Delete */}
+                      <td className="py-3.5 px-3 text-right">
+                        <div className="flex items-center justify-end space-x-1.5">
+                          {/* 1. View Results Button */}
+                          <button
+                            onClick={() => {
+                              logActivity(window.location.pathname, `VIEW_RESULTS_ID_${recon.id}`)
+                              navigate(`/results/${recon.id}`)
+                            }}
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-[#701460] hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors"
+                            title="View Results"
+                          >
+                            <FiEye className="h-4 w-4" />
+                          </button>
+
+                          {/* 2. Dashboard Button */}
+                          <button
+                            onClick={() => {
+                              logActivity('/', `VIEW_REPORT_DASHBOARD_ID_${recon.id}`)
+                              navigate(`/report/${recon.id}`)
+                            }}
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-[#701460] hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors"
+                            title="View Visual Dashboard"
+                          >
+                            <FiBarChart2 className="h-4 w-4" />
+                          </button>
+
+                          {/* 3. Review & Approve Button (Role-Aware) */}
+                          <button
+                            onClick={() => {
+                              logActivity(window.location.pathname, `VIEW_APPROVAL_ID_${recon.id}`)
+                              navigate(`/approval/${recon.id}`)
+                            }}
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors"
+                            title={hasRole('manager') ? "Review & Approve Exceptions" : "View Approval Status"}
+                          >
+                            <FiCheckCircle className="h-4 w-4" />
+                          </button>
+
+                          {/* 4. Download Report Button */}
+                          {recon.status === 'completed' && (
+                            <button
+                              onClick={() => handleDownload(recon.id)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+                              title="Download Enriched Excel Report"
+                            >
+                              <FiDownload className="h-4 w-4" />
+                            </button>
+                          )}
+
+                          {/* 5. Delete Button */}
+                          <button
+                            onClick={() => setDeleteConfirmId(recon.id)}
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                            title="Delete Reconciliation Job"
+                          >
+                            <FiTrash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs">
+            <span className="text-gray-500">
+              Showing <strong className="font-semibold text-gray-700 dark:text-gray-200">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</strong>–
+              <strong className="font-semibold text-gray-700 dark:text-gray-200">{Math.min(currentPage * ITEMS_PER_PAGE, filteredReconciliations.length)}</strong> of{' '}
+              <strong className="font-semibold text-gray-700 dark:text-gray-200">{filteredReconciliations.length}</strong> reconciliations
+            </span>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <FiChevronLeft className="h-4 w-4" />
+              </button>
+              {[...Array(totalPages)].map((_, i) => (
+                <button
+                  key={i + 1}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold ${
+                    currentPage === i + 1
+                      ? 'bg-[#701460] text-white'
+                      : 'border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <FiChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Delete Confirmation Modal ─────────────────────────────────────── */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="p-2.5 bg-rose-100 dark:bg-rose-950/60 rounded-xl">
+                <FiTrash2 className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Delete Reconciliation</h3>
+                <p className="text-xs text-gray-400">Job #{deleteConfirmId}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+              Are you sure you want to permanently delete this reconciliation job and all its analyzed asset records? This action cannot be undone.
+            </p>
+            <div className="mt-5 flex items-center justify-end space-x-2">
               <button
                 onClick={() => setDeleteConfirmId(null)}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirmId)}
                 disabled={deleting}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-colors flex items-center space-x-1.5"
               >
-                {deleting ? <FiLoader className="animate-spin h-4 w-4" /> : <FiTrash2 className="h-4 w-4" />}
-                {deleting ? 'Deleting...' : 'Delete'}
+                {deleting ? <FiLoader className="animate-spin h-3.5 w-3.5" /> : <FiTrash2 className="h-3.5 w-3.5" />}
+                <span>{deleting ? 'Deleting...' : 'Delete Job'}</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(142,40,141,0.4)] hover:shadow-[0_8px_25px_rgba(142,40,141,0.6)] p-5 text-[#8E288D] transform hover:scale-105 transition-all duration-300">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[#8E288D] text-xs font-medium">Total Jobs</p>
-                <p className="text-3xl font-bold mt-1">{stats.total}</p>
-              </div>
-              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-                <FiFileText className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(0,128,128,0.4)] hover:shadow-[0_8px_25px_rgba(0,128,128,0.6)] p-5 text-[#008080] transform hover:scale-105 transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[#008080] text-xs font-medium">Completed</p>
-                <p className="text-3xl font-bold mt-1">{stats.completed}</p>
-              </div>
-              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-                <FiCheckCircle className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] p-5 text-gray-800 transform hover:scale-105 transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-700 text-xs font-medium">Tag Matched</p>
-                <p className="text-3xl font-bold mt-1">{(stats.exactMatch || 0).toLocaleString()}</p>
-                <p className="text-xs font-semibold text-gray-500 mt-0.5">Rule / Matched</p>
-              </div>
-              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-                <FiTarget className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] p-5 text-gray-800 transform hover:scale-105 transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-700 text-xs font-medium">Near Match</p>
-                <p className="text-3xl font-bold mt-1">{((stats.nearMatch || 0) + (stats.aiMatched || 0)).toLocaleString()}</p>
-                <p className="text-xs font-semibold text-gray-500 mt-0.5">AI+Fuzzy / Require Review</p>
-              </div>
-              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-                <FiSearch className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(207,181,59,0.4)] hover:shadow-[0_8px_25px_rgba(207,181,59,0.6)] p-5 text-gray-800 transform hover:scale-105 transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-700 text-xs font-medium">Unmatch</p>
-                <p className="text-3xl font-bold mt-1">{(stats.unMatch || 0).toLocaleString()}</p>
-                <p className="text-xs font-semibold text-gray-500 mt-0.5">Unmatched Assets</p>
-              </div>
-              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-                <FiXCircle className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-xl hover:shadow-2xl shadow-[0_4px_15px_rgba(236,72,153,0.4)] hover:shadow-[0_8px_25px_rgba(236,72,153,0.6)] p-5 text-pink-500 transform hover:scale-105 transition-transform">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-pink-500 text-xs font-medium">Duplicates</p>
-                <p className="text-3xl font-bold mt-1">{(stats.duplicates || 0).toLocaleString()}</p>
-                <p className="text-xs text-pink-500 mt-0.5">Phys. + ERP</p>
-              </div>
-              <div className="bg-white bg-opacity-20 p-2.5 rounded-lg">
-                <FiCopy className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Aging Chart */}
-        <div
-          className="cursor-context-menu"
-          title="Right-click for AI insights"
-          onContextMenu={e => openAIContextMenu(e, {
-            chartData: { source: 'dashboard_aging_analysis', agingData, year: agingYear },
-            chartType: 'bar',
-            title: 'AI Analysis - Dashboard Aging Chart',
-            targetLabel: 'Dashboard Aging Chart',
-            analysisContext: { page: 'Dashboard', section: 'Aging Analysis' }
-          })}
-        >
-          {agingData.length > 0 && <AgingChart agingData={agingData} agingYear={agingYear} />}
-        </div>
-      </div>
-
-      {/* Action Bar */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">Reconciliation Jobs</h2>
-            <p className="text-gray-600 mt-1">Manage and track your asset reconciliations</p>
-          </div>
-          <Link
-            to="/upload"
-            className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#D4AF37] hover:to-[#7A1E79] transition-all shadow-md hover:shadow-lg transform hover:scale-105"
-          >
-            <FiUpload className="mr-2 h-5 w-5" />
-            New Reconciliation
-          </Link>
-        </div>
-        <div className="mt-6 flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#8E288D] h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Search by filename..."
-              value={searchTerm}
-              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-          <div className="relative">
-            <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <select
-              value={filterStatus}
-              onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1) }}
-              className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none bg-white"
-            >
-              <option value="all">All Status</option>
-              <option value="completed">Completed</option>
-              <option value="processing">Processing</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Reconciliations List */}
-      {filteredReconciliations.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-md p-12 text-center">
-          <FiUpload className="mx-auto h-16 w-16 text-gray-400" />
-          <h3 className="mt-4 text-lg font-medium text-gray-900">No reconciliations found</h3>
-          <p className="mt-2 text-sm text-gray-500">
-            {searchTerm || filterStatus !== 'all'
-              ? 'Try adjusting your search or filter'
-              : 'Get started by uploading your first files'}
-          </p>
-          {!searchTerm && filterStatus === 'all' && (
-            <div className="mt-6">
-              <Link
-                to="/upload"
-                className="inline-flex items-center px-6 py-3 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-primary-600 hover:bg-primary-700"
-              >
-                <FiUpload className="mr-2" />
-                Upload Files
-              </Link>
-            </div>
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 gap-6">
-            {paginatedReconciliations.map((recon) => (
-              <div key={recon.id} className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow overflow-hidden">
-                <div className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-2xl font-bold text-gray-800">#{recon.id}</span>
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadge(recon.status)}`}>
-                          {getStatusIcon(recon.status)}
-                          <span className="ml-1 capitalize">{recon.status}</span>
-                        </span>
-                      </div>
-                      <div className="mt-4 space-y-2">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <FiFileText className="mr-2 h-4 w-4" />
-                          <span className="font-medium">Physical:</span>
-                          <span className="ml-2">{recon.customer_file}</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-600">
-                          <FiFileText className="mr-2 h-4 w-4" />
-                          <span className="font-medium">ERP:</span>
-                          <span className="ml-2">{recon.internal_file}</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-600">
-                          <FiUser className="mr-2 h-4 w-4" />
-                          <span className="font-medium">Requester:</span>
-                          {recon.requester_role && (
-                            <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-semibold capitalize ${
-                              recon.requester_role === 'admin'   ? 'bg-red-100 text-red-700' :
-                              recon.requester_role === 'manager' ? 'bg-purple-100 text-[#8E288D]' :
-                                                                   'bg-blue-100 text-blue-700'
-                            }`}>
-                              {recon.requester_role}
-                            </span>
-                          )}
-                          <span className="ml-2">{recon.requester_username || '—'}</span>
-                          {recon.requester_email && (
-                            <span className="ml-2 text-gray-400">({recon.requester_email})</span>
-                          )}
-                        </div>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <FiClock className="mr-2 h-4 w-4" />
-                          {new Date(recon.created_at).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="ml-6 flex flex-col space-y-2">
-                      {recon.status === 'completed' && (
-                        <>
-                          <button
-                            onClick={() => { logActivity(window.location.pathname, `VIEW_RESULTS_ID_${recon.id}`); navigate(`/results/${recon.id}`) }}
-                            className="px-4 py-2 bg-gradient-to-r from-[#CFB53B] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#CFB53B] transition-colors text-sm font-medium"
-                          >
-                            View Results
-                          </button>
-                          <button
-                            onClick={() => { logActivity(`/`, `VIEW_REPORT_DASHBOARD_ID_${recon.id}`); navigate(`/report/${recon.id}`) }}
-                            className="px-4 py-2 bg-gradient-to-r from-[#000] to-[#8E288D] text-white rounded-lg hover:from-[#8E288D] hover:to-[#000] transition-colors text-sm font-medium flex items-center justify-center"
-                          >
-                            📊 Dashboard
-                          </button>
-                          <button
-                            onClick={() => { logActivity(window.location.pathname, `VIEW_APPROVAL_ID_${recon.id}`); navigate(`/approval/${recon.id}`) }}
-                            className="px-4 py-2 bg-gradient-to-r from-[#CFB53B] to-[#000000] text-white rounded-lg hover:from-[#000000] hover:to-[#CFB53B] transition-colors text-sm font-medium flex items-center justify-center"
-                          >
-                            <FiCheck className="mr-2 h-4 w-4" />
-                            {hasRole('manager') ? 'Review & Approve' : 'Approval Status'}
-                          </button>
-                        </>
-                      )}
-                      {/* Delete button — always visible */}
-                      <button
-                        onClick={() => setDeleteConfirmId(recon.id)}
-                        className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-800 text-white rounded-lg hover:from-red-700 hover:to-red-900 transition-colors text-sm font-medium flex items-center justify-center"
-                      >
-                        <FiTrash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </button>
-                      {recon.status === 'completed' && (
-                        <button
-                          onClick={() => handleDownload(recon.id)}
-                          className="px-4 py-2 bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] transition-colors text-sm font-medium flex items-center justify-center"
-                        >
-                          <FiDownload className="mr-2 h-4 w-4" />
-                          Download
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {recon.status === 'completed' && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
-                      <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-[#8E288D]">{recon.statistics.rule_matched}</p>
-                          <p className="text-xs text-gray-600 mt-1">Exact Match</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-[#8E288D]">{recon.statistics.ai_matched}</p>
-                          <p className="text-xs text-gray-600 mt-1">AI Match</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-[#CFB53B]">{recon.statistics.manual_review}</p>
-                          <p className="text-xs text-gray-600 mt-1">Near Match</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-pink-600">{recon.statistics.customer_unmatched}</p>
-                          <p className="text-xs text-gray-600 mt-1">Unmatched</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-orange-500">{recon.statistics.customer_duplicates || 0}</p>
-                          <p className="text-xs text-gray-600 mt-1">Physical Dup.</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-orange-700">{recon.statistics.internal_duplicates || 0}</p>
-                          <p className="text-xs text-gray-600 mt-1">ERP Dup.</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-[#8E288D]">
-                            {recon.statistics.total_customer_records > 0
-                              ? ((recon.statistics.rule_matched + recon.statistics.ai_matched) / recon.statistics.total_customer_records * 100).toFixed(1)
-                              : '0.0'}%
-                          </p>
-                          <p className="text-xs text-gray-600 mt-1">Match Rate</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="bg-white rounded-xl shadow-md px-6 py-4 flex items-center justify-between">
-              <p className="text-sm text-gray-600">
-                Showing <span className="font-semibold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span>–
-                <span className="font-semibold">{Math.min(currentPage * ITEMS_PER_PAGE, filteredReconciliations.length)}</span> of{' '}
-                <span className="font-semibold">{filteredReconciliations.length}</span> reconciliations
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
-                >
-                  <FiChevronLeft className="h-4 w-4 text-gray-600" />
-                </button>
-                {[...Array(totalPages)].map((_, i) => {
-                  const pn = i + 1
-                  if (pn === 1 || pn === totalPages || (pn >= currentPage - 1 && pn <= currentPage + 1)) {
-                    return (
-                      <button
-                        key={pn}
-                        onClick={() => setCurrentPage(pn)}
-                        className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
-                          currentPage === pn
-                            ? 'border-[#8E288D] text-white bg-[#8E288D]'
-                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pn}
-                      </button>
-                    )
-                  } else if (pn === currentPage - 2 || pn === currentPage + 2) {
-                    return <span key={pn} className="text-gray-400 text-sm px-1">…</span>
-                  }
-                  return null
-                })}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
-                >
-                  <FiChevronRight className="h-4 w-4 text-gray-600" />
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
+      {/* ── AI Analysis Modals & Context Menus ─────────────────────────────── */}
       <AIAnalysisModal
         isOpen={showAIModal}
         onClose={() => setShowAIModal(false)}

@@ -8,28 +8,84 @@ class DataCleaner:
     
     COLUMN_MAPPING = {
         'old tag number': 'old_tag_number',
+        'old tag no.': 'old_tag_number',
         'old_tag': 'old_tag_number',
         'old tag no': 'old_tag_number',
         'new tag number': 'new_tag_number',
+        'new tag no.': 'new_tag_number',
         'new_tag': 'new_tag_number',
         'new tag no': 'new_tag_number',
         'year': 'year',
         'category': 'category',
         'description': 'description',
+        'asset description': 'description',
+        'asset_description': 'description',
         'desc': 'description',
         'serial no': 'serial_no',
         'serial number': 'serial_no',
         'serial': 'serial_no',
         'department': 'department',
+        'department/branch': 'department',
+        'branch': 'department',
         'unit': 'department',
         'department/unit': 'department',
         'district': 'district',
+        'division/districts': 'district',
+        'division/district': 'district',
+        'division': 'district',
+        'districts': 'district',
         'book value': 'book_value',
         'value': 'book_value',
         'asset number': 'asset_number',
         'asset no': 'asset_number',
         'asset_no': 'asset_number'
     }
+
+    REQUIRED_COLUMNS = {
+        'old_tag_number': 'Old Tag Number',
+        'new_tag_number': 'New Tag Number',
+        'description': 'Asset Description',
+        'department': 'Department/Branch',
+        'district': 'Division/Districts',
+    }
+
+    @staticmethod
+    def normalize_header(column: str) -> str:
+        """Normalize harmless header formatting differences before matching."""
+        return re.sub(r'[^a-z0-9]+', ' ', str(column).lower()).strip()
+
+    @staticmethod
+    def map_column(column: str):
+        """Map a cleaned header to the internal field used by reconciliation."""
+        normalized = DataCleaner.normalize_header(column)
+        aliases = {
+            DataCleaner.normalize_header(key): value
+            for key, value in DataCleaner.COLUMN_MAPPING.items()
+        }
+        if normalized in aliases:
+            return aliases[normalized]
+
+        words = set(normalized.split())
+        if 'old' in words and 'tag' in words:
+            return 'old_tag_number'
+        if 'new' in words and 'tag' in words:
+            return 'new_tag_number'
+        if words & {'description', 'desc', 'details'}:
+            return 'description'
+        if words & {'department', 'branch', 'unit'}:
+            return 'department'
+        if words & {'district', 'districts', 'division'}:
+            return 'district'
+        return None
+
+    @staticmethod
+    def validate_columns(columns: List[str]) -> List[str]:
+        """Return the required business fields that are absent from a file."""
+        mapped = {DataCleaner.map_column(column) for column in columns}
+        return [
+            label for key, label in DataCleaner.REQUIRED_COLUMNS.items()
+            if key not in mapped
+        ]
     
     @staticmethod
     def read_excel(file_path: str) -> pd.DataFrame:
@@ -45,7 +101,10 @@ class DataCleaner:
                 print(f"  Large file detected ({file_size_mb:.1f}MB) - this may take a moment...")
             
             # Read entire file - pandas is optimized for this
-            df = pd.read_excel(file_path, engine='openpyxl')
+            if file_path.lower().endswith('.csv'):
+                df = pd.read_csv(file_path)
+            else:
+                df = pd.read_excel(file_path, engine='openpyxl')
             print(f"  ✓ Read {len(df)} rows from Excel file ({file_size_mb:.1f}MB)")
             return df
                 
@@ -55,14 +114,12 @@ class DataCleaner:
     @staticmethod
     def standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
         """Standardize column names"""
-        # Convert column names to lowercase and strip whitespace
-        df.columns = df.columns.str.lower().str.strip()
-        
         # Map columns to standard names
         column_rename = {}
         for col in df.columns:
-            if col in DataCleaner.COLUMN_MAPPING:
-                column_rename[col] = DataCleaner.COLUMN_MAPPING[col]
+            mapped_column = DataCleaner.map_column(col)
+            if mapped_column:
+                column_rename[col] = mapped_column
         
         df = df.rename(columns=column_rename)
         

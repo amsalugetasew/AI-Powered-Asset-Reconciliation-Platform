@@ -84,7 +84,10 @@ def create_user():
         user = User(
             username=data['username'],
             email=data['email'],
-            role=data['role']
+            role=data['role'],
+            full_name=data.get('full_name', '').strip() or None,
+            employee_id=data.get('employee_id', '').strip() or None,
+            department=data.get('department', '').strip() or None,
         )
         user.set_password(data['password'])
         
@@ -187,6 +190,65 @@ def update_role(user_id):
             'user': user.to_dict()
         }), 200
         
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/users/<int:user_id>', methods=['PUT'])
+@jwt_required()
+@require_admin
+def update_user(user_id):
+    """
+    Update a user's profile fields (Admin only): full_name, employee_id, department, email, username, role.
+    """
+    try:
+        admin_user = get_user_from_token()
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.get_json(silent=True) or {}
+
+        if 'username' in data and data['username']:
+            dup = User.query.filter(User.username == data['username'], User.id != user_id).first()
+            if dup:
+                return jsonify({'error': 'Username already exists'}), 400
+            user.username = data['username'].strip()
+
+        if 'email' in data and data['email']:
+            dup = User.query.filter(User.email == data['email'], User.id != user_id).first()
+            if dup:
+                return jsonify({'error': 'Email already exists'}), 400
+            user.email = data['email'].strip()
+
+        if 'full_name' in data:
+            user.full_name = (data['full_name'] or '').strip() or None
+        if 'employee_id' in data:
+            user.employee_id = (data['employee_id'] or '').strip() or None
+        if 'department' in data:
+            user.department = (data['department'] or '').strip() or None
+
+        if 'role' in data and data['role']:
+            valid_roles = ['officer', 'manager', 'admin']
+            if data['role'] not in valid_roles:
+                return jsonify({'error': f'Invalid role. Must be one of: {", ".join(valid_roles)}'}), 400
+            if admin_user.id == user_id:
+                return jsonify({'error': 'Cannot modify your own role'}), 400
+            user.role = data['role']
+
+        db.session.commit()
+
+        AuditService.log_operation(
+            user_id=admin_user.id,
+            operation_type='UPDATE_USER',
+            resource_type='user',
+            resource_id=user.id,
+            details={'updated_username': user.username}
+        )
+
+        return jsonify({'message': 'User updated successfully', 'user': user.to_dict()}), 200
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

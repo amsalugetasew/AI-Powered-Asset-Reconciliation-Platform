@@ -1,8 +1,9 @@
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, current_app, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
+from io import BytesIO
 import pandas as pd
 import json
 
@@ -11,6 +12,7 @@ from services.reconciliation_service import ReconciliationService
 from services.audit_service import AuditService
 from utils.rbac import require_role, get_user_from_token, get_user_role
 from config import Config
+from utils.data_cleaner import DataCleaner
 
 reconciliation_bp = Blueprint('reconciliation', __name__, url_prefix='/api/reconciliation')
 
@@ -18,6 +20,21 @@ def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
+
+
+def _missing_required_columns(file_storage):
+    """Read only the header row so invalid uploads are rejected before saving."""
+    filename = file_storage.filename.lower()
+    file_bytes = file_storage.read()
+    file_storage.stream.seek(0)
+    if not file_bytes:
+        raise ValueError('The uploaded file is empty')
+
+    if filename.endswith('.csv'):
+        columns = pd.read_csv(BytesIO(file_bytes), nrows=0).columns
+    else:
+        columns = pd.read_excel(BytesIO(file_bytes), nrows=0).columns
+    return DataCleaner.validate_columns(columns)
 
 
 def _auto_save_records(reconciliation_id, report_path):
@@ -90,7 +107,32 @@ def upload_files():
             return jsonify({'error': 'No file selected'}), 400
         
         if not allowed_file(customer_file.filename) or not allowed_file(internal_file.filename):
-            return jsonify({'error': 'Only Excel files (.xlsx, .xls) are allowed'}), 400
+            return jsonify({'error': 'Only Excel or CSV files (.xlsx, .xls, .csv) are allowed'}), 400
+
+        validation_errors = []
+        for file_storage, label in (
+            (internal_file, 'ERP Asset Register'),
+            (customer_file, 'Physical Inventory Count'),
+        ):
+            try:
+                missing_columns = _missing_required_columns(file_storage)
+            except Exception as error:
+                app_logger = current_app.logger
+                app_logger.exception('Failed to inspect uploaded %s file: %s', label, error)
+                validation_errors.append(
+                    f'{label} file could not be read. Please upload a valid Excel or CSV file.'
+                )
+                continue
+            if missing_columns:
+                validation_errors.append(
+                    f"{label} file is missing required column(s): {', '.join(missing_columns)}"
+                )
+
+        if validation_errors:
+            return jsonify({
+                'error': ' | '.join(validation_errors),
+                'validation_errors': validation_errors,
+            }), 400
         
         # Save files
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -1005,13 +1047,22 @@ def approve_group():
 def get_approval_summary(reconciliation_id):
     """
     Get approval summary for a reconciliation showing counts by category and status.
+    Officers can only view their own reconciliations; managers/admins can view any.
     """
     try:
+        user_id = int(get_jwt_identity())
+        user_role = get_user_role()
+
         # Verify reconciliation exists
         reconciliation = Reconciliation.query.get(reconciliation_id)
         if not reconciliation:
             return jsonify({'error': 'Reconciliation not found'}), 404
-        
+
+        # Role-based access control
+        if user_role == 'officer' and reconciliation.user_id != user_id:
+            return jsonify({'error': 'Access denied',
+                            'message': 'You can only view your own reconciliation records.'}), 403
+
         # Get counts by category and approval status
         from sqlalchemy import func
         

@@ -25,7 +25,7 @@ class Config:
     MAX_CONTENT_LENGTH = int(os.getenv('MAX_FILE_SIZE', 100)) * 1024 * 1024  # MB to bytes
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.getenv('UPLOAD_FOLDER', 'uploads'))
     REPORTS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.getenv('REPORTS_FOLDER', 'reports'))
-    ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
+    ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
     
     # Batch Processing for Large Datasets
     BATCH_SIZE = int(os.getenv('BATCH_SIZE', 10000))

@@ -93,6 +93,15 @@ def create_app(config_name='default'):
             if 'is_active' not in user_columns:
                 with db.engine.begin() as connection:
                     connection.execute(text('ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1'))
+            if 'full_name' not in user_columns:
+                with db.engine.begin() as connection:
+                    connection.execute(text('ALTER TABLE users ADD COLUMN full_name VARCHAR(150)'))
+            if 'employee_id' not in user_columns:
+                with db.engine.begin() as connection:
+                    connection.execute(text('ALTER TABLE users ADD COLUMN employee_id VARCHAR(50)'))
+            if 'department' not in user_columns:
+                with db.engine.begin() as connection:
+                    connection.execute(text('ALTER TABLE users ADD COLUMN department VARCHAR(100)'))
     
         # Health check endpoint
         @app.route('/api/health', methods=['GET'])
