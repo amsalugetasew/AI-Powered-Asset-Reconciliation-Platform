@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -24,7 +24,7 @@ const RESULT_COLUMN_PAIRS = [
 ]
 
 const APPROVAL_BADGE_CLS = {
-  pending: 'bg-gray-10 text-gray-700 border-gray-30',
+  pending: 'bg-gray-10 text-[#6B7280] border-gray-30',
   reconciled: 'bg-purple-10 text-[#8E288D] border-purple-30',
   unreconciled: 'bg-red-10 text-red-800 border-red-30',
   surplus_assets: 'bg-orange-10 text-orange-800 border-orange-30',
@@ -72,23 +72,44 @@ const Results = () => {
     targetLabel: '',
     analysisContext: {}
   })
+  const tableScrollRef = useRef(null)
+  const dragState = useRef({ active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 })
+
+  const handleTableMouseDown = event => {
+    if (event.button !== 0 || !tableScrollRef.current || event.target.closest('button, a, input, select, th')) return
+    dragState.current = {
+      active: true,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: tableScrollRef.current.scrollLeft,
+      scrollTop: tableScrollRef.current.scrollTop,
+    }
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    event.currentTarget.classList.add('cursor-grabbing')
+  }
+
+  const handleTableMouseMove = event => {
+    if (!dragState.current.active || !tableScrollRef.current) return
+    event.preventDefault()
+    tableScrollRef.current.scrollLeft = dragState.current.scrollLeft - (event.clientX - dragState.current.startX)
+    tableScrollRef.current.scrollTop = dragState.current.scrollTop - (event.clientY - dragState.current.startY)
+  }
+
+  const stopTableDragging = event => {
+    dragState.current.active = false
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    event.currentTarget.classList.remove('cursor-grabbing')
+  }
 
   const toggleCol = (label) =>
     setExpandedCols(prev => ({ ...prev, [label]: !prev[label] }))
 
   const openAIModal = ({ chartData, chartType, title, targetLabel, analysisContext, action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
-    setAiModalConfig({ chartData, chartType, title, targetLabel, analysisContext })
-    setAiModalAction(action)
-    setAiModalAnalysisType(analysisType)
-    setAiModalOutputFormat(outputFormat)
-    setShowAIModal(true)
+    return undefined
   }
 
   const openAIContextMenu = (event, config) => {
-    event.preventDefault()
-    setAiModalConfig(config)
-    setMenuPosition({ x: event.clientX, y: event.clientY })
-    setShowAIContextMenu(true)
+    return undefined
   }
 
   const handleAIContextSelect = ({ action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
@@ -208,10 +229,10 @@ const Results = () => {
 
   // Overall distribution chart
   const chartData = [
-    { name: 'Rule Matched', value: stats.rule_matched, color: '#CFB53B' },
-    { name: 'AI Matched', value: stats.ai_matched, color: '#8E288D' },
-    { name: 'Manual Review', value: stats.manual_review, color: '#101010' },
-    { name: 'Unmatched', value: stats.customer_unmatched, color: 'hsla(0, 98%, 67%, 1.00)' }
+    { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
+    { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
+    { name: 'Manual Review', value: stats.manual_review, color: '#CFB53B' },
+    { name: 'Unmatched', value: stats.customer_unmatched, color: '#BE123C' }
   ]
 
   // Physical records breakdown
@@ -219,8 +240,8 @@ const Results = () => {
   const customerData = [
     { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
-    { name: 'Manual Review', value: stats.manual_review, color: '#f59e0b' },
-    { name: 'Not Reconciled', value: stats.customer_unmatched, color: '#ef4444' }
+    { name: 'Manual Review', value: stats.manual_review, color: '#CFB53B' },
+    { name: 'Not Reconciled', value: stats.customer_unmatched, color: '#BE123C' }
   ]
 
   // ERP records breakdown (assuming similar distribution)
@@ -228,8 +249,8 @@ const Results = () => {
   const internalData = [
     { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
-    { name: 'Manual Review', value: stats.manual_review, color: '#f59e0b' },
-    { name: 'Not Reconciled', value: stats.internal_unmatched, color: '#ef4444' }
+    { name: 'Manual Review', value: stats.manual_review, color: '#CFB53B' },
+    { name: 'Not Reconciled', value: stats.internal_unmatched, color: '#BE123C' }
   ]
 
   // Comparison bar chart data
@@ -252,27 +273,23 @@ const Results = () => {
   ]
 
   return (
-    <div className="px-0 lg:px-0 lg:px-6">
-      <div className="mb-4">
-        <button
-          onClick={() => navigate('/')}
-          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-700"
-        >
-          <FiArrowLeft className="mr-0" />
-          Back to Dashboard
+    <div className="min-w-0 bg-[#f7f9fc] px-0 pb-10 lg:px-6">
+      <div className="mb-4 flex items-center gap-2 border-b border-slate-200 pb-3 text-sm text-slate-400">
+        <button onClick={() => navigate('/')} className="font-semibold text-[#8E288D] hover:text-[#7A1E79]">
+          Upload &amp; Reconcile
         </button>
+        <span>›</span>
+        <span className="font-medium text-slate-500">Full Result</span>
       </div>
 
-      <div className="sm:flex sm:items-center sm:justify-between">
-        <div className='flex'>
-          <h1 className="text-3xl font-semibold  text-gray-900 mr-4">
-            Reconciliation Results #{id}
-          </h1>
-          <p className="mt-2 text-sm text-gray-700">
-            Completed on {new Date(reconciliation.completed_at).toLocaleString()}
+      <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">Reconciliation Results #{id}</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Execution Timestamp: {new Date(reconciliation.completed_at).toLocaleString()} <span className="text-slate-400">(Automatic Daily Sync)</span>
           </p>
         </div>
-        <div className="mt-2 sm:mt-0 flex space-x-3">
+        <div className="flex flex-wrap gap-2">
           {/* <button
             onClick={() => openAIModal({
               chartData,
@@ -289,26 +306,20 @@ const Results = () => {
           </button> */}
           <button
             onClick={() => navigate(`/report/${id}`)}
-            className="inline-flex items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium 
-            bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg hover:from-gray-400 hover:to-300"
-          >
+            className="flex h-10 w-46 items-center justify-center rounded-lg hover:border-b-2 hover:border-[#8E288D] px-4 text-sm font-medium text-gray-600 shadow transition-colors hover:text-[#8E288D]">
             <FiBarChart2 className="w-5 h-5 mr-2" />
             Dashboard Report
           </button>
           <button
             onClick={() => navigate(`/approval/${id}`)}
-            className="inline-flex items-center px-4 py-3 border 
-            border-transparent rounded-md shadow-sm text-sm font-medium 
-            bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg hover:from-gray-400 hover:to-300"
+            className="flex h-10 w-46 items-center justify-center rounded-lg hover:border-b-2 hover:border-[#8E288D] px-4 text-sm font-medium text-gray-600 shadow transition-colors hover:text-[#8E288D]"
           >
             <FiCheck className="mr-2" />
             {hasRole('manager') ? 'Review & Approve' : 'View Approval Status'}
           </button>
           <button
             onClick={handleDownload}
-            className="inline-flex items-center px-4 py-3 border 
-            border-transparent rounded-md shadow-sm text-sm font-medium 
-            bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg hover:from-gray-400 hover:to-300"
+            className="flex h-10 w-46 items-center justify-center rounded-lg hover:border-b-2 hover:border-[#8E288D] px-4 text-sm font-medium text-gray-600 shadow transition-colors hover:text-[#8E288D]"
           >
             <FiDownload className="mr-2" />
             Download
@@ -318,8 +329,7 @@ const Results = () => {
 
       {/* Processed Records Table */}
       <div
-        className="mt-8 shadow rounded-xl overflow-hidden cursor-context-menu"
-        style={{ background: '#fff' }}
+        className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm cursor-context-menu"
         title="Right-click for AI insights"
         onContextMenu={e => openAIContextMenu(e, {
           chartData: {
@@ -341,10 +351,13 @@ const Results = () => {
         })}
       >
         {/* Table header bar — dark blue like reference */}
-        <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #c4c4c4 0%, #d4d4d4 100%)" }}>
-          <h2 className="text-base font-semibold text-gray-600 tracking-wide">Processed Records</h2>
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold tracking-tight text-slate-800">Processed Records - {totalRecords} records</h2>
+            {/* <p className="mt-0.5 text-xs text-slate-400">Detailed comparison between Physical Audit findings and ERP register entries</p> */}
+          </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-[#8E288D]">{totalRecords} records</span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">{totalRecords} records</span>
             <button
               onClick={() => setTableCollapsed(c => !c)}
               className="text-[#8E288D] opacity-70 hover:opacity-100 font-bold text-lg leading-none px-1"
@@ -355,18 +368,18 @@ const Results = () => {
         </div>
 
         {/* Category tabs */}
-        <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap gap-2" style={{ background: '#f8fafc'}}>
+        <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-white px-4 py-3">
           {[
             { key: 'all',           label: 'All',                                          cls: 'bg-white text-gray-600 border-gray-300',       active: 'bg-[#1a3a5c] text-white border-[#1a3a5c]' },
-            { key: 'Exact Match',   label: `Tag Match (${stats.rule_matched})`,           cls: 'bg-white text-[#1a3a5c] border-[#1a3a5c]',     active: 'bg-[#1a3a5c] text-white border-[#1a3a5c]'  },
-            { key: 'AI Match',      label: `AI Match (${stats.ai_matched})`,                cls: 'bg-white text-purple-700 border-purple-300',   active: 'bg-[#7A1E79] text-white border-[#7A1E79]'  },
-            { key: 'Manual Review', label: `Near Match (${stats.manual_review})`,           cls: 'bg-white text-[#1a3a5c] border-[#1a3a5c]',       active: 'bg-[#1a3a5c] text-white border-[#1a3a5c]'    },
+            { key: 'Exact Match',   label: `Exact Match (${stats.rule_matched})`,           cls: 'bg-white text-[#8E288D] border-[#8E288D]',     active: 'bg-[#8E288D] text-white border-[#8E288D]'  },
+            { key: 'AI Match',      label: `AI Match (${stats.ai_matched})`,                cls: 'bg-white text-[#CFB53B] border-[#CFB53B]',   active: 'bg-[#CFB53B] text-white border-[#CFB53B]'  },
+            { key: 'Manual Review', label: `Manual Review (${stats.manual_review})`,           cls: 'bg-white text-[#CFB53B] border-[#CFB53B]',       active: 'bg-[#CFB53B] text-white border-[#CFB53B]'    },
             { key: 'Unmatched',     label: `Unmatched (${stats.customer_unmatched})`,       cls: 'bg-white text-red-600 border-red-300',         active: 'bg-red-600 text-white border-red-600'      },
             { key: 'Duplicate',     label: `Duplicates (${(stats.customer_duplicates||0)+(stats.internal_duplicates||0)})`, cls: 'bg-white text-pink-600 border-pink-300', active: 'bg-pink-600 text-white border-pink-600' },
           ].map(tab => (
             <button key={tab.key}
               onClick={() => handleCategoryChange(tab.key)}
-              className={`px-3 py-1 rounded border text-xs font-semibold transition-colors ${
+              className={`rounded-lg h-10 w-44 border px-4 py-1.5 text-xs font-semibold transition-colors ${
                 selectedCategory === tab.key ? tab.active : tab.cls + ' hover:opacity-80'
               }`}>
               {tab.label}
@@ -377,8 +390,15 @@ const Results = () => {
         {/* Table — collapsible */}
         {!tableCollapsed && (
           <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full" style={{ borderCollapse: 'collapse' }}>
+            <div
+              ref={tableScrollRef}
+              className="h-[420px] cursor-grab select-none overflow-auto overscroll-contain"
+              onPointerDown={handleTableMouseDown}
+              onPointerMove={handleTableMouseMove}
+              onPointerUp={stopTableDragging}
+              onPointerCancel={stopTableDragging}
+            >
+              <table className="reconciliation-table min-w-full" style={{ borderCollapse: 'collapse' }}>
                 <thead>
                   {/* Row 1 — dark blue group headers like reference */}
                   <tr style={{ background: "linear-gradient(90deg, #CFB53B 0%, #8E288D 100%)" }}>
@@ -547,7 +567,7 @@ const Results = () => {
                             color: {
                               reconciled: '#1a3a5c', unreconciled: '#991b1b',
                               surplus_assets: '#3c4349ff', exist_in_erp_not_physical: '#9c5b75ff',
-                              duplicated: '#334155', unique: '#134e4a', pending: '#000',
+                              duplicated: '#334155', unique: '#134e4a', pending: '#6B7280',
                             }[rec.approval_status] || '#64748b'
                           }}>
                           {APPROVAL_LABEL[rec.approval_status] || 'Pending'}
@@ -685,130 +705,6 @@ const Results = () => {
           </div>
         </div>
       </div>
-
-      {/* Comparison Bar Chart */}
-      {/* <div className="mt-8 bg-white shadow rounded-lg p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-6">Customer vs ERP Records Comparison</h3>
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={comparisonData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="category" style={{ fontSize: '14px', fontWeight: '500' }} />
-            <YAxis style={{ fontSize: '14px' }} />
-            <Tooltip 
-              contentStyle={{ fontSize: '14px', fontWeight: '500' }}
-              labelStyle={{ fontSize: '15px', fontWeight: '600' }}
-            />
-            <Legend wrapperStyle={{ fontSize: '14px', fontWeight: '500' }} />
-            <Bar dataKey="Customer" fill="#8E288D" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="ERP" fill="#008080" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div> */}
-
-      {/* Detailed Breakdown Charts */}
-      {/* <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6"> */}
-      {/* Physical Records Breakdown */}
-      {/* <div className="bg-white shadow rounded-lg p-6">
-          <div className="flex items-center mb-4">
-            <FiUsers className="h-6 w-6 text-purple-600 mr-2" />
-            <h3 className="text-lg font-semibold text-gray-900">Physical Records Breakdown</h3>
-          </div>
-          <div className="mb-4 p-4 bg-purple-50 rounded-lg">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Total Physical Records:</span>
-              <span className="text-2xl font-bold text-purple-600">{stats.total_customer_records}</span>
-            </div>
-          </div> */}
-      {/* <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={customerData}
-                cx="50%"
-                cy="50%"
-                labelLine={true}
-                label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
-                outerRadius={90}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {customerData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ fontSize: '14px', fontWeight: '500' }} />
-            </PieChart>
-          </ResponsiveContainer> */}
-      {/* <div className="mt-4 space-y-2">
-            <div className="flex justify-between items-center p-2 bg-green-50 rounded">
-              <span className="text-sm font-medium text-gray-700">✓ Rule Matched</span>
-              <span className="text-sm font-bold text-green-700">{stats.rule_matched} records</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
-              <span className="text-sm font-medium text-gray-700">✓ AI Matched</span>
-              <span className="text-sm font-bold text-[#8E288D]">{stats.ai_matched} records</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-yellow-50 rounded">
-              <span className="text-sm font-medium text-gray-700">⚠ Manual Review</span>
-              <span className="text-sm font-bold text-yellow-700">{stats.manual_review} records</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-red-50 rounded">
-              <span className="text-sm font-medium text-gray-700">✗ Not Reconciled</span>
-              <span className="text-sm font-bold text-red-700">{stats.customer_unmatched} records</span>
-            </div>
-          </div>
-        </div> */}
-
-      {/* ERP Records Breakdown */}
-      {/* <div className="bg-white shadow rounded-lg p-6">
-          <div className="flex items-center mb-4">
-            <FiDatabase className="h-6 w-6 text-teal-600 mr-2" />
-            <h3 className="text-lg font-semibold text-gray-900">ERP Records Breakdown</h3>
-          </div>
-          <div className="mb-4 p-4 bg-teal-50 rounded-lg">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Total ERP Records:</span>
-              <span className="text-2xl font-bold text-teal-600">{stats.total_internal_records}</span>
-            </div>
-          </div> */}
-      {/* <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={internalData}
-                cx="50%"
-                cy="50%"
-                labelLine={true}
-                label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
-                outerRadius={90}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {internalData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ fontSize: '14px', fontWeight: '500' }} />
-            </PieChart>
-          </ResponsiveContainer> */}
-      {/* <div className="mt-4 space-y-2">
-            <div className="flex justify-between items-center p-2 bg-green-50 rounded">
-              <span className="text-sm font-medium text-gray-700">✓ Rule Matched</span>
-              <span className="text-sm font-bold text-green-700">{stats.rule_matched} records</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
-              <span className="text-sm font-medium text-gray-700">✓ AI Matched</span>
-              <span className="text-sm font-bold text-[#8E288D]">{stats.ai_matched} records</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-yellow-50 rounded">
-              <span className="text-sm font-medium text-gray-700">⚠ Manual Review</span>
-              <span className="text-sm font-bold text-yellow-700">{stats.manual_review} records</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-red-50 rounded">
-              <span className="text-sm font-medium text-gray-700">✗ Not Reconciled</span>
-              <span className="text-sm font-bold text-red-700">{stats.internal_unmatched} records</span>
-            </div>
-          </div>
-        </div>
-      </div> */}
 
       {/* Overall Statistics Summary */}
       <div className="mt-8 mb-8">

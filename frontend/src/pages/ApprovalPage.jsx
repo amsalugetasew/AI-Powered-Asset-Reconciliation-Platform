@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react'
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -10,16 +10,17 @@ import {
   FiChevronLeft, FiChevronRight, FiAlertCircle, FiFilter, FiChevronDown
 } from 'react-icons/fi'
 import { useAuth } from '../context/AuthContext'
+import { clearCachedGets } from '../services/cachedGet'
 
 // ── Status definitions ────────────────────────────────────────────────────────
 const STATUSES = [
-  { value: 'pending', label: 'Pending', color: '#CFB53B' },
-  { value: 'reconciled', label: 'Reconciled', color: '#1a3a5c' },
-  { value: 'unreconciled', label: 'Unreconciled', color: 'red' },
-  { value: 'surplus_assets', label: 'Surplus Assets', color: 'orange' },
-  { value: 'exist_in_erp_not_physical', label: 'Shortage Assets', color: 'purple' },
-  { value: 'duplicated', label: 'Duplicated', color: 'pink' },
-  { value: 'unique', label: 'Unique', color: 'teal' },
+  { value: 'pending', label: 'Pending', color: '#6B7280' },
+  { value: 'reconciled', label: 'Reconciled', color: '#8E288D' },
+  { value: 'unreconciled', label: 'Unreconciled', color: '#BE123C' },
+  { value: 'surplus_assets', label: 'Surplus Assets', color: '#BE123C' },
+  { value: 'exist_in_erp_not_physical', label: 'Shortage Assets', color: '#BE123C' },
+  { value: 'duplicated', label: 'Duplicated', color: '#000000' },
+  { value: 'unique', label: 'Unique', color: '#8E288D' },
 ]
 
 const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.value, s]))
@@ -50,7 +51,15 @@ const BULK_OPTIONS_MATCHED = [
   { value: 'unreconciled', label: 'Unreconciled' },
 ]
 const BULK_OPTIONS_UNMATCHED = [
+  { value: 'reconciled', label: 'Reconciled' },
+  { value: 'unreconciled', label: 'Unreconciled' },
+]
+const BULK_OPTIONS_PHYSICAL_UNMATCHED = [
   { value: 'surplus_assets', label: 'Surplus Assets' },
+  { value: 'reconciled', label: 'Reconciled' },
+  { value: 'unreconciled', label: 'Unreconciled' },
+]
+const BULK_OPTIONS_ERP_UNMATCHED = [
   { value: 'exist_in_erp_not_physical', label: 'Shortage Assets' },
   { value: 'reconciled', label: 'Reconciled' },
   { value: 'unreconciled', label: 'Unreconciled' },
@@ -129,7 +138,7 @@ const StatusDropdown = ({ recordId, current, onSelect, loading }) => {
 }
 
 // ── Bulk action dropdown ──────────────────────────────────────────────────────
-const BulkDropdown = ({ category, onSelect, loading }) => {
+const BulkDropdown = ({category, onSelect,  loading,  className = '',}) => {
   const [open, setOpen] = useState(false)
   const [subCat, setSubCat] = useState(null) // for Unmatched sub-category step
   const isDuplicate = category === 'Duplicate'
@@ -141,8 +150,13 @@ const BulkDropdown = ({ category, onSelect, loading }) => {
     { value: 'ERP Unmatched', label: 'ERP Unmatched' },
   ]
 
+  const optionsForSubCat = subCat === 'Physical Unmatched'
+    ? BULK_OPTIONS_PHYSICAL_UNMATCHED
+    : subCat === 'ERP Unmatched'
+      ? BULK_OPTIONS_ERP_UNMATCHED
+      : BULK_OPTIONS_UNMATCHED
   const optionsForCat = isDuplicate ? BULK_OPTIONS_DUPLICATE
-    : isUnmatched ? BULK_OPTIONS_UNMATCHED
+    : isUnmatched ? optionsForSubCat
       : BULK_OPTIONS_MATCHED
 
   const loadingKey = loading && Object.keys(loading).find(k => k.startsWith(category) && loading[k])
@@ -159,7 +173,7 @@ const BulkDropdown = ({ category, onSelect, loading }) => {
       <button
         onClick={() => { setOpen(o => !o); setSubCat(null) }}
         disabled={!!loadingKey}
-        className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium text-white bg-[#8E288D] hover:bg-[#7A1E79] disabled:opacity-50"
+        className={`inline-flex items-center justify-center gap-1 rounded text-xs font-medium text-white bg-[#8E288D] hover:bg-[#7A1E79] disabled:opacity-50 transition-colors ${className}`}
       >
         {loadingKey ? <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" /> : null}
         Bulk Approve <FiChevronDown className="w-3 h-3" />
@@ -260,18 +274,11 @@ const ApprovalPage = () => {
   const [aiModalOutputFormat, setAiModalOutputFormat] = useState('combined')
 
   const openAIModal = ({ chartData, chartType, title, targetLabel, analysisContext, action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
-    setAiModalConfig({ chartData, chartType, title, targetLabel, analysisContext })
-    setAiModalAction(action)
-    setAiModalAnalysisType(analysisType)
-    setAiModalOutputFormat(outputFormat)
-    setShowAIModal(true)
+    return undefined
   }
 
   const openAIContextMenu = (event, config) => {
-    event.preventDefault()
-    setAiModalConfig(config)
-    setMenuPosition({ x: event.clientX, y: event.clientY })
-    setShowAIContextMenu(true)
+    return undefined
   }
 
   const handleAIContextSelect = ({ action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
@@ -289,7 +296,35 @@ const ApprovalPage = () => {
   const [totalRecords, setTotalRecords] = useState(0)
   const [expandedCols, setExpandedCols] = useState({}) // { [colLabel]: true }
   const [tableCollapsed, setTableCollapsed] = useState(false)
+  const approvalTableRef = useRef(null)
+  const approvalDragState = useRef({ active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 })
   const PER_PAGE = 10
+
+  const handleApprovalTableMouseDown = event => {
+    if (event.button !== 0 || !approvalTableRef.current || event.target.closest('button, a, input, select, th')) return
+    approvalDragState.current = {
+      active: true,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: approvalTableRef.current.scrollLeft,
+      scrollTop: approvalTableRef.current.scrollTop,
+    }
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    event.currentTarget.classList.add('cursor-grabbing')
+  }
+
+  const handleApprovalTableMouseMove = event => {
+    if (!approvalDragState.current.active || !approvalTableRef.current) return
+    event.preventDefault()
+    approvalTableRef.current.scrollLeft = approvalDragState.current.scrollLeft - (event.clientX - approvalDragState.current.startX)
+    approvalTableRef.current.scrollTop = approvalDragState.current.scrollTop - (event.clientY - approvalDragState.current.startY)
+  }
+
+  const stopApprovalTableDragging = event => {
+    approvalDragState.current.active = false
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    event.currentTarget.classList.remove('cursor-grabbing')
+  }
 
   const toggleCol = (label) =>
     setExpandedCols(prev => ({ ...prev, [label]: !prev[label] }))
@@ -340,6 +375,7 @@ const ApprovalPage = () => {
         record_id: recordId,
         approval_decision: decision,
       })
+      clearCachedGets()
       logActivity(`/approval/${id}`, `APPROVE_RECORD_${recordId}_AS_${decision.toUpperCase()}`)
       toast.success(`Marked as "${STATUS_MAP[decision]?.label || decision}"`)
       await fetchRecords()
@@ -361,6 +397,7 @@ const ApprovalPage = () => {
         category,
         approval_decision: decision,
       })
+      clearCachedGets()
       logActivity(`/approval/${id}`, `BULK_APPROVE_${category.toUpperCase()}_AS_${decision.toUpperCase()}`)
       toast.success(`All "${category}" → "${STATUS_MAP[decision]?.label || decision}"`)
       await fetchRecords()
@@ -447,7 +484,7 @@ const ApprovalPage = () => {
   const pct = overall.total > 0 ? ((overallDone / overall.total) * 100).toFixed(0) : 0
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 pb-12">
+    <div className="min-w-0 bg-[#f7f9fc] px-4 pb-12 sm:px-6 lg:px-8">
       {/* Back */}
       <div className="mb-0">
         <button onClick={() => navigate(-1)} className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
@@ -456,9 +493,9 @@ const ApprovalPage = () => {
       </div>
 
       {/* Title + progress */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-4">
+      <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">
             {canApprove ? 'Approval Review' : 'Approval Status'} — Reconciliation #{id}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -467,7 +504,7 @@ const ApprovalPage = () => {
               : 'View approval status for this reconciliation'}
           </p>
         </div>
-        <div className="bg-white border rounded-lg p-0 min-w-[300px] shadow-sm">
+        <div className="min-w-[300px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           {/* Overall approval progress — excludes Duplicate category */}
           <p className="text-xs text-gray-500 mb-1 font-medium">
             Approval Progress (excluding Duplicates)
@@ -544,16 +581,16 @@ const ApprovalPage = () => {
       </div>
 
       {/* Filter + bulk row (outside table card) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         {/* Status filter pills */}
         <div className="flex items-center gap-2 flex-wrap">
           <FiFilter className="text-gray-400 flex-shrink-0" />
           {['all', ...STATUSES.map(s => s.value)].map(sf => (
             <button key={sf}
               onClick={() => { setStatusFilter(sf); setPage(1) }}
-              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${statusFilter === sf
-                  ? 'bg-[#8E288D] text-white border-[#8E288D]'
-                  : 'bg-white text-gray-600 border-gray-300 hover:border-[#8E288D]'
+              className={`flex h-10 w-36 items-center justify-center px-4 text-sm font-medium transition-colors ${statusFilter === sf
+                  ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D]'
+                  : 'text-gray-600'
                 }`}>
               {sf === 'all' ? 'All' : (STATUS_MAP[sf]?.label || sf)}
             </button>
@@ -566,12 +603,13 @@ const ApprovalPage = () => {
             category={selectedCategory}
             onSelect={handleBulkDecision}
             loading={bulkLoading}
+            className="h-10 w-44"
           />
         )}
       </div>
 
       {/* Reconciliation Records Table */}
-      <div className="mt-2 shadow rounded-xl overflow-hidden cursor-context-menu" style={{ background: '#f8fafc' }} title="Right-click for AI insights"
+      <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm cursor-context-menu" title="Right-click for AI insights"
         onContextMenu={e => openAIContextMenu(e, {
           chartData: {
             source: 'approval_records_table',
@@ -586,10 +624,13 @@ const ApprovalPage = () => {
           analysisContext: { page: 'Approval', section: 'Approval Records Table' }
         })}>
         {/* Dark navy header bar */}
-        <div className="flex items-center justify-between px-5 py-3" style={{ background: "linear-gradient(90deg, #c4c4c4 0%, #d4d4d4 100%)" }}>
-          <h2 className="text-base font-semibold text-gray-600 tracking-wide">Reconciliation Records</h2>
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold tracking-tight text-slate-800">Reconciliation Records - {totalRecords} records</h2>
+            <p className="mt-0.5 text-xs text-slate-400">Review and update approval status for reconciled asset records</p>
+          </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-[#8E288D]">{totalRecords} records</span>
+            <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">{totalRecords} records</span>
             <button
               onClick={() => setTableCollapsed(c => !c)}
               className="text-[#8E288D] opacity-70 hover:opacity-100 font-bold text-lg leading-none px-1"
@@ -600,7 +641,7 @@ const ApprovalPage = () => {
         </div>
 
         {/* Category tab pills */}
-        <div className="px-4 py-3 border-b border-gray-200 flex flex-wrap gap-2" style={{ background: '#f8fafc' }}>
+        <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-white px-4 py-3">
           {CATEGORIES.map(cat => {
             const s = getSummary(cat.key)
             const isActive = selectedCategory === cat.key
@@ -623,7 +664,7 @@ const ApprovalPage = () => {
             return (
               <button key={cat.key}
                 onClick={() => { setSelectedCategory(cat.key); setPage(1) }}
-                className={`px-3 py-1 rounded border text-xs font-semibold transition-colors ${isActive ? activeCls[cat.key] : inactiveCls[cat.key]}`}>
+                className={`rounded-lg h-10 w-44 border px-4 py-1.5 text-xs font-semibold transition-colors ${isActive ? activeCls[cat.key] : inactiveCls[cat.key]}`}>
                 {cat.label}
                 {cat.key !== 'all' && (
                   <span className="ml-1 opacity-80">
@@ -637,8 +678,15 @@ const ApprovalPage = () => {
         {/* Table — collapsible */}
         {!tableCollapsed && (
         <>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+        <div
+          ref={approvalTableRef}
+          className="h-[420px] cursor-grab select-none overflow-auto overscroll-contain"
+          onPointerDown={handleApprovalTableMouseDown}
+          onPointerMove={handleApprovalTableMouseMove}
+          onPointerUp={stopApprovalTableDragging}
+          onPointerCancel={stopApprovalTableDragging}
+        >
+          <table className="reconciliation-table min-w-[2100px] text-sm" style={{ borderCollapse: 'collapse' }}>
             <thead>
               {/* Row 1 — dark navy group headers */}
               <tr style={{ background: "#e7e7e7"}}>
@@ -824,7 +872,7 @@ const ApprovalPage = () => {
                           color: {
                             reconciled: '#1a3a5c', unreconciled: '#991b1b',
                             surplus_assets: '#4c1d95', exist_in_erp_not_physical: '#831843',
-                            duplicated: '#334155', unique: '#134e4a', pending: '#92400e',
+                            duplicated: '#334155', unique: '#134e4a', pending: '#6B7280',
                           }[rec.approval_status] || '#475569'
                         }}>
                           {STATUS_MAP[rec.approval_status || 'pending']?.label || 'Pending'}
@@ -943,7 +991,7 @@ const ApprovalPage = () => {
             {cat.key === 'Duplicate' ? (
               <>
                 <div className="flex justify-between">
-                  <span className="text-[#CFB53B]">{s.pending} pending</span>
+                  <span className="text-[#6B7280]">{s.pending} pending</span>
                   <span className="text-pink-600">{s.duplicated || 0} duplicated</span>
                 </div>
                 <div className="flex justify-between">
@@ -953,7 +1001,7 @@ const ApprovalPage = () => {
             ) : cat.key === 'Unmatched' ? (
               <>
                 <div className="flex justify-between">
-                  <span className="text-[#CFB53B]">{s.pending} pending</span>
+                  <span className="text-[#6B7280]">{s.pending} pending</span>
                   <span className="text-[#8E288D]">{s.reconciled} reconciled</span>
                 </div>
                 <div className="flex justify-between text-gray-500 mt-1 border-t border-gray-100 pt-1">
@@ -964,7 +1012,7 @@ const ApprovalPage = () => {
             ) : (
               <>
                 <div className="flex justify-between">
-                  <span className="text-[#CFB53B]">{s.pending} pending</span>
+                  <span className="text-[#6B7280]">{s.pending} pending</span>
                   <span className="text-[#8E288D]">{s.reconciled} reconciled</span>
                 </div>
                 <div className="flex justify-between">

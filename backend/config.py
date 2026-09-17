@@ -29,9 +29,12 @@ class Config:
     
     # Batch Processing for Large Datasets
     BATCH_SIZE = int(os.getenv('BATCH_SIZE', 10000))
+    FUZZY_MAX_COMPARISONS_PER_RECORD = int(os.getenv('FUZZY_MAX_COMPARISONS_PER_RECORD', 500))
     MAX_AI_RECORDS = int(os.getenv('MAX_AI_RECORDS', 1000))
     
     # AI Configuration
+    ENABLE_AI_MATCHING = os.getenv('ENABLE_AI_MATCHING', 'false').lower() == 'true'
+    ENABLE_AI_ANALYSIS = os.getenv('ENABLE_AI_ANALYSIS', 'false').lower() == 'true'
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
     ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
     AI_PROVIDER = os.getenv('AI_PROVIDER', 'openai')

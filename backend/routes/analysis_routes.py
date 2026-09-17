@@ -12,10 +12,17 @@ from services.ai_analysis_service import AIAnalysisService
 from services.report_generator import ReportGenerator, HAS_REPORTLAB, HAS_PYTHON_DOCX
 from models import db, ReconciliationRecord, Reconciliation, User
 from utils.rbac import get_user_role
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 analysis_bp = Blueprint('analysis', __name__, url_prefix='/api/analysis')
+
+
+@analysis_bp.before_request
+def disable_ai_analysis_when_configured_off():
+    if not Config.ENABLE_AI_ANALYSIS:
+        return jsonify({'error': 'AI analysis is disabled.'}), 503
 
 # Initialize services
 try:

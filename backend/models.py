@@ -215,6 +215,7 @@ class AuditLog(db.Model):
             'id': self.id,
             'user_id': self.user_id,
             'username': self.user.username if self.user else None,
+            'full_name': self.user.full_name if self.user else None,
             'operation_type': self.operation_type,
             'resource_type': self.resource_type,
             'resource_id': self.resource_id,

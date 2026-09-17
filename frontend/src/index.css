@@ -99,3 +99,79 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Shared table treatment for the reconciliation list and record views. */
+.reconciliation-table {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #ffffff;
+  color: #17324d;
+  table-layout: auto;
+}
+
+.reconciliation-table thead th {
+  min-width: 5.5rem;
+  overflow: hidden;
+  resize: horizontal;
+  color: #b01986 !important;
+  cursor: col-resize;
+  background: #ffffff !important;
+  border-color: #edf0f4 !important;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em !important;
+  line-height: 1.25;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.reconciliation-table thead th[rowspan] {
+  min-width: 7rem;
+}
+
+.reconciliation-table thead th.cursor-pointer {
+  cursor: col-resize;
+}
+
+.reconciliation-table thead tr:first-child th {
+  border-top: 0;
+  padding-top: 1.15rem;
+  padding-bottom: 1.15rem;
+}
+
+.reconciliation-table thead tr:last-child th {
+  color: #66758a !important;
+  font-size: 0.68rem;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+
+.reconciliation-table tbody tr {
+  background-color: #ffffff;
+  border-bottom: 1px solid #f0f2f5 !important;
+  transition: background-color 150ms ease;
+}
+
+.reconciliation-table tbody tr:hover {
+  background: #fff8fc !important;
+}
+
+.reconciliation-table tbody td {
+  background-color: #ffffff;
+  color: #17324d;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+
+.reconciliation-table tbody td:not(:first-child) {
+  font-weight: 600;
+}
+
+.reconciliation-table tbody td:first-child {
+  font-weight: 700;
+}
+
+.reconciliation-table tfoot,
+.reconciliation-table + * {
+  font-family: Arial, Helvetica, sans-serif;
+}

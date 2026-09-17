@@ -80,6 +80,15 @@ class RuleMatcher:
                        match_type: str) -> List[Dict]:
         """Match records on specific fields"""
         matches = []
+
+        # Index the ERP values once instead of scanning every ERP row for each
+        # customer row. This changes the lookup from O(customers * ERP rows)
+        # to O(customers + ERP rows) for each rule pass.
+        internal_by_value = {}
+        for internal_index, internal_row in internal_df.iterrows():
+            value = internal_row[internal_field]
+            if value and value != '':
+                internal_by_value.setdefault(value, []).append(internal_index)
         
         for c_idx, c_row in customer_df.iterrows():
             # Skip if already matched
@@ -92,35 +101,25 @@ class RuleMatcher:
             if not customer_value or customer_value == '':
                 continue
             
-            for i_idx, i_row in internal_df.iterrows():
-                # Skip if already matched
-                if i_row['source_index'] in matched_internal_indices:
-                    continue
-                
-                internal_value = i_row[internal_field]
-                
-                # Skip empty values
-                if not internal_value or internal_value == '':
-                    continue
-                
-                # Exact match
-                if customer_value == internal_value:
-                    # Calculate fuzzy matching score based on description column
-                    desc_c = str(c_row.get('description', ''))
-                    desc_i = str(i_row.get('description', ''))
-                    
-                    if desc_c.strip() and desc_i.strip() and desc_c.lower() != 'nan' and desc_i.lower() != 'nan':
-                        confidence = round(fuzz.token_set_ratio(desc_c, desc_i) / 100.0, 4)
-                    else:
-                        confidence = 1.0
-                        
-                    match_record = RuleMatcher._create_match_record(
-                        c_row, i_row, match_type, confidence
-                    )
-                    matches.append(match_record)
-                    matched_customer_indices.add(c_row['source_index'])
-                    matched_internal_indices.add(i_row['source_index'])
-                    break
+            candidate_indices = internal_by_value.get(customer_value, [])
+            i_idx = next((index for index in candidate_indices
+                          if internal_df.at[index, 'source_index'] not in matched_internal_indices), None)
+            if i_idx is None:
+                continue
+
+            i_row = internal_df.loc[i_idx]
+            desc_c = str(c_row.get('description', ''))
+            desc_i = str(i_row.get('description', ''))
+
+            if desc_c.strip() and desc_i.strip() and desc_c.lower() != 'nan' and desc_i.lower() != 'nan':
+                confidence = round(fuzz.token_set_ratio(desc_c, desc_i) / 100.0, 4)
+            else:
+                confidence = 1.0
+
+            match_record = RuleMatcher._create_match_record(c_row, i_row, match_type, confidence)
+            matches.append(match_record)
+            matched_customer_indices.add(c_row['source_index'])
+            matched_internal_indices.add(i_row['source_index'])
         
         return matches
     

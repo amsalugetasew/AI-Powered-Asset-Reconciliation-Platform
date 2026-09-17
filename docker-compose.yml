@@ -35,6 +35,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - FUZZY_MAX_COMPARISONS_PER_RECORD=${FUZZY_MAX_COMPARISONS_PER_RECORD:-500}
     ports:
       - "6000:6000"
     depends_on:

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { logActivity } from '../services/activityService'
+import { cachedGet, clearCachedGets } from '../services/cachedGet'
 import { useAuth } from '../context/AuthContext'
 import AIAnalysisModal from '../components/AIAnalysisModal'
 import AIContextMenu from '../components/AIContextMenu'
@@ -10,11 +11,10 @@ import {
   FiUpload, FiDownload, FiClock, FiCheckCircle, FiXCircle, FiLoader,
   FiFileText, FiFilter, FiSearch, FiCheck, FiCopy, FiTarget,
   FiTrash2, FiChevronLeft, FiChevronRight, FiUser, FiBarChart2, FiEye,
-  FiRefreshCw, FiAlertTriangle, FiPlus
+  FiRefreshCw, FiMinusCircle, FiPlus, FiLayers, FiMapPin,FiPackage, FiHelpCircle
 } from 'react-icons/fi'
 
 // ── Palette for charts ─────────────────────────────────────────────────────────
-// Bucket order: < 1yr, 1-3yr, 3-5yr, 5-10yr, 10-20yr, >20yr, Unknown
 const AGING_BUCKET_CONFIG = [
   { key: '< 1 yr',    label: '< 1 yr',    color: '#22c55e' },  // green  – fresh
   { key: '1 – 3 yr',  label: '1 – 3 yr',  color: '#8E288D' },  // blue
@@ -26,41 +26,27 @@ const AGING_BUCKET_CONFIG = [
 ]
 
 // ── Category Distribution Bar Component ─────────────────────────────────────
-// Each bar = Reconciled (approved: reconciled+surplus+shortage+duplicate) vs Unresolved (unreconciled+pending)
-// Purple bar = Reconciled, gray track = Unresolved
+// Horizontal stacked rows match the reporting page breakdown layout.
 const CategoryDistributionChart = ({ categoryData, monthLabel }) => {
-  const [hovered, setHovered] = React.useState(null)
-
   const hasData = categoryData && categoryData.length > 0
 
-  const items = hasData
-    ? categoryData.slice(0, 10).map(cat => {
+  const items = (categoryData || []).slice(0, 10).map(cat => {
         const resolved = (cat.reconciled || 0)
           + (cat.surplus_assets || 0)
           + (cat.exist_in_erp_not_physical || 0)
           + (cat.duplicated || 0)
           + (cat.unique || 0)
-        const unresolved = (cat.unreconciled || 0) + (cat.pending || 0)
-        const total      = resolved + unresolved
-        const resolvedPct = total > 0 ? Math.round((resolved / total) * 100) : 0
+        const unmatched = cat.unreconciled || 0
+        const pending    = cat.pending || 0
+        const total      = resolved + unmatched + pending
         return {
           name:         cat.name || 'Unknown',
           resolved,
-          unresolved,
+          unmatched,
+          pending,
           total,
-          resolvedPct,
         }
       })
-    : [
-        { name: 'Furniture & Fitting',  resolved: 190, unresolved: 10,  total: 200, resolvedPct: 95 },
-        { name: 'Hardware',             resolved: 144, unresolved: 56,  total: 200, resolvedPct: 72 },
-        { name: 'Office Equipment',     resolved: 104, unresolved: 96,  total: 200, resolvedPct: 52 },
-        { name: 'ATM & POS',            resolved: 60,  unresolved: 140, total: 200, resolvedPct: 30 },
-        { name: 'Motor Vehicle',        resolved: 46,  unresolved: 154, total: 200, resolvedPct: 23 },
-        { name: 'Premises',             resolved: 38,  unresolved: 162, total: 200, resolvedPct: 19 },
-        { name: 'Hardware Expense',     resolved: 30,  unresolved: 170, total: 200, resolvedPct: 15 },
-        { name: 'Equipment Expense',    resolved: 20,  unresolved: 180, total: 200, resolvedPct: 10 },
-      ]
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 h-full flex flex-col gap-4">
@@ -73,74 +59,36 @@ const CategoryDistributionChart = ({ categoryData, monthLabel }) => {
             {monthLabel && <span className="text-xs font-normal text-[#8E288D] ml-1.5">({monthLabel})</span>}
           </h2>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            Reconciled vs Unresolved per asset category
+            Reconciled, Unmatched, and Pending per asset category
           </p>
         </div>
-        {!hasData && (
-          <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0">
-            Sample data
-          </span>
-        )}
       </div>
 
-      {/* Bars */}
-      <div className="flex items-end justify-between gap-2 flex-1 pb-7 relative">
-        {items.map((item) => {
-          const isHov = hovered === item.name
-          return (
-            <div
-              key={item.name}
-              className="flex-1 flex flex-col items-center justify-end h-full group relative cursor-pointer"
-              onMouseEnter={() => setHovered(item.name)}
-              onMouseLeave={() => setHovered(null)}
-            >
-              {/* Percentage label above bar */}
-              <span
-                className="text-[11px] font-bold mb-1.5 transition-all duration-150"
-                style={{ color: '#8E288D', opacity: isHov ? 1 : 0.8 }}
-              >
-                {item.resolvedPct}%
-              </span>
-
-              {/* Bar column */}
-              <div
-                className="w-full max-w-[40px] rounded-t-md overflow-hidden flex flex-col-reverse"
-                style={{
-                  height: '100%',
-                  backgroundColor: '#f3f0f4',  // unresolved track (light purple-gray)
-                }}
-              >
-                {/* Reconciled (purple) — fills from bottom */}
-                <div
-                  className="w-full rounded-t-md transition-all duration-700 ease-out"
-                  style={{
-                    height: `${Math.max(2, item.resolvedPct)}%`,
-                    backgroundColor: '#8E288D',
-                    opacity: isHov ? 1 : 0.85,
-                    boxShadow: isHov ? '0 -2px 8px rgba(142,40,141,0.4)' : 'none',
-                  }}
-                />
-              </div>
-
-              {/* Tooltip on hover */}
-              {isHov && (
-                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 bg-gray-900 text-white text-[11px] rounded-lg px-3 py-2 shadow-xl whitespace-nowrap pointer-events-none">
-                  <p className="font-bold mb-1">{item.name}</p>
-                  <p><span className="inline-block w-2 h-2 rounded-full bg-[#8E288D] mr-1" />Reconciled: <span className="font-semibold">{item.resolved.toLocaleString()}</span> ({item.resolvedPct}%)</p>
-                  <p><span className="inline-block w-2 h-2 rounded-full bg-[#f3f0f4] border border-gray-400 mr-1" />Unresolved: <span className="font-semibold">{item.unresolved.toLocaleString()}</span> ({100 - item.resolvedPct}%)</p>
-                  <p className="text-gray-400 mt-0.5">Total: {item.total.toLocaleString()}</p>
-                </div>
-              )}
-
-              {/* X-axis label */}
-              <div className="absolute top-full mt-2 left-1/2 w-20 origin-top-left -rotate-45">
-                <p className="text-[9.5px] font-medium text-gray-500 dark:text-gray-400 leading-tight whitespace-nowrap truncate">
-                  {item.name}
-                </p>
-              </div>
+      {/* Horizontal stacked rows */}
+      <div className="space-y-4">
+        {hasData ? items.map(item => (
+          <div key={item.name}>
+            <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+              <span className="truncate font-semibold text-gray-700 dark:text-gray-200" title={item.name}>{item.name}</span>
+              <span className="flex-shrink-0 text-gray-400">{item.total.toLocaleString()}</span>
             </div>
-          )
-        })}
+            <div className="flex h-9 w-full overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800" title={`${item.name}: ${item.total.toLocaleString()} records`}>
+              {[
+                { key: 'resolved', value: item.resolved, color: '#8E288D', label: 'Reconciled' },
+                { key: 'unmatched', value: item.unmatched, color: '#BE123C', label: 'Unmatched' },
+                { key: 'pending', value: item.pending, color: '#6B7280', label: 'Pending' },
+              ].map(segment => segment.value > 0 && (
+                <div key={segment.key} className="flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
+                  style={{ width: `${(segment.value / item.total) * 100}%`, backgroundColor: segment.color }}
+                  title={`${segment.label}: ${segment.value.toLocaleString()}`}>
+                  {segment.value / item.total > 0.12 && <span className={`truncate px-1 text-[10px] font-semibold ${segment.key === 'pending' ? 'text-slate-700' : 'text-white'}`}>{segment.label}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )) : (
+          <p className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">No category data yet</p>
+        )}
       </div>
 
       {/* Legend */}
@@ -150,8 +98,12 @@ const CategoryDistributionChart = ({ categoryData, monthLabel }) => {
           <span className="text-xs font-semibold" style={{ color: '#8E288D' }}>Reconciled</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm flex-shrink-0 bg-[#f3f0f4] border border-gray-300" />
-          <span className="text-xs font-semibold text-gray-400">Unresolved</span>
+          <span className="w-3 h-3 rounded-sm flex-shrink-0 bg-red-500" />
+          <span className="text-xs font-semibold text-red-500">Unmatched</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#6B7280' }} />
+          <span className="text-xs font-semibold" style={{ color: '#6B7280' }}>Pending</span>
         </div>
       </div>
 
@@ -159,8 +111,160 @@ const CategoryDistributionChart = ({ categoryData, monthLabel }) => {
   )
 }
 
+const BREAKDOWN_COLORS = {
+  reconciled: '#8E288D',
+  unreconciled: '#BE123C',
+  pending: '#6B7280',
+  surplus_assets: '#BE123C',
+  exist_in_erp_not_physical: '#BE123C',
+  duplicated: '#000000',
+  unique: '#8E288D',
+}
+
+const LOCATION_COLORS = {
+  same_dept_diff_district: '#CFB53B',
+  different: '#BE123C',
+  same_dept: '#8E288D',
+  na: '#6B7280',
+}
+const LOCATION_LABELS = {
+  same_dept_diff_district: 'Same Dept, Diff District',
+  different: 'Different',
+  same_dept: 'Same Dept',
+  na: 'N/A',
+}
+
+const BREAKDOWN_LABELS = {
+  reconciled: 'Reconciled',
+  unreconciled: 'Unmatched',
+  pending: 'Pending',
+  surplus_assets: 'Surplus',
+  exist_in_erp_not_physical: 'Shortage',
+  duplicated: 'Duplicate',
+  unique: 'Unique',
+}
+
+const ReportingBreakdownChart = ({ title, subtitle, data, side, dimension, icon: Icon }) => {
+  const excludedStatus = side === 'erp' ? 'surplus_assets' : 'exist_in_erp_not_physical'
+  const statuses = Object.keys(BREAKDOWN_COLORS)
+    .filter(status => status !== excludedStatus)
+    .filter(status => data?.some(row => Number(row[status] || 0) > 0))
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="mb-5 flex items-start gap-2">
+        {Icon && <Icon className="mt-0.5 h-5 w-5 text-[#8E288D]" />}
+        <div>
+          <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">{title}</h2>
+          <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{subtitle}</p>
+        </div>
+      </div>
+
+      {data?.length ? (
+        <>
+          <div className="space-y-4">
+            {data.map(row => {
+              const total = statuses.reduce((sum, status) => sum + Number(row[status] || 0), 0)
+              if (!total) return null
+              return (
+                <div key={row.name}>
+                  <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                    <span className="truncate font-semibold text-gray-700 dark:text-gray-200" title={row.name}>{row.name}</span>
+                    <span className="flex-shrink-0 text-gray-400">{total.toLocaleString()}</span>
+                  </div>
+                  <div className="flex h-8 w-full overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800">
+                    {statuses.map(status => {
+                      const value = Number(row[status] || 0)
+                      if (!value) return null
+                      return (
+                        <div
+                          key={status}
+                          className="flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
+                          style={{ width: `${(value / total) * 100}%`, backgroundColor: BREAKDOWN_COLORS[status] }}
+                          title={`${BREAKDOWN_LABELS[status]}: ${value.toLocaleString()}`}
+                        >
+                          {value / total > 0.12 && <span className="truncate px-1 text-[10px] font-semibold text-white">{BREAKDOWN_LABELS[status]}</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 border-t border-gray-100 pt-4 dark:border-gray-800">
+            {statuses.map(status => (
+              <div key={status} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: BREAKDOWN_COLORS[status] }} />
+                {BREAKDOWN_LABELS[status]}
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="py-10 text-center text-sm text-gray-400">No {dimension} data available</p>
+      )}
+    </div>
+  )
+}
+
+const LocationReconciliationChart = ({ data, side }) => {
+  const excludedStatus = side === 'erp' ? 'surplus_assets' : 'exist_in_erp_not_physical'
+  const statuses = Object.keys(BREAKDOWN_COLORS)
+    .filter(status => status !== excludedStatus)
+    .filter(status => data?.some(row => Number(row[status] || 0) > 0))
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="mb-5 flex items-start gap-2">
+        <FiMapPin className="mt-0.5 h-5 w-5 text-[#8E288D]" />
+        <div>
+          <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">Location Reconciliation</h2>
+          <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+            Department/branch and division/district matching
+          </p>
+        </div>
+      </div>
+
+      {data?.length ? (
+        <div className="space-y-4">
+          {data.map(item => {
+            const total = statuses.reduce((sum, status) => sum + Number(item[status] || 0), 0)
+            return (
+              <div key={item.name}>
+                <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+                  <span className="truncate font-semibold text-gray-700 dark:text-gray-200" title={item.name}>{item.name}</span>
+                  <span className="flex-shrink-0 text-gray-400">{total.toLocaleString()}</span>
+                </div>
+                <div className="flex h-8 w-full overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800">
+                  {statuses.map(status => {
+                    const value = Number(item[status] || 0)
+                    if (!value) return null
+                    return <div key={status} className="flex items-center justify-center overflow-hidden"
+                      style={{ width: `${(value / total) * 100}%`, backgroundColor: BREAKDOWN_COLORS[status] }}
+                      title={`${BREAKDOWN_LABELS[status]}: ${value.toLocaleString()}`}>
+                      {value / total > 0.12 && <span className="truncate px-1 text-[10px] font-semibold text-white">{BREAKDOWN_LABELS[status]}</span>}
+                    </div>
+                  })}
+                </div>
+              </div>
+            )
+          })}
+          <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-600 dark:border-gray-800 dark:text-gray-300">
+            {statuses.map(status => <span key={status} className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: BREAKDOWN_COLORS[status] }} />
+              {BREAKDOWN_LABELS[status]}
+            </span>)}
+          </div>
+        </div>
+      ) : (
+        <p className="py-10 text-center text-sm text-gray-400">No Location data available</p>
+      )}
+    </div>
+  )
+}
+
 // ── Asset Aging Ring/Donut Chart (Current Month ERP Data Only) ────────────────
-const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount }) => {
+const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount, side = 'erp' }) => {
   const [hovered, setHovered] = React.useState(null)
   const [tooltip, setTooltip]  = React.useState({ visible: false, x: 0, y: 0, item: null })
 
@@ -221,7 +325,6 @@ const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount }) =>
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 h-full flex flex-col gap-4">
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -288,7 +391,7 @@ const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount }) =>
                 {totalAssets.toLocaleString()}
               </span>
               <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mt-0.5">
-                Total ERP Assets
+                Total {side === 'erp' ? 'ERP' : 'Physical'} Assets
               </span>
             </>
           )}
@@ -349,6 +452,8 @@ const Dashboard = () => {
   const [analyticsData, setAnalyticsData] = useState(null)
   const [agingData, setAgingData] = useState([])
   const [agingYear, setAgingYear] = useState(new Date().getFullYear())
+  const [dashboardSide, setDashboardSide] = useState('erp')
+  const [dashboardChartTab, setDashboardChartTab] = useState('category')
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
@@ -367,29 +472,29 @@ const Dashboard = () => {
   const [aiModalAnalysisType, setAiModalAnalysisType] = useState('summary')
   const [aiModalOutputFormat, setAiModalOutputFormat] = useState('combined')
 
-  const ITEMS_PER_PAGE = 5
+  const ITEMS_PER_PAGE = 3
   const navigate = useNavigate()
   const { user, userRole, hasRole } = useAuth()
 
   useEffect(() => {
     fetchDashboardData()
-  }, [])
+  }, [dashboardSide])
 
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
       const [reconRes, agingRes, analyticsRes] = await Promise.allSettled([
-        axios.get('/api/reconciliation/list'),
-        axios.get('/api/reconciliation/analytics/aging'),
-        axios.get('/api/reconciliation/analytics')
+        cachedGet('/api/reconciliation/list'),
+        cachedGet(`/api/reconciliation/analytics/aging?side=${dashboardSide}&period=current_month`),
+        cachedGet('/api/reconciliation/analytics?period=current_month')
       ])
 
       if (reconRes.status === 'fulfilled') {
         setReconciliations(reconRes.value.data.reconciliations || [])
       }
       if (agingRes.status === 'fulfilled') {
-        setAgingData(agingRes.value.data.buckets || [])
-        setAgingYear(agingRes.value.data.current_year || new Date().getFullYear())
+        setAgingData(agingRes.value.data?.buckets || [])
+        setAgingYear(agingRes.value.data?.current_year || new Date().getFullYear())
       }
       if (analyticsRes.status === 'fulfilled') {
         setAnalyticsData(analyticsRes.value.data || null)
@@ -430,16 +535,7 @@ const Dashboard = () => {
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear
   })
 
-  // If no records in current calendar month, scope to latest upload month in user's dataset or current month
-  const activeMonthReconciliations = currentMonthReconciliations.length > 0
-    ? currentMonthReconciliations
-    : scopedReconciliations.filter(r => {
-        if (!scopedReconciliations.length) return false
-        const latestTimestamp = Math.max(...scopedReconciliations.map(x => new Date(x.created_at).getTime()))
-        const latestDate = new Date(latestTimestamp)
-        const d = new Date(r.created_at)
-        return d.getMonth() === latestDate.getMonth() && d.getFullYear() === latestDate.getFullYear()
-      })
+  const activeMonthReconciliations = currentMonthReconciliations
 
   const activeMonthDate = activeMonthReconciliations.length > 0 && activeMonthReconciliations[0]?.created_at
     ? new Date(activeMonthReconciliations[0].created_at)
@@ -458,25 +554,26 @@ const Dashboard = () => {
   // Pull approval_kpis from analyticsData (server-computed, role-scoped)
   // Falls back to 0 while data loads
   const kpi = analyticsData?.approval_kpis || {}
+  const erpSide = kpi.side_counts?.erp || {}
+  const physicalSide = kpi.side_counts?.physical || {}
 
   // 1. Reconciled = all approved statuses: reconciled + surplus_assets + shortage + duplicated + unique
-  const reconciledCount = (kpi.reconciled || 0)
-    + (kpi.surplus_assets || 0)
-    + (kpi.exist_erp_not_physical || 0)
-    + (kpi.duplicated || 0)
-    + (kpi.unique || 0)
+  const reconciledCount = Number(erpSide.resolved || kpi.resolved_erp || 0)
 
   // Use server ERP/physical totals when available, fall back to job-level aggregates
   const erpTotal      = kpi.total_erp_assets   || totalERPRecords
   const physicalTotal = kpi.physical_count      || totalPhysicalRecords
 
-  // 2. Unresolved = unreconciled + pending
-  const unresolvedCount = (kpi.unreconciled || 0) + (kpi.pending || 0)
+  // 2. Unresolved ERP records are the ERP remainder after resolved records.
+  const unmatchedERPCount = Number(erpSide.unmatched || kpi.unmatched_erp || 0)
+  const unmatchedRate = erpTotal > 0
+    ? ((unmatchedERPCount / erpTotal) * 100).toFixed(1)
+    : '0.0'
 
   // 3. Surplus = physical records not in ERP (from approval_kpis)
-  const surplusCount = kpi.surplus_assets || activeMonthReconciliations.reduce(
+  const surplusCount = Number(physicalSide.surplus || kpi.surplus_assets || activeMonthReconciliations.reduce(
     (s, r) => s + (r.statistics?.customer_unmatched || 0), 0
-  )
+  ))
 
   // 4. Reconciliation Rate = reconciled / total ERP assets
   const matchRate = erpTotal > 0
@@ -485,20 +582,38 @@ const Dashboard = () => {
 
   const reconciledRate = matchRate
 
-  const unresolvedRate = erpTotal > 0
-    ? ((unresolvedCount / erpTotal) * 100).toFixed(1)
-    : '0.0'
+  // 4. Shortage = ERP records not found in physical count
+  const shortageCount = Number(erpSide.shortage || kpi.exist_erp_not_physical || activeMonthReconciliations.reduce(
+    (s, r) => s + (r.statistics?.internal_unmatched || 0), 0
+  ))
 
   // Surplus Rate: surplus / total physical records
   const surplusRate = physicalTotal > 0
     ? ((surplusCount / physicalTotal) * 100).toFixed(1)
     : '0.0'
 
+  const shortageRate = erpTotal > 0
+    ? ((shortageCount / erpTotal) * 100).toFixed(1)
+    : '0.0'
+
+  const selectedBreakdowns = dashboardSide === 'erp'
+    ? {
+        category: analyticsData?.category_breakdown || [],
+        departmentBranch: analyticsData?.department_breakdown || [],
+        divisionDistrict: analyticsData?.district_breakdown || [],
+        location: analyticsData?.location_reconciliation_chart || [],
+      }
+    : {
+        category: analyticsData?.category_breakdown_physical || [],
+        departmentBranch: analyticsData?.department_breakdown_physical || [],
+        divisionDistrict: analyticsData?.district_breakdown_physical || [],
+        location: analyticsData?.location_reconciliation_chart || [],
+      }
+
+  const selectedSideLabel = dashboardSide === 'erp' ? 'ERP' : 'Physical'
+
   const openAIContextMenu = (event, config) => {
-    event.preventDefault()
-    setAiModalConfig(config)
-    setMenuPosition({ x: event.clientX, y: event.clientY })
-    setShowAIContextMenu(true)
+    return undefined
   }
 
   const handleAIContextSelect = ({ action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
@@ -530,6 +645,7 @@ const Dashboard = () => {
     setDeleting(true)
     try {
       await axios.delete(`/api/reconciliation/${id}`)
+      clearCachedGets()
       logActivity('/', `DELETE_RECONCILIATION_ID_${id}`)
       toast.success('Reconciliation deleted successfully')
       setDeleteConfirmId(null)
@@ -603,18 +719,18 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       {/* ── Scope indicator bar ──────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-xl px-4 py-2.5 border border-gray-100 dark:border-gray-800 shadow-sm">
+      <div className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-xl px-2 py-1.5 border border-gray-100 dark:border-gray-800 shadow-sm">
         <div className="flex items-center gap-2 text-xs">
           <span className="font-semibold text-gray-600 dark:text-gray-300">Data Scope:</span>
           {(userRole === 'admin' || userRole === 'manager') ? (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold bg-purple-50 text-[#701460] dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 font-bold text-[#701460] dark:bg-purple-950/50 dark:text-purple-300">
               <FiUser className="h-3 w-3" />
-              All Officers
+              All Officers(Users) Uploads
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-400">
               <FiUser className="h-3 w-3" />
               My Uploads Only
             </span>
@@ -629,127 +745,249 @@ const Dashboard = () => {
       </div>
 
       {/* ── Top 4 KPI Metric Cards ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid w-full grid-cols-1 gap-4 p-2 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+
         {/* Card 1: Reconciled */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-              <FiCheck className="h-3 w-3 mr-0.5" />
+        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+
+          {/* KPI Label + Icon */}
+          <div
+            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            style={{
+              color: '#8E288D',
+              backgroundColor: '#8E288D10',
+            }}
+          >
+            {/* Centered Title */}
+            <span className="text-center">
               Reconciled ({activeMonthLabel})
             </span>
+
+            {/* Right Corner Icon */}
+            <span className="absolute right-2 text-base">
+              <FiCheckCircle />
+            </span>
           </div>
-          <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-3 tracking-tight">
+
+          {/* KPI Value */}
+          <p className="mt-4 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white text-center">
             {reconciledCount.toLocaleString()}
           </p>
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-gray-800 text-xs">
-            <span className="text-gray-400 truncate">
+
+          {/* KPI Note + Percentage */}
+          <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
+            <span className="truncate text-gray-600">
               {reconciledCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 text-[11px] ml-1 flex-shrink-0">
+
+            <span className="ml-1 inline-flex flex-shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold text-[#8E288D]">
               {reconciledRate}%
             </span>
           </div>
         </div>
 
-        {/* Card 2: Unresolved (Unreconciled) */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
-              <FiAlertTriangle className="h-3 w-3 mr-0.5" />
-              Unresolved ({activeMonthLabel})
+
+        {/* Card 2: Unmatched ERP records */}
+        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+          {/* KPI Label + Icon */}
+          <div
+            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            style={{
+              color: '#BE123C',
+              backgroundColor: '#BE123C10',
+            }}
+          >
+            {/* Centered Title */}
+            <span className="text-center">
+              Unmatched ({activeMonthLabel})
+            </span>
+
+            {/* Right Corner Icon */}
+            <span className="absolute right-2 text-base">
+              <FiHelpCircle />
             </span>
           </div>
-          <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-3 tracking-tight">
-            {unresolvedCount.toLocaleString()}
+
+          {/* KPI Value */}
+          <p className="mt-4 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white text-center">
+            {unmatchedERPCount.toLocaleString()}
           </p>
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-gray-800 text-xs">
-            <span className="text-gray-400 truncate">
-              {unresolvedCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
+
+          {/* KPI Note + Percentage */}
+          <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
+            <span className="truncate text-gray-600">
+              {unmatchedERPCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-bold text-rose-700 bg-rose-50 dark:bg-rose-950/50 text-[11px] ml-1 flex-shrink-0">
-              {unresolvedRate}%
+
+            <span className="ml-1 inline-flex flex-shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold text-rose-700">
+              {unmatchedRate}%
             </span>
           </div>
+
         </div>
 
-        {/* Card 3: Surplus Assets (Physical not in ERP) */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800" title="Assets found in Physical/Customer records but not in ERP">
-              <FiPlus className="h-3 w-3 mr-0.5" />
+
+        {/* Card 3: Surplus Assets */}
+        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+          {/* KPI Label + Icon */}
+          <div
+            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            style={{
+              color: '#B45309',
+              backgroundColor: '#B4530910',
+            }}
+            title="Assets found in Physical/Customer records but not in ERP"
+          >
+            {/* Centered Title */}
+            <span className="text-center">
               Surplus Assets ({activeMonthLabel})
             </span>
+
+            {/* Right Corner Icon */}
+            <span className="absolute right-2 text-base">
+              <FiPackage />
+            </span>
           </div>
-          <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-3 tracking-tight">
+
+          {/* KPI Value */}
+          <p className="mt-4 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white text-center">
             {surplusCount.toLocaleString()}
           </p>
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-gray-800 text-xs">
-            <span className="text-gray-400 truncate" title="Physical records not found in ERP">
+
+          {/* KPI Note + Percentage */}
+          <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
+            <span
+              className="truncate text-gray-600"
+              title="Physical/Customer records not found in ERP"
+            >
               {surplusCount.toLocaleString()} / {physicalTotal.toLocaleString()} Physical Records
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-bold text-amber-700 bg-amber-50 dark:bg-amber-950/50 text-[11px] ml-1 flex-shrink-0">
+
+            <span className="ml-1 inline-flex flex-shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold text-amber-700">
               {surplusRate}%
             </span>
           </div>
+
         </div>
 
-        {/* Card 4: Match Rate (Total Matches / Total ERP Records) */}
-        <div className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-purple-50 text-[#701460] dark:bg-purple-950/50 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-              <FiTarget className="h-3 w-3 mr-0.5" />
-              Match Rate ({activeMonthLabel})
+        {/* Card 4: Shortage Assets */}
+        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+
+          {/* KPI Label + Icon */}
+          <div
+            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            style={{
+              color: '#F33838',
+              backgroundColor: '#F3383810',
+            }}
+            title="ERP records not found in the physical count">
+            Shortage Assets ({activeMonthLabel})
+            <span className="absolute right-2 text-base">
+              <FiMinusCircle />
             </span>
           </div>
-          <p className="text-3xl font-extrabold text-gray-900 dark:text-white mt-3 tracking-tight">
-            {matchRate}%
+
+          {/* KPI Value */}
+          <p className="mt-4 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white text-center">
+            {shortageCount.toLocaleString()}
           </p>
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50 dark:border-gray-800 text-xs">
-            <span className="text-gray-400 truncate">
-              {reconciledCount.toLocaleString()} Matches of {erpTotal.toLocaleString()} ERP Records
+
+          {/* KPI Note + Percentage */}
+          <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
+            <span
+              className="truncate text-gray-600"
+              title="ERP records not found in physical count"
+            >
+              {shortageCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 text-[11px] ml-1 flex-shrink-0">
-              ERP Match Rate
+
+            <span className="ml-1 inline-flex flex-shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold text-red-700">
+              {shortageRate}%
             </span>
           </div>
         </div>
+
       </div>
 
-      {/* ── Middle Visualizations: Category Split & Asset Aging ───────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div
-          className="lg:col-span-2 cursor-context-menu"
-          title="Right-click for AI category insights"
-          onContextMenu={e => openAIContextMenu(e, {
-            chartData: { source: 'category_distribution', categories: analyticsData?.category_breakdown },
-            chartType: 'bar',
-            title: 'AI Analysis - Category Distribution',
-            targetLabel: 'Category Distribution Chart',
-            analysisContext: { page: 'Dashboard', section: 'Category Distribution' }
-          })}
-        >
-          <CategoryDistributionChart
-            categoryData={analyticsData?.category_breakdown}
-            monthLabel={activeMonthLabel}
-          />
+      {/* ── Side tabs and chart cards ────────────────────────────────────── */}
+      <div className="mb-4 flex gap-2">
+        {['erp', 'physical'].map(side => (
+          <button key={side} onClick={() => setDashboardSide(side)}
+            className={`border-b-2 px-5 py-3 text-sm font-semibold ${
+              dashboardSide === side
+                ? 'border-[#8E288D] text-[#8E288D]'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}>
+            {side === 'erp' ? 'ERP' : 'Physical'}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:col-span-2">
+          <div className="border-b border-gray-100 p-4 dark:border-gray-800">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: 'category', label: 'Category' },
+                { key: 'departmentBranch', label: 'Department / Branch' },
+                { key: 'divisionDistrict', label: 'Division / District' },
+                { key: 'location', label: 'Location' },
+              ].map(tab => (
+                <button key={tab.key} onClick={() => setDashboardChartTab(tab.key)}
+                  className={`flex h-10 w-44 items-center justify-center px-4 text-sm font-medium transition-colors ${dashboardChartTab === tab.key
+                      ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D]'
+                      : 'text-gray-600'
+                    }`}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4">
+            {dashboardChartTab === 'category' && (
+              <CategoryDistributionChart categoryData={selectedBreakdowns.category} monthLabel={`${selectedSideLabel} · ${activeMonthLabel}`} />
+            )}
+            {dashboardChartTab === 'departmentBranch' && (
+              <ReportingBreakdownChart
+                title={`${selectedSideLabel} Department / Branch Performance`}
+                subtitle="Reconciled, unmatched, pending, and side-specific variance"
+                data={selectedBreakdowns.departmentBranch}
+                side={dashboardSide}
+                dimension="Department / Branch"
+                icon={FiMapPin}
+              />
+            )}
+            {dashboardChartTab === 'divisionDistrict' && (
+              <ReportingBreakdownChart
+                title={`${selectedSideLabel} Division / District Performance`}
+                subtitle="Reconciled, unmatched, pending, and side-specific variance"
+                data={selectedBreakdowns.divisionDistrict}
+                side={dashboardSide}
+                dimension="Division / District"
+                icon={FiLayers}
+              />
+            )}
+            {dashboardChartTab === 'location' && (
+              <LocationReconciliationChart data={selectedBreakdowns.location} side={dashboardSide} />
+            )}
+          </div>
         </div>
 
-        <div
-          className="cursor-context-menu"
-          title="Right-click for AI aging insights"
+        <div className="cursor-context-menu" title="Right-click for AI aging insights"
           onContextMenu={e => openAIContextMenu(e, {
-            chartData: { source: 'asset_aging', agingData, year: agingYear },
+            chartData: { source: 'asset_aging', agingData, year: agingYear, side: dashboardSide },
             chartType: 'pie',
-            title: 'AI Analysis - Asset Aging',
-            targetLabel: 'Asset Aging Ring Chart',
-            analysisContext: { page: 'Dashboard', section: 'Aging Analysis' }
-          })}
-        >
+            title: `AI Analysis - ${selectedSideLabel} Asset Aging`,
+            targetLabel: `${selectedSideLabel} Asset Aging Ring Chart`,
+            analysisContext: { page: 'Dashboard', section: 'Aging Analysis', side: dashboardSide }
+          })}>
           <DonutAgingChart
             agingData={agingData}
             agingYear={agingYear}
-            monthLabel={activeMonthLabel}
-            totalERPCount={erpTotal}
+            monthLabel={`${selectedSideLabel} · ${activeMonthLabel}`}
+            totalERPCount={dashboardSide === 'erp' ? erpTotal : physicalTotal}
+            side={dashboardSide}
           />
         </div>
       </div>
@@ -761,18 +999,15 @@ const Dashboard = () => {
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-base font-bold text-gray-900 dark:text-white">
-                Recent Reconciliation Reports
+                Reconciliation Reports
               </h2>
-              <Link
+              {/* <Link
                 to="/analytics"
                 className="text-xs font-semibold text-[#701460] dark:text-purple-400 hover:underline"
               >
                 See All Reports
-              </Link>
+              </Link> */}
             </div>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              Recent automated and manual branch reconciliation executions
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -826,7 +1061,7 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="overflow-x-auto mt-2">
-            <table className="w-full text-left border-collapse">
+            <table className="reconciliation-table w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 text-[12px] font-bold uppercase tracking-wider text-[#8E288D] dark:text-gray-200 text-center">
                   <th className="py-3 px-3">Requested By</th>
@@ -860,7 +1095,7 @@ const Dashboard = () => {
                           </div>
                           <div>
                             <p className="text-[12px] text-gray-700 dark:text-gray-500">
-                              <span className='font-bold'>Requester:</span> <span className='text-[#8E288D]'> {user?.full_name || user?.username || 'User'} : {user?.email || user?.username || 'User'}</span>
+                              <span className='font-bold'>Requester:</span> <span className='text-[#8E288D]'> {recon.requester_username || `User #${recon.user_id || 'Unknown'}`} : {recon.requester_email || 'Email unavailable'}</span>
                             </p>
                             <p className="text-gray-800 dark:text-gray-100 capitalize">
                               <span className='font-bold'>File:</span>

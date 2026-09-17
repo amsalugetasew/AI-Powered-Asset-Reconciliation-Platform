@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import {
   FiPlus, FiTrash2, FiX, FiShield, FiLock, FiEdit2,
   FiSearch, FiChevronLeft, FiChevronRight, FiUsers, FiUserCheck, FiUserX,
+  FiMoreVertical,
 } from 'react-icons/fi'
 import { Hash, Mail, Building2, Eye, EyeOff, Lock } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -84,6 +85,7 @@ const UserManagement = () => {
 
   const [selectedUser,  setSelectedUser]  = useState(null)
   const [pendingAction, setPendingAction] = useState(null)
+  const [openActionMenu, setOpenActionMenu] = useState(null)
 
   const [showPassword,        setShowPassword]        = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -99,6 +101,22 @@ const UserManagement = () => {
   })
 
   useEffect(() => { fetchUsers() }, [])
+
+  useEffect(() => {
+    if (!openActionMenu) return undefined
+    const closeMenu = event => {
+      if (!event.target.closest('[data-user-action-menu]')) setOpenActionMenu(null)
+    }
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') setOpenActionMenu(null)
+    }
+    document.addEventListener('mousedown', closeMenu)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeMenu)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [openActionMenu])
 
   const fetchUsers = async () => {
     try {
@@ -274,66 +292,115 @@ const UserManagement = () => {
       </div>
 
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid w-full grid-cols-1 gap-4 p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
+
         {/* Total */}
-        <div className="rounded-2xl border border-purple-100 bg-gradient-to-br from-purple-100 to-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-[#8E288D] flex items-center justify-center">
-              <FiUsers className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-xs font-bold uppercase tracking-wider text-[#8E288D]">Total Users</span>
+        <div className="w-full min-h-[160px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+
+          {/* KPI Label + Icon */}
+          <div
+            className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            style={{
+              color: '#8E288D',
+              backgroundColor: '#8E288D10',
+            }}
+          >
+            <span className="text-sm">
+              <FiUsers />
+            </span>
+
+            Total Users
           </div>
-          <div className="flex w-full items-baseline justify-between">
+
+          {/* KPI Value */}
+          <div className="mt-4 flex w-full items-baseline justify-between">
             <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-extrabold text-gray-900">{totalUsers}</p>
-              <p className="text-xl font-semibold text-gray-500">Users</p>
+              <p className="text-4xl font-extrabold text-gray-900">
+                {totalUsers}
+              </p>
+              <p className="text-xl font-semibold text-gray-500">
+                Users
+              </p>
             </div>
-              <span className="mt-1 inline-block text-[14px] font-extrabold px-2 py-0.5 rounded-full bg-purple-100 text-[#8E288D]">
-                Validated
-              </span>
+
+            <span className="mt-1 inline-block rounded-full bg-purple-100 px-2 py-0.5 text-[14px] font-extrabold text-[#8E288D]">
+              Validated
+            </span>
           </div>
         </div>
+
+
         {/* Active */}
-        <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
-              <FiUserCheck className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">Active Users</span>
+        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+
+          {/* KPI Label + Icon */}
+          <div
+            className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            style={{
+              color: '#059669',
+              backgroundColor: '#10B98110',
+            }}
+          >
+            <span className="text-sm">
+              <FiUserCheck />
+            </span>
+
+            Active Users
           </div>
-          <div className="flex w-full items-baseline justify-between">
+
+          {/* KPI Value */}
+          <div className="mt-4 flex w-full items-baseline justify-between">
             <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-extrabold text-gray-900">{activeUsers}</p>
-              <p className="text-xl font-semibold text-gray-500">Users</p>
+              <p className="text-4xl font-extrabold text-gray-900">
+                {activeUsers}
+              </p>
+              <p className="text-xl font-semibold text-gray-500">
+                Users
+              </p>
             </div>
-              <span className="mt-1 inline-block text-[14px] font-extrabold px-2 py-0.5 rounded-full bg-green-100 text-emerald-700">
-                Validated
-              </span>
+
+            <span className="mt-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-[14px] font-extrabold text-emerald-700">
+              Validated
+            </span>
           </div>
         </div>
+
+
         {/* Suspended */}
-        <div className="rounded-2xl border border-red-100 bg-gradient-to-br from-red-50 to-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-red-400 flex items-center justify-center">
-              <FiUserX className="h-4 w-4 text-white" />
-            </div>
-            <span className="text-xs font-bold uppercase tracking-wider text-red-500">Suspended Users</span>
+        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+
+          {/* KPI Label + Icon */}
+          <div
+            className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            style={{
+              color: '#EF4444',
+              backgroundColor: '#DC262610',
+            }}
+          >
+            <span className="text-sm">
+              <FiUserX />
+            </span>
+
+            Suspended Users
           </div>
-          <div className="flex w-full items-baseline justify-between">
+
+          {/* KPI Value */}
+          <div className="mt-4 flex w-full items-baseline justify-between">
             <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-extrabold text-gray-900">{suspendedUsers}</p>
-              <p className="text-xl font-semibold text-gray-500">Users</p>
+              <p className="text-4xl font-extrabold text-gray-900">
+                {suspendedUsers}
+              </p>
+              <p className="text-xl font-semibold text-gray-500">
+                Users
+              </p>
             </div>
-              <span className="mt-1 inline-block text-[14px] font-extrabold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                Suspended
-              </span>
+
+            <span className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-[14px] font-extrabold text-red-700">
+              Suspended
+            </span>
           </div>
-          
-          {/* <p className="text-4xl font-extrabold text-gray-900">{suspendedUsers}</p>
-          <p className="text-xs text-gray-500 mt-1">invites</p>
-          <p className="text-xs text-gray-400 mt-3">Action needed</p>
-          <span className="mt-1 inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Validated</span> */}
         </div>
+
       </div>
 
       {/* ── Filter bar ───────────────────────────────────────────────────── */}
@@ -412,7 +479,7 @@ const UserManagement = () => {
                     No users match the current filters.
                   </td>
                 </tr>
-              ) : paginated.map(user => (
+              ) : paginated.map((user, userIndex) => (
                 <tr key={user.id} className="hover:bg-gray-50/70 transition-colors group">
                   {/* User cell */}
                   <td className="px-5 py-3.5">
@@ -455,50 +522,44 @@ const UserManagement = () => {
                   </td>
 
                   {/* Actions */}
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center justify-end gap-1">
-                      {/* Edit */}
-                      <IconBtn
-                        onClick={() => openEditModal(user)}
-                        title="Edit user"
-                        className="text-[#8E288D] hover:bg-purple-50 border border-purple-200"
+                  <td className="px-5 py-3.5 text-right">
+                    <div className="relative inline-block" data-user-action-menu>
+                      <button
+                        type="button"
+                        onClick={event => {
+                          if (openActionMenu === user.id) {
+                            setOpenActionMenu(null)
+                            return
+                          }
+                          const rowBottom = event.currentTarget.getBoundingClientRect().bottom
+                          const isLastTwoRows = userIndex >= paginated.length - 2
+                          const opensUpward = isLastTwoRows || rowBottom + 180 > window.innerHeight
+                          setOpenActionMenu({ id: user.id, opensUpward })
+                        }}
+                        aria-label={`Actions for ${user.full_name || user.username}`}
+                        aria-expanded={openActionMenu?.id === user.id}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8E288D] transition-colors hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
                       >
-                        <FiEdit2 className="h-3.5 w-3.5" />
-                      </IconBtn>
+                        <FiMoreVertical className="h-5 w-5" />
+                      </button>
 
-                      {/* Activate / Deactivate */}
-                      <IconBtn
-                        onClick={() => handleUserAction(user, user.is_active ? 'deactivate' : 'activate')}
-                        title={user.is_active ? 'Deactivate user' : 'Activate user'}
-                        disabled={user.id === currentUser?.id}
-                        className={user.is_active
-                          ? 'text-amber-600 hover:bg-amber-50 border border-amber-200'
-                          : 'text-emerald-600 hover:bg-emerald-50 border border-emerald-200'}
-                      >
-                        {user.is_active
-                          ? <FiUserX className="h-3.5 w-3.5" />
-                          : <FiUserCheck className="h-3.5 w-3.5" />}
-                      </IconBtn>
-
-                      {/* Reset Password */}
-                      <IconBtn
-                        onClick={() => handleUserAction(user, 'reset-password')}
-                        title="Reset password"
-                        disabled={user.id === currentUser?.id}
-                        className="text-blue-600 hover:bg-blue-50 border border-blue-200"
-                      >
-                        <FiLock className="h-3.5 w-3.5" />
-                      </IconBtn>
-
-                      {/* Delete */}
-                      <IconBtn
-                        onClick={() => handleUserAction(user, 'delete')}
-                        title="Delete user"
-                        disabled={user.id === currentUser?.id}
-                        className="text-red-500 hover:bg-red-50 border border-red-200"
-                      >
-                        <FiTrash2 className="h-3.5 w-3.5" />
-                      </IconBtn>
+                      {openActionMenu?.id === user.id && (
+                        <div className={`absolute right-0 z-30 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 text-left shadow-xl ${openActionMenu.opensUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+                          <button type="button" onClick={() => { setOpenActionMenu(null); openEditModal(user) }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-purple-50">
+                            <FiEdit2 className="h-4 w-4 text-[#8E288D]" /> Edit User
+                          </button>
+                          <button type="button" disabled={user.id === currentUser?.id} onClick={() => { setOpenActionMenu(null); handleUserAction(user, user.is_active ? 'deactivate' : 'activate') }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40">
+                            {user.is_active ? <FiUserX className="h-4 w-4 text-amber-600" /> : <FiUserCheck className="h-4 w-4 text-emerald-600" />}
+                            {user.is_active ? 'Suspend User' : 'Activate User'}
+                          </button>
+                          <button type="button" disabled={user.id === currentUser?.id} onClick={() => { setOpenActionMenu(null); handleUserAction(user, 'reset-password') }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40">
+                            <FiLock className="h-4 w-4 text-blue-600" /> Reset Password
+                          </button>
+                          <button type="button" disabled={user.id === currentUser?.id} onClick={() => { setOpenActionMenu(null); handleUserAction(user, 'delete') }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
+                            <FiTrash2 className="h-4 w-4" /> Delete User
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>

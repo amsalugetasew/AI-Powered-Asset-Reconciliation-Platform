@@ -23,4 +23,4 @@ RUN mkdir -p uploads reports
 EXPOSE 5000
 
 # Run with gunicorn
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--timeout", "300", "app:app"]
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--timeout", "1800", "app:app"]

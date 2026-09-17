@@ -131,7 +131,43 @@ class FuzzyMatcher:
         total_internals = len(internal_df)
         
         print(f"  Starting fuzzy matching: {total_customers} customer vs {total_internals} internal records")
-        print(f"  Threshold: {threshold}, Batch size: {batch_size}")
+        print(f"  Threshold: {threshold}, Batch size: {batch_size}, Max candidates: {max_comparisons_per_record}")
+
+        # Build reusable blocking indexes once. The previous implementation
+        # filtered the full ERP DataFrame for every customer row, which made
+        # large inputs effectively quadratic before scoring even started.
+        block_indexes = {}
+        for block_name, columns in {
+            'category_department': ('category', 'department'),
+            'category': ('category',),
+            'department': ('department',),
+            'district': ('district',),
+        }.items():
+            index = {}
+            for internal_index, internal_row in internal_df.iterrows():
+                values = tuple(str(internal_row.get(column, '') or '').strip() for column in columns)
+                if not all(values):
+                    continue
+                index.setdefault(values, []).append(internal_row['source_index'])
+            block_indexes[block_name] = index
+
+        def candidate_source_indices(customer_row):
+            if total_internals <= max_comparisons_per_record:
+                return internal_df['source_index'].tolist()
+
+            description = str(customer_row.get('description', '') or '').strip()
+            description_word = description.split()[0] if description else ''
+            keys = [
+                ('category_department', (str(customer_row.get('category', '') or '').strip(), str(customer_row.get('department', '') or '').strip())),
+                ('category', (str(customer_row.get('category', '') or '').strip(),)),
+                ('department', (str(customer_row.get('department', '') or '').strip(),)),
+                ('district', (str(customer_row.get('district', '') or '').strip(),)),
+            ]
+            for block_name, key in keys:
+                candidates = block_indexes[block_name].get(key, [])
+                if candidates:
+                    return candidates[:max_comparisons_per_record]
+            return internal_df['source_index'].iloc[:max_comparisons_per_record].tolist()
         
         # For large datasets, use batch processing
         if total_customers > batch_size:
@@ -146,7 +182,7 @@ class FuzzyMatcher:
                 batch_matches = FuzzyMatcher._process_batch(
                     customer_batch, internal_df, threshold,
                     matched_customer_indices, matched_internal_indices,
-                    max_comparisons_per_record
+                    max_comparisons_per_record, candidate_source_indices
                 )
                 
                 potential_matches.extend(batch_matches)
@@ -161,16 +197,8 @@ class FuzzyMatcher:
                 best_score = 0.0
                 best_internal_idx = None
                 
-                # Limit comparisons for very large internal datasets
-                internal_sample = internal_df
-                if len(internal_df) > max_comparisons_per_record:
-                    # Sample based on category first to reduce search space
-                    if pd.notna(c_row.get('category')) and c_row['category']:
-                        internal_sample = internal_df[internal_df['category'] == c_row['category']]
-                        if len(internal_sample) == 0:
-                            internal_sample = internal_df.sample(min(max_comparisons_per_record, len(internal_df)))
-                    else:
-                        internal_sample = internal_df.sample(min(max_comparisons_per_record, len(internal_df)))
+                candidate_indices = candidate_source_indices(c_row)
+                internal_sample = internal_df.loc[internal_df.index.intersection(candidate_indices)]
                 
                 for i_idx, i_row in internal_sample.iterrows():
                     if i_row['source_index'] in matched_internal_indices:
@@ -234,7 +262,8 @@ class FuzzyMatcher:
     @staticmethod
     def _process_batch(customer_batch: pd.DataFrame, internal_df: pd.DataFrame, 
                       threshold: float, matched_customer_indices: set, 
-                      matched_internal_indices: set, max_comparisons: int) -> List[Dict]:
+                      matched_internal_indices: set, max_comparisons: int,
+                      candidate_source_indices=None) -> List[Dict]:
         """Process a batch of customer records against internal records"""
         batch_matches = []
         
@@ -248,14 +277,17 @@ class FuzzyMatcher:
             
             # Limit comparisons for very large internal datasets
             internal_sample = internal_df
-            if len(internal_df) > max_comparisons:
+            if candidate_source_indices:
+                candidate_indices = candidate_source_indices(c_row)
+                internal_sample = internal_df.loc[internal_df.index.intersection(candidate_indices)]
+            elif len(internal_df) > max_comparisons:
                 # Sample based on category first to reduce search space
                 if pd.notna(c_row.get('category')) and c_row['category']:
                     internal_sample = internal_df[internal_df['category'] == c_row['category']]
                     if len(internal_sample) == 0:
-                        internal_sample = internal_df.sample(min(max_comparisons, len(internal_df)))
+                        internal_sample = internal_df.iloc[:max_comparisons]
                 else:
-                    internal_sample = internal_df.sample(min(max_comparisons, len(internal_df)))
+                    internal_sample = internal_df.iloc[:max_comparisons]
             
             for i_idx, i_row in internal_sample.iterrows():
                 if i_row['source_index'] in matched_internal_indices:

@@ -2,6 +2,7 @@
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { logActivity } from '../services/activityService'
+import { cachedGet } from '../services/cachedGet'
 import AIAnalysisModal from '../components/AIAnalysisModal'
 import AIContextMenu from '../components/AIContextMenu'
 import {
@@ -15,70 +16,104 @@ import {
 
 // ── colour palette ────────────────────────────────────────────────────────────
 const COLORS = {
-  reconciled:             '#CFB53B',
-  unreconciled:           '#ef4444',
-  surplus_assets:         '#8E288D',
-  exist_erp_not_physical: '#ee649dff',
-  duplicated:             '#1a1a1a',
-  unique:                 '#008080',
-  pending:                '#4E79A7',
-  matched:                '#CFB53B',
+  reconciled:             '#8E288D',
+  unreconciled:           '#BE123C',
+  surplus_assets:         '#BE123C',
+  exist_erp_not_physical: '#BE123C',
+  duplicated:             '#000000',
+  unique:                 '#8E288D',
+  pending:                '#6B7280',
+  matched:                '#8E288D',
   ai_matched:             '#8E288D',
   manual:                 '#CFB53B',
 }
 
 const fmt = (n) => n == null ? '—' : Number(n).toLocaleString()
 const pct = (n) => n == null ? '—' : `${Number(n).toFixed(2)}%`
+const duration = (seconds) => {
+  const totalSeconds = Math.max(0, Math.round(Number(seconds || 0)))
+  if (totalSeconds < 60) return `${totalSeconds}s`
+  const totalMinutes = Math.round(totalSeconds / 60)
+  if (totalMinutes < 60) return `${totalMinutes} min`
+  return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
+}
 
-// ── KPI Card ──────────────────────────────────────────────────────────────────
 const KpiCard = ({
   label,
   value,
-  sub,
-  textColor = "text-white",
-  shadow = "shadow-lg",
-  borderColor = "",
   icon: Icon,
-  gradient,
-}) => (
-  <div
-    className={`rounded-xl p-5 ${gradient} ${textColor} ${shadow} ${borderColor}
-    transform hover:scale-105 transition-all duration-300`}
-  >
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-xs font-medium opacity-80 uppercase tracking-wide">
+  color = '#8E288D',
+  textColor = 'text-gray-900',
+}) => {
+  return (
+    <div className="w-full min-h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+      {/* KPI Label + Icon */}
+      <div
+        className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+        style={{
+          color: color,
+          backgroundColor: `${color}10`,
+        }}
+      >
+        {/* Centered Title */}
+        <span className="text-center">
           {label}
-        </p>
-        <p className="text-2xl font-bold mt-1">{value}</p>
-        {sub && <p className="text-xs mt-1 opacity-70">{sub}</p>}
+        </span>
+
+        {/* Right Corner Icon */}
+        <span className="absolute right-2 text-base">
+          <Icon />
+        </span>
       </div>
 
-      {Icon && (
-        <div className="bg-white/20 p-2 rounded-lg">
-          <Icon className="h-6 w-6" />
-        </div>
-      )}
+      {/* KPI Value */}
+      <p
+        className={`mt-4 text-2xl font-extrabold tracking-tight text-center ${textColor}`}
+      >
+        {value}
+      </p>
+
     </div>
-  </div>
-);
+  );
+};
+// const PairedKpiCard = ({ title, icon: Icon, left, right, showRate = true }) => (
+//   <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+//     <div className="mb-3 flex items-center justify-between">
+//       <p className="text-xs font-bold uppercase tracking-wide text-gray-600">{title}</p>
+//       {Icon && <Icon className="h-5 w-5 text-gray-400" />}
+//     </div>
+//     <div className="grid grid-cols-2 divide-x divide-gray-100">
+//       {[left, right].map((item, index) => (
+//         <div key={item.label} className={index === 0 ? 'pr-3' : 'pl-3'}>
+//           <p className="truncate text-xs text-gray-500" title={item.label}>{item.label}</p>
+//           <p className={`mt-1 text-2xl font-extrabold ${item.color}`}>{fmt(item.value)}</p>
+//           {showRate && <>
+//             <p className="mt-1 text-xs font-semibold text-gray-400">{pct(item.rate)}</p>
+//             <p className="text-[10px] text-gray-400">of {fmt(item.total)}</p>
+//           </>}
+//           {item.detail && <p className="mt-1 truncate text-[10px] text-gray-400" title={item.detail}>{item.detail}</p>}
+//         </div>
+//       ))}
+//     </div>
+//   </div>
+// )
 
 // ── Status colours used across breakdown tabs ─────────────────────────────────
 const STATUS_COLORS = {
-  reconciled:                '#CFB53B',
-  unreconciled:              '#f132a8ff',
-  pending:                   '#4E79A7',
-  surplus_assets:            '#8E288D',
-  exist_in_erp_not_physical: '#f14a90ff',
-  duplicated:                '#1a1a1a',
-  unique:                    '#008080',
+  reconciled:                '#8E288D',
+  unreconciled:              '#BE123C',
+  pending:                   '#6B7280',
+  surplus_assets:            '#BE123C',
+  exist_in_erp_not_physical: '#BE123C',
+  duplicated:                '#000000',
+  unique:                    '#8E288D',
 }
-const STATUS_LABELS = {
+const STATUS_LABELS_BASE = {
   reconciled:                'Reconciled',
   unreconciled:              'Unreconciled',
   pending:                   'Pending',
-  surplus_assets:            'Surplus Assets',
-  exist_in_erp_not_physical: 'ERP not Physical',
+  surplus_assets:            'Surplus',
+  exist_in_erp_not_physical: 'Shortage',
   duplicated:                'Duplicated',
   unique:                    'Unique',
 }
@@ -213,7 +248,8 @@ const Analytics = () => {
   const [data, setData]           = useState(null)
   const [agingData, setAgingData] = useState(null)
   const [loading, setLoading]     = useState(true)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [reportSide, setReportSide] = useState('erp')
+  const [activeTab, setActiveTab] = useState('category')
   const [showAIModal, setShowAIModal] = useState(false)
   const [aiModalConfig, setAiModalConfig] = useState({
     chartData: null,
@@ -229,15 +265,11 @@ const Analytics = () => {
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
 
   const openAIModal = ({ chartData, chartType, title, targetLabel, analysisContext }) => {
-    setAiModalConfig({ chartData, chartType, title, targetLabel, analysisContext })
-    setShowAIModal(true)
+    return undefined
   }
 
   const openAIContextMenu = (event, config) => {
-    event.preventDefault()
-    setAiModalConfig(config)
-    setMenuPosition({ x: event.clientX, y: event.clientY })
-    setShowAIContextMenu(true)
+    return undefined
   }
 
   const handleAIContextSelect = ({ action = 'modal', analysisType = 'summary', outputFormat = 'combined' }) => {
@@ -251,8 +283,8 @@ const Analytics = () => {
   useEffect(() => {
     logActivity('/analytics', 'PAGE_VISIT_ANALYTICS')
     Promise.all([
-      axios.get('/api/reconciliation/analytics'),
-      axios.get('/api/reconciliation/analytics/aging'),
+      cachedGet('/api/reconciliation/analytics?period=latest'),
+      cachedGet(`/api/reconciliation/analytics/aging?side=${reportSide}&period=latest`),
     ])
       .then(([r1, r2]) => {
         setData(r1.data)
@@ -260,7 +292,7 @@ const Analytics = () => {
       })
       .catch(() => toast.error('Failed to fetch analytics'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [reportSide])
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">
@@ -278,23 +310,86 @@ const Analytics = () => {
 
   const kpi = data.approval_kpis || {}
 
+  const totalERP = Number(kpi.total_erp_assets || 0)
+  const totalPhysical = Number(kpi.physical_count || 0)
+  const erp = kpi.side_counts?.erp || {}
+  const physical = kpi.side_counts?.physical || {}
+  const resolvedCount = Number(erp.resolved || 0)
+  const pendingCount = Number(erp.pending || 0)
+  const unmatchedCount = Number(erp.unmatched || 0)
+  const selectedSide = reportSide === 'erp' ? erp : physical
+  const STATUS_LABELS = {
+    ...STATUS_LABELS_BASE,
+    surplus_assets: 'Surplus',
+    exist_in_erp_not_physical: 'Shortage',
+  }
+  const lastReconciliation = data.last_reconciliation
+  const timestampProcessingSeconds = lastReconciliation?.completed_at && lastReconciliation?.created_at
+    ? Math.max((new Date(lastReconciliation.completed_at) - new Date(lastReconciliation.created_at)) / 1000, 0)
+    : 0
+  const processingSeconds = Number(data.last_reconciliation_processing_seconds || data.processing_time_seconds || 0) || timestampProcessingSeconds
+  const selectedTotal = reportSide === 'erp' ? totalERP : totalPhysical
+  const selectedResolved = Number(selectedSide.resolved || 0)
+  const selectedPending = Number(selectedSide.approval_pending ?? selectedSide.pending ?? 0)
+  const selectedUnmatched = Number(selectedSide.unmatched || 0)
+  const selectedSurplus = Number(selectedSide.surplus || 0)
+  const shortageCount = Number(erp.shortage || 0)
+  const selectedShortage = Number(selectedSide.shortage || 0)
+  const selectedDuplicate = Number(selectedSide.duplicate || 0)
+  const rate = (value, total) => total > 0 ? (value / total) * 100 : 0
+
   // ── Donut data ────────────────────────────────────────────────────────────
   const donutData = [
-    { name: 'Reconciled',           value: kpi.reconciled || 0,             color: COLORS.reconciled },
-    { name: 'Unreconciled',         value: kpi.unreconciled || 0,           color: COLORS.unreconciled },
-    { name: 'Surplus Assets',       value: kpi.surplus_assets || 0,         color: COLORS.surplus_assets },
-    { name: 'Loss Assets',          value: kpi.exist_erp_not_physical || 0, color: COLORS.exist_erp_not_physical },
-    { name: 'Duplicated',           value: kpi.duplicated || 0,             color: COLORS.duplicated },
-    { name: 'Unique',               value: kpi.unique || 0,                 color: COLORS.unique },
-    { name: 'Pending',              value: kpi.pending || 0,                color: COLORS.pending },
+    { name: 'Matched (Reconciled)', value: selectedResolved, color: COLORS.reconciled },
+    { name: reportSide === 'erp' ? 'Shortage' : 'Surplus',
+      value: reportSide === 'erp' ? selectedShortage : selectedSurplus,
+      color: reportSide === 'erp' ? COLORS.exist_erp_not_physical : COLORS.surplus_assets },
+    { name: 'Pending', value: selectedPending, color: COLORS.pending },
+    { name: 'Unmatched', value: selectedUnmatched, color: '#BE123C' },
+    { name: 'Duplicate', value: selectedDuplicate, color: COLORS.duplicated },
   ].filter(d => d.value > 0)
 
+  const erpExactMatch = Number(data.total_rule_matched || 0)
+  const erpNearMatch = Number(data.total_manual_review || 0)
+  const erpAiMatch = Number(data.total_ai_matched || 0)
+  const erpShortage = Number(kpi.side_counts?.erp?.shortage ?? (kpi.exist_erp_not_physical ?? 0))
+  const erpDuplicate = Number(kpi.side_counts?.erp?.duplicate ?? (kpi.duplicated ?? 0))
+  const erpUnmatch = Number(
+    kpi.side_counts?.erp?.unmatched ?? (kpi.unmatched_erp ?? Math.max(totalERP - erpExactMatch - erpNearMatch - erpAiMatch - erpShortage - erpDuplicate, 0))
+  )
+
+  const matchBreakdown = [
+    { label: 'Exact Match', value: erpExactMatch, color: COLORS.reconciled },
+    { label: 'Near Match', value: erpNearMatch, color: '#f59e0b' },
+    { label: 'AI Match', value: erpAiMatch, color: COLORS.ai_matched },
+    { label: 'Unmatch', value: reportSide === 'erp' ? erpUnmatch : Number(physical.unmatched || 0), color: '#BE123C' },
+    { label: reportSide === 'erp' ? 'Shortage' : 'Surplus',
+      value: reportSide === 'erp' ? erpShortage : Number(physical.surplus || 0),
+      color: reportSide === 'erp' ? COLORS.exist_erp_not_physical : COLORS.surplus_assets },
+    { label: 'Duplicate', value: reportSide === 'erp' ? erpDuplicate : Number(physical.duplicate || 0), color: COLORS.duplicated },
+  ].filter(item => item.value > 0)
+
+  const sideBreakdowns = reportSide === 'erp' ? {
+    category: data.category_breakdown || [],
+    departmentBranch: data.department_breakdown || [],
+    divisionDistrict: data.district_breakdown || [],
+    location: data.location_reconciliation_chart || [],
+  } : {
+    category: data.category_breakdown_physical || [],
+    departmentBranch: data.department_breakdown_physical || [],
+    divisionDistrict: data.district_breakdown_physical || [],
+    location: data.location_reconciliation_chart || [],
+  }
+  const visibleStatusKeys = Object.keys(STATUS_COLORS).filter(key =>
+    reportSide === 'erp' ? key !== 'surplus_assets' : key !== 'exist_in_erp_not_physical'
+  )
+
   const tabs = [
-    { key: 'overview',  label: 'Overview'   },
-    { key: 'category',  label: 'Category'   },
-    { key: 'branch',    label: 'Branch'     },
-    { key: 'division',  label: 'Division'   },
-    { key: 'aging',     label: 'Aging'      },
+    { key: 'category', label: 'Category' },
+    { key: 'departmentBranch', label: 'Department / Branch' },
+    { key: 'divisionDistrict', label: 'Division / District' },
+    { key: 'aging', label: 'Aging' },
+    { key: 'location', label: 'Location' },
   ]
 
   return (
@@ -317,451 +412,428 @@ const Analytics = () => {
         </div>
       </div>
 
-      {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        <KpiCard label="Total ERP Assets"      value={fmt(kpi.total_erp_assets)}   icon={FiDatabase}    
-         gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
-        <KpiCard label="Physical Count"        value={fmt(kpi.physical_count)}     icon={FiLayers}     
-         gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500"/>
-        <KpiCard label="Reconciled"            value={fmt(kpi.reconciled)}         icon={FiCheckCircle} 
-        gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
-        <KpiCard label="Reconciliation Rate"   value={pct(kpi.reconciliation_rate)} icon={FiPercent}    
-        gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
-        <KpiCard label="Unmatched"          value={fmt(kpi.unreconciled)}       icon={FiXCircle}     
-        gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500" />
-        <KpiCard label="Surplus Assets"        value={fmt(kpi.surplus_assets)}     icon={FiAlertCircle} 
-        gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500"/>
-        <KpiCard label="Shortage/Loss Asset"        value={fmt(kpi.exist_erp_not_physical)}     icon={FiAlertTriangle} 
-        gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500"/>
-          <KpiCard label="Pending Approval"        value={fmt(kpi.pending)}     icon={FiClock} 
-        gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500"/>
-          <KpiCard label="Duplicates"        value={fmt(kpi.duplicated)}     icon={FiCopy} 
-        gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500"/>
-          <KpiCard label="Avg. Match Rate"        value={fmt(data.average_match_rate)}     icon={FiPercent} 
-        gradient="bg-gradient-to-br from-white-500 to-white-600"
-          borderColor="border-l-4 border-l-gray-100"
-          shadow="shadow-[0_4px_15px_rgba(107,114,128,0.4)]" textColor="text-black-500"/>
+      <div className="mb-8 grid w-full grid-cols-1 gap-4 p-2 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          label="ERP Records"
+          value={fmt(totalERP)}
+          icon={FiDatabase}
+          color="#8E288D"
+        />
+
+        <KpiCard
+          label="Physical Records"
+          value={fmt(totalPhysical)}
+          icon={FiLayers}
+          color="#CFB53B"
+        />
+
+        <KpiCard
+          label="Match Rate (ERP)"
+          value={pct(kpi.erp_match_rate ?? data.average_match_rate)}
+          icon={FiPercent}
+          color="#059669"
+        />
+
+        <KpiCard
+          label="Processing Time"
+          value={duration(processingSeconds)}
+          icon={FiClock}
+          color="#2563EB"
+        />
+
       </div>
 
-      {/* secondary KPIs */}
-      {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-400">
-          <p className="text-xs text-gray-500">Shortage/Loss Asset</p>
-          <p className="text-2xl font-bold text-purple-600">{fmt(kpi.exist_erp_not_physical)}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-gray-400">
-          <p className="text-xs text-gray-500">Pending Approval</p>
-          <p className="text-2xl font-bold text-gray-600">{fmt(kpi.pending)}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-[#008080]">
-          <p className="text-xs text-gray-500">Avg. Match Rate</p>
-          <p className="text-2xl font-bold text-teal-600">{pct(data.average_match_rate)}</p>
-        </div>
-      </div> */}
-
-      {/* ── Tabs ─────────────────────────────────────────────────────────── */}
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => { setActiveTab(t.key); logActivity('/analytics', `TAB_SWITCH_${t.key.toUpperCase()}`) }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === t.key
-                ? 'bg-[#8E288D] text-white shadow'
-                : 'bg-white text-gray-600 border border-gray-200 hover:border-[#8E288D]'
+      <div className="mb-2 flex gap-2 border-b border-gray-200">
+        {['erp', 'physical'].map(side => (
+          <button key={side} onClick={() => setReportSide(side)}
+            className={`border-b-2 px-5 py-1 text-sm font-semibold capitalize ${
+              reportSide === side ? 'border-[#8E288D] text-[#8E288D]' : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}>
-            {t.label}
+            {side === 'erp' ? 'ERP' : 'Physical'}
           </button>
         ))}
       </div>
 
-      {/* ── Overview Tab ─────────────────────────────────────────────────── */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Donut chart */}
-          <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
-            onContextMenu={e => openAIContextMenu(e, {
-                chartData: {
-                  source: 'analytics_overall_status_donut',
-                  donutData,
-                  total: donutData.reduce((s, d) => s + d.value, 0)
-                },
-                chartType: 'donut',
-                title: 'AI Analysis - Overall Reconciliation Status',
-                targetLabel: 'Overall Reconciliation Status',
-                analysisContext: { page: 'Analytics', section: 'Overview' }
-              })}>
-            <h3 className="text-lg font-semibold text-gray-800 mb-1">Overall Reconciliation Status</h3>
-            {(() => {
-              const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1
-              return (
-                <>
-                  <p className="text-xs text-gray-400 mb-3">
-                    Total: {donutTotal.toLocaleString()} records
-                  </p>
-                  <ResponsiveContainer width="100%" height={320}>
-                    <PieChart>
-                      <Pie data={donutData} cx="50%" cy="50%"
-                        innerRadius={70} outerRadius={120}
-                        paddingAngle={3} dataKey="value"
-                        // label={({ name, value, percent }) =>
-                        //   percent > 0.04
-                        //     ? `${name.split(' ')[0]}: ${((value / donutTotal) * 100).toFixed(1)}%`
-                        //     : ''
-                        // }
-                        labelLine={true}>
-                        {donutData.map((entry, i) => (
-                          <Cell key={i} fill={entry.color} />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-2">
+          <div className="border-b border-gray-100 p-4">
+            <div className="flex flex-wrap gap-2">
+              {tabs.map(t => (
+                <button key={t.key} onClick={() => { setActiveTab(t.key); logActivity('/analytics', `TAB_SWITCH_${t.key.toUpperCase()}`) }}
+                  className={`flex h-10 w-44 items-center justify-center px-4 text-sm font-medium transition-colors ${activeTab === t.key
+                        ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D]'
+                        : 'text-gray-600'
+                  }`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4">
+            {activeTab === 'category' && (
+              <div className="bg-white rounded-xl cursor-context-menu" title="Right-click for AI insights"
+                onContextMenu={e => openAIContextMenu(e, {
+                    chartData: {
+                      source: 'analytics_category_breakdown',
+                      categoryBreakdown: sideBreakdowns.category
+                    },
+                    chartType: 'stacked_bar',
+                    title: 'AI Analysis - Category Breakdown',
+                    targetLabel: 'Category Breakdown',
+                    analysisContext: { page: 'Analytics', section: 'Category Breakdown' }
+                  })}>
+                <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                  <FiLayers className="text-[#8E288D]" /> Asset Reconciliation by Category
+                </h3>
+                <p className="text-xs text-gray-400 mb-5">
+                  Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''} ·{' '}
+                  {((kpi.reconciled||0)+(kpi.unreconciled||0)+(kpi.surplus_assets||0)+(kpi.exist_erp_not_physical||0)+(kpi.duplicated||0)+(kpi.unique||0)+(kpi.pending||0)).toLocaleString()} total records
+                </p>
+                {sideBreakdowns.category.length ? (
+                  (() => {
+                    const activeKeys = visibleStatusKeys.filter(k =>
+                      sideBreakdowns.category.some(r => (r[k] || 0) > 0)
+                    )
+                    return (
+                      <>
+                        {sideBreakdowns.category.map(row => (
+                          <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
+                            colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
                         ))}
-                      </Pie>
-                      <Tooltip content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        const p = payload[0]
-                        const sharePct = ((p.value / donutTotal) * 100).toFixed(1)
-                        return (
-                          <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
-                            <p className="font-bold border-b border-gray-600 pb-1 mb-1">{p.name}</p>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-gray-300">Count</span>
-                              <span className="font-semibold">{p.value.toLocaleString()}</span>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                          {activeKeys.map(s => (
+                            <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                              <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                              {STATUS_LABELS[s]}
                             </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-gray-300">Share</span>
-                              <span className="font-semibold">{sharePct}%</span>
+                          ))}
+                        </div>
+                      </>
+                    )
+                  })()
+                ) : <p className="text-gray-400 text-center py-8">No category data — approve records first</p>}
+              </div>
+            )}
+
+            {activeTab === 'departmentBranch' && (
+              <div className="bg-white rounded-xl cursor-context-menu" title="Right-click for AI insights"
+                onContextMenu={e => openAIContextMenu(e, {
+                    chartData: {
+                      source: 'analytics_department_branch_breakdown',
+                      departmentBreakdown: sideBreakdowns.departmentBranch
+                    },
+                    chartType: 'stacked_bar',
+                    title: 'AI Analysis - Department / Branch Performance',
+                    targetLabel: 'Department / Branch Performance',
+                    analysisContext: { page: 'Analytics', section: 'Department / Branch Performance' }
+                  })}>
+                <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                  <FiMapPin className="text-[#8E288D]" /> Department / Branch Performance
+                </h3>
+                <p className="text-xs text-gray-400 mb-5">
+                  Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''}
+                </p>
+                {sideBreakdowns.departmentBranch.length ? (
+                  (() => {
+                    const activeKeys = visibleStatusKeys.filter(k =>
+                      sideBreakdowns.departmentBranch.some(r => (r[k] || 0) > 0)
+                    )
+                    return (
+                      <>
+                        {sideBreakdowns.departmentBranch.map(row => (
+                          <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
+                            colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
+                        ))}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                          {activeKeys.map(s => (
+                            <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                              <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                              {STATUS_LABELS[s]}
                             </div>
-                            <div className="flex justify-between gap-4 border-t border-gray-600 mt-1 pt-1">
-                              <span className="text-gray-300">Total</span>
-                              <span className="font-semibold">{donutTotal.toLocaleString()}</span>
+                          ))}
+                        </div>
+                      </>
+                    )
+                  })()
+                ) : <p className="text-gray-400 text-center py-8">No department/branch data — approve records first</p>}
+              </div>
+            )}
+
+            {activeTab === 'divisionDistrict' && (
+              <div className="bg-white rounded-xl cursor-context-menu" title="Right-click for AI insights"
+                onContextMenu={e => openAIContextMenu(e, {
+                    chartData: {
+                      source: 'analytics_division_district_breakdown',
+                      districtBreakdown: sideBreakdowns.divisionDistrict
+                    },
+                    chartType: 'stacked_bar',
+                    title: 'AI Analysis - Division / District Performance',
+                    targetLabel: 'Division / District Performance',
+                    analysisContext: { page: 'Analytics', section: 'Division / District Performance' }
+                  })}>
+                <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                  <FiBarChart2 className="text-[#8E288D]" /> Division / District Performance
+                </h3>
+                <p className="text-xs text-gray-400 mb-5">
+                  Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''}
+                </p>
+                {sideBreakdowns.divisionDistrict.length ? (
+                  (() => {
+                    const activeKeys = visibleStatusKeys.filter(k =>
+                      sideBreakdowns.divisionDistrict.some(r => (r[k] || 0) > 0)
+                    )
+                    return (
+                      <>
+                        {sideBreakdowns.divisionDistrict.map(row => (
+                          <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
+                            colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
+                        ))}
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
+                          {activeKeys.map(s => (
+                            <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                              <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+                              {STATUS_LABELS[s]}
                             </div>
-                          </div>
-                        )
-                      }} />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </>
+                          ))}
+                        </div>
+                      </>
+                    )
+                  })()
+                ) : <p className="text-gray-400 text-center py-8">No division/district data — approve records first</p>}
+              </div>
+            )}
+
+            {activeTab === 'location' && (
+              <div className="bg-white rounded-xl cursor-context-menu" title="Right-click for AI insights"
+                onContextMenu={e => openAIContextMenu(e, {
+                  chartData: {
+                    source: 'analytics_location_reconciliation',
+                    data: sideBreakdowns.location
+                  },
+                  chartType: 'bar',
+                  title: 'AI Analysis - Location Reconciliation',
+                  targetLabel: 'Location Reconciliation',
+                  analysisContext: { page: 'Analytics', section: 'Location Reconciliation' }
+                })}>
+                <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                  <FiMapPin className="text-[#8E288D]" /> Location Reconciliation
+                </h3>
+                <p className="text-xs text-gray-400 mb-5">Department/branch and division/district matching across all records</p>
+                {sideBreakdowns.location.length ? (
+                  (() => {
+                    const locationStatuses = visibleStatusKeys.filter(status =>
+                      sideBreakdowns.location.some(row => Number(row[status] || 0) > 0)
+                    )
+                    return (
+                      <div>
+                        {sideBreakdowns.location.map(row => (
+                          <HorizontalStackedBar key={row.name} row={row} statuses={locationStatuses}
+                            colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
+                        ))}
+                        <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-600">
+                          {locationStatuses.map(status => (
+                            <span key={status} className="flex items-center gap-1.5">
+                              <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: STATUS_COLORS[status] }} />
+                              {STATUS_LABELS[status]}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()
+                ) : <p className="text-gray-400 text-center py-8">No location data available</p>}
+              </div>
+            )}
+
+            {activeTab === 'aging' && (() => {
+              if (!agingData) return (
+                <div className="bg-white rounded-xl text-center text-gray-400">
+                  <FiLoader className="animate-spin mx-auto h-8 w-8 mb-2" />
+                  <p>Loading aging data…</p>
+                </div>
+              )
+
+              const AGING_COLORS = {
+                reconciled: '#8E288D',
+                unreconciled: '#000000',
+                pending: '#6B7280',
+                duplicated: '#000000',
+                unique: '#008080',
+                ...(reportSide === 'erp'
+                  ? { exist_in_erp_not_physical: '#BE123C' }
+                  : { surplus_assets: '#BE123C' }),
+              }
+              const AGING_LABELS = {
+                reconciled: 'Reconciled', unreconciled: 'Unmatched',
+                pending: 'Pending',
+                duplicated: 'Duplicated', unique: 'Unique',
+                ...(reportSide === 'erp'
+                  ? { exist_in_erp_not_physical: 'Shortage' }
+                  : { surplus_assets: 'Surplus' }),
+              }
+              const AGING_STATUS_KEYS = Object.keys(AGING_COLORS)
+
+              const stackedBuckets = agingData.stacked_buckets || []
+              const buckets = agingData.buckets || []
+              const agingTotal = buckets.reduce((s, d) => s + d.count, 0) || 1
+              const currentYear = agingData.current_year || new Date().getFullYear()
+
+              const agingActiveKeys = AGING_STATUS_KEYS.filter(k =>
+                stackedBuckets.some(row => (row[k] || 0) > 0)
+              )
+
+              return (
+                <div className="space-y-6">
+                  <div className="bg-white rounded-xl cursor-context-menu" title="Right-click for AI insights"
+                    onContextMenu={e => openAIContextMenu(e, {
+                        chartData: {
+                          source: 'analytics_aging_analysis',
+                          agingBuckets: stackedBuckets.length ? stackedBuckets : buckets
+                        },
+                        chartType: 'bar',
+                        title: 'AI Analysis - Aging Analysis',
+                        targetLabel: 'Aging Analysis',
+                        analysisContext: { page: 'Analytics', section: 'Aging Analysis' }
+                      })}>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                      📅 Asset Aging — {reportSide === 'erp' ? 'ERP' : 'Physical'} Records (vs {currentYear})
+                    </h3>
+                    <p className="text-xs text-gray-400 mb-4">
+                      Based on year field in Finance data · {agingTotal.toLocaleString()} total records
+                    </p>
+                    {stackedBuckets.length ? (
+                      <div className="w-full">
+                        <div className="space-y-1">
+                          {stackedBuckets.map(row => (
+                            <HorizontalStackedBar
+                              key={row.bucket}
+                              row={row}
+                              statuses={agingActiveKeys}
+                              colors={AGING_COLORS}
+                              labels={AGING_LABELS}
+                              rowLabel={row.bucket}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4 pt-3 border-t border-gray-100">
+                          {agingActiveKeys.map(s => (
+                            <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
+                              <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: AGING_COLORS[s] }} />
+                              {AGING_LABELS[s]}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : buckets.length ? (
+                      <div className="space-y-3">
+                        {buckets.map((d, i) => {
+                          const sharePct = ((d.count / agingTotal) * 100).toFixed(1)
+                          const color = ['#8E288D','#000','#CFB53B','#f97316','#ef4444','#b91c1c','#9ca3af'][Math.min(i, 6)]
+                          return (
+                            <div key={d.bucket} className="flex items-center gap-2">
+                              <span className="text-xs text-gray-600 w-16 flex-shrink-0">{d.bucket}</span>
+                              <div className="flex-1 bg-gray-100 rounded-md h-8 overflow-hidden">
+                                <div className="h-full flex items-center rounded-md transition-all duration-700"
+                                  style={{ width: `${sharePct}%`, backgroundColor: color }}>
+                                  <span className="text-white text-xs font-semibold px-2 select-none">{d.count.toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <span className="text-xs font-medium text-gray-600 w-12 text-right">{sharePct}%</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in ERP records</p>}
+                  </div>
+                </div>
               )
             })()}
           </div>
-
-          {/* Match type breakdown */}
-          <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
-            onContextMenu={e => openAIContextMenu(e, {
-                chartData: {
-                  source: 'analytics_match_type_breakdown',
-                  matchBreakdown: data.approval_kpis
-                },
-                chartType: 'bar',
-                title: 'AI Analysis - Match Type Breakdown',
-                targetLabel: 'Match Type Breakdown',
-                analysisContext: { page: 'Analytics', section: 'Overview' }
-              })}>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Match Type Breakdown</h3>
-            <div className="space-y-4 mt-6">
-              {[
-                { label: 'Exact Matches',    value: data.total_rule_matched, color: COLORS.matched },
-                { label: 'AI-Assisted',      value: data.total_ai_matched,   color: COLORS.ai_matched },
-                { label: 'Near Match',       value: data.total_manual_review,color: '#3b82f6' },
-              ].map(item => {
-                const total = data.total_customer_records || 1
-                const rate  = ((item.value / total) * 100).toFixed(1)
-                return (
-                  <div key={item.label}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium text-gray-700">{item.label}</span>
-                      <span className="font-bold" style={{ color: item.color }}>
-                        {fmt(item.value)} ({rate}%)
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div className="h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${rate}%`, backgroundColor: item.color }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-gray-100 grid grid-cols-2 gap-3">
-              <div className="bg-green-50 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500">Total Reconciliations</p>
-                <p className="text-xl font-bold text-green-600">{data.total_reconciliations}</p>
-              </div>
-              <div className="bg-teal-50 rounded-lg p-3 text-center">
-                <p className="text-xs text-gray-500">Records Processed</p>
-                <p className="text-xl font-bold text-teal-600">{fmt(data.total_customer_records)}</p>
-              </div>
-            </div>
-          </div>
         </div>
-      )}
 
-      {/* ── Category Tab ─────────────────────────────────────────────────── */}
-      {activeTab === 'category' && (
-        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm" title="Right-click for AI insights"
           onContextMenu={e => openAIContextMenu(e, {
               chartData: {
-                source: 'analytics_category_breakdown',
-                categoryBreakdown: data.category_breakdown
+                source: 'analytics_overall_status_donut',
+                donutData,
+                total: donutData.reduce((s, d) => s + d.value, 0)
               },
-              chartType: 'stacked_bar',
-              title: 'AI Analysis - Category Breakdown',
-              targetLabel: 'Category Breakdown',
-              analysisContext: { page: 'Analytics', section: 'Category Breakdown' }
+              chartType: 'donut',
+              title: 'AI Analysis - Overall Reconciliation Status',
+              targetLabel: 'Overall Reconciliation Status',
+              analysisContext: { page: 'Analytics', section: 'Overview' }
             })}>
-          <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
-            <FiLayers className="text-[#8E288D]" /> Asset Reconciliation by Category
-          </h3>
-          <p className="text-xs text-gray-400 mb-5">
-            Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''} ·{' '}
-            {((kpi.reconciled||0)+(kpi.unreconciled||0)+(kpi.surplus_assets||0)+(kpi.exist_erp_not_physical||0)+(kpi.duplicated||0)+(kpi.unique||0)+(kpi.pending||0)).toLocaleString()} total records
-          </p>
-          {data.category_breakdown?.length ? (
-            (() => {
-              const activeKeys = Object.keys(STATUS_COLORS).filter(k =>
-                data.category_breakdown.some(r => (r[k] || 0) > 0)
-              )
-              return (
-                <>
-                  {data.category_breakdown.map(row => (
-                    <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
-                      colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
-                  ))}
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
-                    {activeKeys.map(s => (
-                      <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
-                        <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
-                        {STATUS_LABELS[s]}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )
-            })()
-          ) : <p className="text-gray-400 text-center py-8">No category data — approve records first</p>}
-        </div>
-      )}
-
-      {/* ── Branch/District Tab ───────────────────────────────────────────── */}
-      {activeTab === 'branch' && (
-        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
-          onContextMenu={e => openAIContextMenu(e, {
-              chartData: {
-                source: 'analytics_branch_breakdown',
-                districtBreakdown: data.district_breakdown
-              },
-              chartType: 'stacked_bar',
-              title: 'AI Analysis - Branch/District Performance',
-              targetLabel: 'Branch / District Performance',
-              analysisContext: { page: 'Analytics', section: 'Branch / District Performance' }
-            })}>
-          <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
-            <FiMapPin className="text-[#8E288D]" /> Branch / District Performance
-          </h3>
-          <p className="text-xs text-gray-400 mb-5">
-            Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''}
-          </p>
-          {data.district_breakdown?.length ? (
-            (() => {
-              const activeKeys = Object.keys(STATUS_COLORS).filter(k =>
-                data.district_breakdown.some(r => (r[k] || 0) > 0)
-              )
-              return (
-                <>
-                  {data.district_breakdown.map(row => (
-                    <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
-                      colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
-                  ))}
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
-                    {activeKeys.map(s => (
-                      <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
-                        <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
-                        {STATUS_LABELS[s]}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )
-            })()
-          ) : <p className="text-gray-400 text-center py-8">No district/branch data — approve records first</p>}
-        </div>
-      )}
-
-      {/* ── Division/Department Tab ───────────────────────────────────────── */}
-      {activeTab === 'division' && (
-        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
-          onContextMenu={e => openAIContextMenu(e, {
-              chartData: {
-                source: 'analytics_division_breakdown',
-                departmentBreakdown: data.department_breakdown
-              },
-              chartType: 'stacked_bar',
-              title: 'AI Analysis - Division / Department Performance',
-              targetLabel: 'Division / Department Performance',
-              analysisContext: { page: 'Analytics', section: 'Division / Department Performance' }
-            })}>
-          <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
-            <FiBarChart2 className="text-[#8E288D]" /> Division / Department Performance
-          </h3>
-          <p className="text-xs text-gray-400 mb-5">
-            Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''}
-          </p>
-          {data.department_breakdown?.length ? (
-            (() => {
-              const activeKeys = Object.keys(STATUS_COLORS).filter(k =>
-                data.department_breakdown.some(r => (r[k] || 0) > 0)
-              )
-              return (
-                <>
-                  {data.department_breakdown.map(row => (
-                    <HorizontalStackedBar key={row.name} row={row} statuses={activeKeys}
-                      colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
-                  ))}
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-gray-100">
-                    {activeKeys.map(s => (
-                      <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
-                        <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
-                        {STATUS_LABELS[s]}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )
-            })()
-          ) : <p className="text-gray-400 text-center py-8">No department data — approve records first</p>}
-        </div>
-      )}
-
-      {/* ── Aging Tab ────────────────────────────────────────────────────── */}
-      {activeTab === 'aging' && (() => {
-        if (!agingData) return (
-          <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400">
-            <FiLoader className="animate-spin mx-auto h-8 w-8 mb-2" />
-            <p>Loading aging data…</p>
-          </div>
-        )
-
-        const AGING_COLORS = {
-          reconciled:               '#CFB53B',
-          unreconciled:             '#000000',
-          pending:                  '#4E79A7',
-          surplus_assets:           '#8E288D',
-          exist_in_erp_not_physical:'#e64595ff',
-          duplicated:               '#9C755F',
-          unique:                   '#008080',
-        }
-        const AGING_LABELS = {
-          reconciled: 'Reconciled', unreconciled: 'Unmatched',
-          pending: 'Pending', surplus_assets: 'Surplus Assets',
-          exist_in_erp_not_physical: 'Shortage Asset',
-          duplicated: 'Duplicated', unique: 'Unique',
-        }
-        const AGING_STATUS_KEYS = Object.keys(AGING_COLORS)
-
-        const stackedBuckets = agingData.stacked_buckets || []
-        const buckets = agingData.buckets || []
-        const agingTotal = buckets.reduce((s, d) => s + d.count, 0) || 1
-        const currentYear = agingData.current_year || new Date().getFullYear()
-
-        // Grand total across ALL buckets — bar widths scale relative to this
-        const agingGrandTotal = stackedBuckets.reduce((s, row) =>
-          s + AGING_STATUS_KEYS.reduce((rs, k) => rs + (row[k] || 0), 0), 0
-        ) || agingTotal
-
-        const agingActiveKeys = AGING_STATUS_KEYS.filter(k =>
-          stackedBuckets.some(row => (row[k] || 0) > 0)
-        )
-
-        return (
-          <div className="space-y-6">
-            {/* Stacked age bucket bars */}
-            <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
-              onContextMenu={e => openAIContextMenu(e, {
-                  chartData: {
-                    source: 'analytics_aging_analysis',
-                    agingBuckets: stackedBuckets.length ? stackedBuckets : buckets
-                  },
-                  chartType: 'bar',
-                  title: 'AI Analysis - Aging Analysis',
-                  targetLabel: 'Aging Analysis',
-                  analysisContext: { page: 'Analytics', section: 'Aging Analysis' }
-                })}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                📅 Asset Aging — ERP Records (vs {currentYear})
-              </h3>
-              <p className="text-xs text-gray-400 mb-4">
-                Based on year field in Finance data · {agingTotal.toLocaleString()} total records
-              </p>
-              {stackedBuckets.length ? (
-                <>
-                  <div className="space-y-1">
-                    {stackedBuckets.map(row => (
-                      <HorizontalStackedBar
-                        key={row.bucket}
-                        row={row}
-                        statuses={agingActiveKeys}
-                        colors={AGING_COLORS}
-                        labels={AGING_LABELS}
-                        rowLabel={row.bucket}
-                        grandTotal={agingGrandTotal}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-4 pt-3 border-t border-gray-100">
-                    {agingActiveKeys.map(s => (
-                      <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
-                        <span className="w-3 h-3 rounded-sm inline-block flex-shrink-0" style={{ backgroundColor: AGING_COLORS[s] }} />
-                        {AGING_LABELS[s]}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : buckets.length ? (
-                /* fallback: simple bars if stacked data not yet available */
-                <div className="space-y-3">
-                  {buckets.map((d, i) => {
-                    const sharePct = ((d.count / agingTotal) * 100).toFixed(1)
-                    const color = ['#8E288D','#000','#CFB53B','#f97316','#ef4444','#b91c1c','#9ca3af'][Math.min(i, 6)]
-                    return (
-                      <div key={d.bucket} className="flex items-center gap-2">
-                        <span className="text-xs text-gray-600 w-16 flex-shrink-0">{d.bucket}</span>
-                        <div className="flex-1 bg-gray-100 rounded-md h-8 overflow-hidden">
-                          <div className="h-full flex items-center rounded-md transition-all duration-700"
-                            style={{ width: `${sharePct}%`, backgroundColor: color }}>
-                            <span className="text-white text-xs font-semibold px-2 select-none">{d.count.toLocaleString()}</span>
+          <h3 className="text-lg font-semibold text-gray-800 mb-1">Overview</h3>
+          {(() => {
+            const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1
+            const chartTotal = donutTotal
+            return (
+              <>
+                <p className="text-xs text-gray-400 mb-3">
+                  Total: {chartTotal.toLocaleString()} records
+                </p>
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie data={donutData} cx="50%" cy="50%"
+                      innerRadius={62} outerRadius={96}
+                      paddingAngle={3} dataKey="value"
+                      labelLine={true}>
+                      {donutData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null
+                      const p = payload[0]
+                      const sharePct = ((p.value / chartTotal) * 100).toFixed(1)
+                      return (
+                        <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                          <p className="font-bold border-b border-gray-600 pb-1 mb-1">{p.name}</p>
+                          <div className="flex justify-between gap-4">
+                            <span className="text-gray-300">Count</span>
+                            <span className="font-semibold">{p.value.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between gap-4">
+                            <span className="text-gray-300">Share</span>
+                            <span className="font-semibold">{sharePct}%</span>
+                          </div>
+                          <div className="flex justify-between gap-4 border-t border-gray-600 mt-1 pt-1">
+                            <span className="text-gray-300">Total</span>
+                            <span className="font-semibold">{chartTotal.toLocaleString()}</span>
                           </div>
                         </div>
-                        <span className="text-xs font-medium text-gray-600 w-12 text-right">{sharePct}%</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : <p className="text-gray-400 text-center py-8">No aging data — year field may be missing in ERP records</p>}
-            </div>
+                      )
+                    }} />
+                    <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
 
-            {/* Info note */}
-            <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-blue-700">
-              💡 This shows system-wide aging across all reconciliations. For per-reconciliation aging with department &amp; branch breakdown, open the <strong>📊 Dashboard Report</strong> for a specific reconciliation.
-            </div>
-          </div>
-        )
-      })()}
+                <div className="mt-6 border-t border-gray-100 pt-5">
+                  <h4 className="mb-3 text-sm font-semibold text-gray-700">Match Type Breakdown</h4>
+                  <div className="space-y-3">
+                    {matchBreakdown.map(item => {
+                      const pctValue = chartTotal > 0 ? ((item.value / chartTotal) * 100).toFixed(1) : 0
+                      return (
+                        <div key={item.label}>
+                          <div className="mb-1 flex items-center justify-between text-xs text-gray-600">
+                            <span className="font-medium">{item.label}</span>
+                            <span className="font-bold" style={{ color: item.color }}>{item.value.toLocaleString()} ({pctValue}%)</span>
+                          </div>
+                          <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+                            <div className="h-full rounded-full" style={{ width: `${pctValue}%`, backgroundColor: item.color }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )
+          })()}
+        </div>
+      </div>
+
       <AIAnalysisModal
         isOpen={showAIModal}
         onClose={() => setShowAIModal(false)}

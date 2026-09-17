@@ -8,6 +8,18 @@ all sensitive operations performed in the system.
 from models import db, AuditLog
 from flask import request
 from datetime import datetime
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
+def get_client_ip():
+    """Return the originating client IP when the app is behind a proxy."""
+    forwarded_for = request.headers.get('X-Forwarded-For', '')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+    return request.headers.get('X-Real-IP') or request.remote_addr
 
 
 class AuditService:
@@ -51,7 +63,7 @@ class AuditService:
             # Get IP address from request context if available
             ip_address = None
             if request:
-                ip_address = request.remote_addr or request.environ.get('HTTP_X_FORWARDED_FOR')
+                ip_address = get_client_ip()
             
             # Create audit log entry
             audit_log = AuditLog(
@@ -67,11 +79,11 @@ class AuditService:
             db.session.add(audit_log)
             db.session.commit()
             
-            print(f"✓ Audit log created: {operation_type} on {resource_type}:{resource_id} by user {user_id}")
+            logger.info('Audit log created: %s on %s:%s by user %s', operation_type, resource_type, resource_id, user_id)
             return True
             
         except Exception as e:
-            print(f"✗ Failed to log audit: {str(e)}")
+            logger.exception('Failed to log audit operation: %s', e)
             db.session.rollback()
             return False
     
@@ -99,7 +111,7 @@ class AuditService:
                 .all()
             return logs
         except Exception as e:
-            print(f"✗ Failed to fetch user audit logs: {str(e)}")
+            logger.exception('Failed to fetch user audit logs: %s', e)
             return []
     
     @staticmethod
@@ -129,7 +141,7 @@ class AuditService:
                 .all()
             return logs
         except Exception as e:
-            print(f"✗ Failed to fetch audit logs: {str(e)}")
+            logger.exception('Failed to fetch audit logs: %s', e)
             return []
     
     @staticmethod
@@ -160,7 +172,7 @@ class AuditService:
              .all()
             return logs
         except Exception as e:
-            print(f"✗ Failed to fetch resource audit logs: {str(e)}")
+            logger.exception('Failed to fetch resource audit logs: %s', e)
             return []
     
     @staticmethod
@@ -186,7 +198,7 @@ class AuditService:
                 .all()
             return logs
         except Exception as e:
-            print(f"✗ Failed to fetch operation audit logs: {str(e)}")
+            logger.exception('Failed to fetch operation audit logs: %s', e)
             return []
     
     @staticmethod
@@ -224,7 +236,7 @@ class AuditService:
                 'by_user': {user_id: count for user_id, count in user_counts}
             }
         except Exception as e:
-            print(f"✗ Failed to fetch audit stats: {str(e)}")
+            logger.exception('Failed to fetch audit statistics: %s', e)
             return {
                 'total_logs': 0,
                 'by_operation': {},

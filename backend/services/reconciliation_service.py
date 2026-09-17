@@ -1,7 +1,5 @@
 import pandas as pd
 from typing import Dict, Tuple
-import os
-from datetime import datetime
 
 from utils.data_cleaner import DataCleaner
 from utils.rule_matcher import RuleMatcher
@@ -25,8 +23,8 @@ class ReconciliationService:
         # Initialize AI matcher if API key is available
         self.ai_matcher = None
         api_key = config.OPENAI_API_KEY
-        
-        if api_key and api_key.strip():
+
+        if getattr(config, 'ENABLE_AI_MATCHING', False) and api_key and api_key.strip():
             try:
                 self.ai_matcher = AIMatcher(
                     provider='groq',
@@ -36,37 +34,25 @@ class ReconciliationService:
                     rate_limit_delay=self.rate_limit_delay,
                     max_retries=self.max_retries
                 )
-                print(f"✓ AI Matcher initialized successfully")
-                print(f"  - AI Match Threshold: {self.ai_match_threshold}")
-                print(f"  - Manual Review Threshold: {self.manual_review_threshold}")
-                print(f"  - Fuzzy Pre-filter Threshold: {self.fuzzy_prefilter_threshold}")
-                print(f"  - Top K Candidates: {self.ai_top_k_candidates}")
-                print(f"  - Rate Limit Delay: {self.rate_limit_delay}s")
-                print(f"  - Max Retries: {self.max_retries}")
-            except Exception as e:
-                print(f"✗ Failed to initialize AI Matcher: {str(e)}")
+            except Exception:
                 self.ai_matcher = None
-        else:
-            print("✗ No API key found - AI matching disabled")
     
     @staticmethod
     def extract_duplicates(df: pd.DataFrame, batch_size: int = 50000) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Separate duplicate records from the input DataFrame with memory-efficient batch processing.
         Keep the first row in each duplicate group for matching, and place only additional repeated rows into the duplicate report.
-        
+
         Args:
             df: Input DataFrame
             batch_size: Size of batches for processing large datasets
-            
+
         Returns:
             Tuple of (main_df, duplicates_df)
         """
         if df.empty:
             return df.copy(), df.copy()
-        
-        print(f"  Detecting duplicates in {len(df)} records...")
-        
+
         # For small datasets, use original logic
         if len(df) <= batch_size:
             empty_tags = (df['new_tag_number'] == '') & (df['serial_no'] == '')
@@ -86,12 +72,7 @@ class ReconciliationService:
                 df_empty[~empty_dupes_mask]
             ]).sort_index().copy()
             
-            print(f"    ✓ Found {len(duplicates_df)} duplicates, {len(main_df)} unique records")
             return main_df, duplicates_df
-        
-        # For large datasets, use memory-efficient batch processing
-        print(f"    Using batch processing (batch size: {batch_size})...")
-        
         empty_tags = (df['new_tag_number'] == '') & (df['serial_no'] == '')
         df_empty = df[empty_tags]
         df_non_empty = df[~empty_tags]
@@ -109,8 +90,6 @@ class ReconciliationService:
                 else:
                     seen_tags.add(key)
             
-            if i > 0:
-                print(f"      Processed {min(i+batch_size, len(df_non_empty))}/{len(df_non_empty)} records")
         
         # Process empty tags
         empty_dupes_mask = df_empty.duplicated(keep='first')
@@ -125,7 +104,6 @@ class ReconciliationService:
             df_empty[~empty_dupes_mask]
         ]).sort_index()
         
-        print(f"    ✓ Found {len(duplicates_df)} duplicates, {len(main_df)} unique records")
         return main_df, duplicates_df
 
     def process_reconciliation(self, customer_file_path: str, internal_file_path: str,
@@ -136,7 +114,6 @@ class ReconciliationService:
         """
         
         # Step 1: Load and clean data
-        print("Step 1: Loading and cleaning data...")
         customer_df_original = DataCleaner.process_file(customer_file_path)
         internal_df_original = DataCleaner.process_file(internal_file_path)
         
@@ -153,43 +130,30 @@ class ReconciliationService:
         if 'serial_no' in internal_match_df.columns:
             internal_match_df['serial_no'] = ''
         
-        print(f"  Total customer records uploaded: {total_customer_uploaded}")
-        print(f"  Total internal records uploaded: {total_internal_uploaded}")
-        
         # Use configured batch size for large datasets
         batch_size = getattr(self.config, 'BATCH_SIZE', 50000)
         customer_df, customer_duplicates = self.extract_duplicates(customer_match_df, batch_size)
         internal_df, internal_duplicates = self.extract_duplicates(internal_match_df, batch_size)
         
-        print(f"  Customer: {len(customer_df)} unique + {len(customer_duplicates)} duplicates")
-        print(f"  Internal: {len(internal_df)} unique + {len(internal_duplicates)} duplicates")
-        
         # Step 2: Rule-based matching
-        print("Step 2: Performing Exact matching...")
         rule_matched_df, unmatched_customer, unmatched_internal = RuleMatcher.exact_match(
             customer_df, internal_df
         )
         
         rule_matched_count = len(rule_matched_df)
-        print(f"Exact matches: {rule_matched_count}")
-        
         # Step 3: Fuzzy matching
-        print("Step 3: Performing fuzzy matching...")
         batch_size = getattr(self.config, 'BATCH_SIZE', 10000)
         fuzzy_matches, remaining_customer, remaining_internal = FuzzyMatcher.fuzzy_match(
-            unmatched_customer, unmatched_internal, threshold=0.60, batch_size=batch_size
+            unmatched_customer,
+            unmatched_internal,
+            threshold=0.60,
+            batch_size=batch_size,
+            max_comparisons_per_record=getattr(self.config, 'FUZZY_MAX_COMPARISONS_PER_RECORD', 500)
         )
         
         # Step 4: AI-assisted matching (if available and needed)
         ai_matched = []
         manual_review = []
-        
-        print(f"\n{'='*60}")
-        print(f"Step 4: AI-Assisted Matching")
-        print(f"{'='*60}")
-        print(f"AI Matcher available: {self.ai_matcher is not None}")
-        print(f"Remaining customer records: {len(remaining_customer)}")
-        print(f"Remaining internal records: {len(remaining_internal)}")
         
         if self.ai_matcher and len(remaining_customer) > 0 and len(remaining_internal) > 0:
             # Add index as a field to track records after AI processing
@@ -210,8 +174,6 @@ class ReconciliationService:
             # Limit AI processing to avoid high costs
             max_ai_records = getattr(self.config, 'MAX_AI_RECORDS', 1000)
             customer_records_limited = customer_records[:max_ai_records]
-            print(f"Processing {len(customer_records_limited)} customer records with AI (limit: {max_ai_records})...")
-            
             ai_matches = self.ai_matcher.ai_match_batch(
                 customer_records_limited, 
                 internal_records, 
@@ -219,24 +181,14 @@ class ReconciliationService:
                 top_k=self.ai_top_k_candidates
             )
             
-            print(f"\nClassifying {len(ai_matches)} AI matches by confidence...")
             # Classify AI matches by confidence
             for match in ai_matches:
                 confidence = match['confidence_score']
-                print(f"  Match: {match.get('customer_description', 'N/A')[:40]}... <-> "
-                      f"{match.get('internal_description', 'N/A')[:40]}... "
-                      f"[Confidence: {confidence:.2f}]")
                 
                 if confidence >= self.ai_match_threshold:
                     ai_matched.append(match)
-                    print(f"    → AI MATCHED (>= {self.ai_match_threshold})")
                 elif confidence >= self.manual_review_threshold:
                     manual_review.append(match)
-                    print(f"    → MANUAL REVIEW (>= {self.manual_review_threshold})")
-                else:
-                    print(f"    → BELOW THRESHOLD (< {self.manual_review_threshold})")
-            
-            print(f"\nResults: {len(ai_matched)} AI matched, {len(manual_review)} manual review")
             
             # Re-populate the excluded fields (serial_no, tag numbers) for the final report
             for m in ai_matched + manual_review:
@@ -265,7 +217,6 @@ class ReconciliationService:
             manual_review.extend(fuzzy_matches)
         else:
             reason = "no API key" if not self.ai_matcher else "no remaining records"
-            print(f"Skipping AI matching ({reason})")
             # All fuzzy matches go to manual review
             manual_review = fuzzy_matches
             fuzzy_matches = []
@@ -305,7 +256,6 @@ class ReconciliationService:
         internal_duplicates = restore_serial(internal_duplicates, internal_df_original, False, False)
         
         # Step 5: Generate report
-        print("Step 5: Generating report...")
         report_path = ReportGenerator.generate_excel_report(
             rule_matched_df=rule_matched_df,
             ai_matched_df=ai_matched_df,
