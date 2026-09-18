@@ -45,6 +45,13 @@ const CATEGORIES = [
   { key: 'Duplicate', label: 'Duplicate' },
 ]
 
+const getPaginationItems = (totalPages, currentPage) => {
+  if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1)
+  if (currentPage <= 3) return [1, 2, 3, 4, 'ellipsis-right', totalPages]
+  if (currentPage >= totalPages - 2) return [1, 'ellipsis-left', totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+  return [1, 'ellipsis-left', currentPage - 1, currentPage, currentPage + 1, 'ellipsis-right', totalPages]
+}
+
 // Bulk action options per category type
 const BULK_OPTIONS_MATCHED = [
   { value: 'reconciled', label: 'Reconciled' },
@@ -97,11 +104,25 @@ const StatusBadge = ({ status }) => {
   )
 }
 
+const getAllowedStatusValues = category => {
+  if (category === 'Physical Unmatched') {
+    return new Set(['pending', 'surplus_assets', 'reconciled', 'unreconciled'])
+  }
+  if (category === 'ERP Unmatched') {
+    return new Set(['pending', 'exist_in_erp_not_physical', 'reconciled', 'unreconciled'])
+  }
+  if (category === 'Duplicate') {
+    return new Set(['pending', 'duplicated', 'unique'])
+  }
+  return new Set(['pending', 'reconciled', 'unreconciled'])
+}
+
 // ── Per-record status dropdown ────────────────────────────────────────────────
-const StatusDropdown = ({ recordId, current, onSelect, loading }) => {
+const StatusDropdown = ({ recordId, category, current, onSelect, loading }) => {
   const [open, setOpen] = useState(false)
   const currentStatus = STATUS_MAP[current] || STATUS_MAP.pending
   const cls = statusBadgeCls[current] || statusBadgeCls.pending
+  const allowedStatuses = getAllowedStatusValues(category)
 
   if (loading) return <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#8E288D]" />
 
@@ -121,13 +142,17 @@ const StatusDropdown = ({ recordId, current, onSelect, loading }) => {
             {STATUSES.map(s => (
               <button
                 key={s.value}
-                onClick={() => { setOpen(false); if (s.value !== current) onSelect(recordId, s.value) }}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${s.value === current ? 'font-semibold text-[#8E288D]' : 'text-gray-700'
-                  }`}
+                disabled={!allowedStatuses.has(s.value) || s.value === current}
+                onClick={() => { setOpen(false); onSelect(recordId, s.value) }}
+                className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 ${
+                  !allowedStatuses.has(s.value) || s.value === current
+                    ? 'cursor-not-allowed text-gray-300'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
               >
-                <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[s.value].split(' ')[0]}`} />
+                <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[s.value].split(' ')[0]} ${!allowedStatuses.has(s.value) || s.value === current ? 'opacity-40' : ''}`} />
                 {s.label}
-                {s.value === current && ' ✓'}
+                {s.value === current && ' (current)'}
               </button>
             ))}
           </div>
@@ -138,14 +163,13 @@ const StatusDropdown = ({ recordId, current, onSelect, loading }) => {
 }
 
 // ── Bulk action dropdown ──────────────────────────────────────────────────────
-const BulkDropdown = ({category, onSelect,  loading,  className = '',}) => {
+const BulkDropdown = ({ category, onSelect, loading, approvalSummary, className = '' }) => {
   const [open, setOpen] = useState(false)
   const [subCat, setSubCat] = useState(null) // for Unmatched sub-category step
   const isDuplicate = category === 'Duplicate'
   const isUnmatched = category === 'Unmatched'
 
   const UNMATCHED_SUBCATS = [
-    { value: 'Unmatched', label: 'All Unmatched' },
     { value: 'Physical Unmatched', label: 'Pysical Unmatched' },
     { value: 'ERP Unmatched', label: 'ERP Unmatched' },
   ]
@@ -159,7 +183,29 @@ const BulkDropdown = ({category, onSelect,  loading,  className = '',}) => {
     : isUnmatched ? optionsForSubCat
       : BULK_OPTIONS_MATCHED
 
+  const getTargetSummary = targetCategory => {
+    if (targetCategory === 'Unmatched') {
+      return ['Physical Unmatched', 'ERP Unmatched'].reduce((result, key) => {
+        const categorySummary = approvalSummary[key] || {}
+        Object.keys(categorySummary).forEach(status => {
+          result[status] = (result[status] || 0) + (categorySummary[status] || 0)
+        })
+        return result
+      }, { total: 0 })
+    }
+    return approvalSummary[targetCategory] || {}
+  }
+
+  const isOptionDisabled = (targetCategory, option) => {
+    const targetSummary = getTargetSummary(targetCategory)
+    return !targetSummary.total || (targetSummary[option.value] || 0) >= targetSummary.total
+  }
+
   const loadingKey = loading && Object.keys(loading).find(k => k.startsWith(category) && loading[k])
+  const categorySummary = category === 'Unmatched'
+    ? getTargetSummary('Unmatched')
+    : approvalSummary[category] || {}
+  const noRecords = !categorySummary.total
 
   const handleClose = () => { setOpen(false); setSubCat(null) }
 
@@ -172,8 +218,8 @@ const BulkDropdown = ({category, onSelect,  loading,  className = '',}) => {
     <div className="relative inline-block">
       <button
         onClick={() => { setOpen(o => !o); setSubCat(null) }}
-        disabled={!!loadingKey}
-        className={`inline-flex items-center justify-center gap-1 rounded text-xs font-medium text-white bg-[#8E288D] hover:bg-[#7A1E79] disabled:opacity-50 transition-colors ${className}`}
+        disabled={!!loadingKey || noRecords}
+        className={`inline-flex items-center justify-center gap-1 rounded text-xs font-medium text-white bg-[#8E288D] hover:bg-[#7A1E79] disabled:cursor-not-allowed disabled:opacity-50 transition-colors ${className}`}
       >
         {loadingKey ? <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" /> : null}
         Bulk Approve <FiChevronDown className="w-3 h-3" />
@@ -213,9 +259,13 @@ const BulkDropdown = ({category, onSelect,  loading,  className = '',}) => {
                 </div>
                 {optionsForCat.map(opt => (
                   <button key={opt.value}
+                    disabled={isOptionDisabled(subCat, opt)}
                     onClick={() => handleSelect(subCat, opt.value)}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-700 flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[opt.value]?.split(' ')[0] || 'bg-gray-300'}`} />
+                    className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 ${isOptionDisabled(subCat, opt)
+                      ? 'cursor-not-allowed text-gray-300'
+                      : 'text-gray-700 hover:bg-gray-50'
+                      }`}>
+                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[opt.value]?.split(' ')[0] || 'bg-gray-300'} ${isOptionDisabled(subCat, opt) ? 'opacity-40' : ''}`} />
                     {opt.label}
                   </button>
                 ))}
@@ -230,9 +280,13 @@ const BulkDropdown = ({category, onSelect,  loading,  className = '',}) => {
                 </div>
                 {optionsForCat.map(opt => (
                   <button key={opt.value}
+                    disabled={isOptionDisabled(category, opt)}
                     onClick={() => handleSelect(category, opt.value)}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-700 flex items-center gap-2">
-                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[opt.value]?.split(' ')[0] || 'bg-gray-300'}`} />
+                    className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 ${isOptionDisabled(category, opt)
+                      ? 'cursor-not-allowed text-gray-300'
+                      : 'text-gray-700 hover:bg-gray-50'
+                      }`}>
+                    <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[opt.value]?.split(' ')[0] || 'bg-gray-300'} ${isOptionDisabled(category, opt) ? 'opacity-40' : ''}`} />
                     {opt.label}
                   </button>
                 ))}
@@ -456,17 +510,17 @@ const ApprovalPage = () => {
   // ── tab styles ─────────────────────────────────────────────────────────────
   const tabCls = (key) => {
     const active = {
-      all: 'bg-gray-700 text-white', 'Exact Match': 'bg-[#8E288D] text-white',
-      'AI Match': 'bg-[#7A1E79] text-white', 'Manual Review': 'bg-[#CFB53B] font-bold text-white',
-      'Unmatched': 'bg-red-600 text-white', 'Duplicate': 'bg-pink-600 text-white'
+      all: 'bg-[#8E288D] text-white', 'Exact Match': 'bg-[#8E288D] text-white',
+      'AI Match': 'bg-[#8E288D] text-white', 'Manual Review': 'bg-[#8E288D] text-white',
+      'Unmatched': 'bg-[#8E288D] text-white', 'Duplicate': 'bg-[#8E288D] text-white'
     }
     const inactive = {
-      all: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-      'Exact Match': 'bg-gray-50 text-[#8E288D] hover:text-[#8E288D] hover:bg-purple-100',
+      all: 'bg-purple-100 text-gray-700 hover:bg-gray-200',
+      'Exact Match': 'bg-purple-50 text-[#8E288D] hover:text-[#8E288D] hover:bg-purple-100',
       'AI Match': 'bg-purple-50 text-[#8E288D] hover:bg-purple-100',
-      'Manual Review': 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100',
-      'Unmatched': 'bg-red-50 text-red-700 hover:bg-red-100',
-      'Duplicate': 'bg-pink-50 text-pink-700 hover:bg-pink-100'
+      'Manual Review': 'bg-purple-50 text-[#8E288D] hover:bg-purple-100',
+      'Unmatched': 'bg-purple-50 text-[#8E288D] hover:bg-purple-100',
+      'Duplicate': 'bg-purple-50 text-[#8E288D] hover:bg-purple-100'
     }
     return selectedCategory === key
       ? (active[key] || 'bg-gray-700 text-white')
@@ -536,7 +590,7 @@ const ApprovalPage = () => {
             const finRecRate = ((overall.reconciled / finTotal) * 100).toFixed(1)
             return (
               <div className="border-t border-gray-100 pt-2 grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-purple-50 rounded p-2">
+                <div className="bg-purple-50 dark:bg-gray-800 rounded p-2">
                   <p className="text-gray-700 font-bold text-center">Physical</p>
                   <p className="text-xl font-bold text-gray-700 text-center">{custRecRate}%</p>
                   <p className="text-gray-600 font-bold text-center">Reconciled</p>
@@ -555,7 +609,7 @@ const ApprovalPage = () => {
                     </div>
                   </div>
                 </div>
-                <div className="bg-teal-50 rounded p-2">
+                <div className="bg-teal-50 dark:bg-gray-800 rounded p-2">
                   <p className="text-gray-700 font-bold text-center">ERP</p>
                   <p className="text-xl font-bold text-gray-700 text-center">{finRecRate}%</p>
                   <p className="text-gray-600 font-bold text-center">Reconciled</p>
@@ -603,6 +657,7 @@ const ApprovalPage = () => {
             category={selectedCategory}
             onSelect={handleBulkDecision}
             loading={bulkLoading}
+            approvalSummary={summary}
             className="h-10 w-44"
           />
         )}
@@ -646,20 +701,20 @@ const ApprovalPage = () => {
             const s = getSummary(cat.key)
             const isActive = selectedCategory === cat.key
             const activeCls = {
-              all:            'bg-[#1a3a5c] text-white border-[#1a3a5c]',
-              'Exact Match':  'bg-[#1a3a5c] text-white border-[#1a3a5c]',
-              'AI Match':     'bg-[#7A1E79] text-white border-[#7A1E79]',
-              'Manual Review':'bg-[#1a3a5c] text-white border-[#1a3a5c]',
-              'Unmatched':    'bg-red-600 text-white border-red-600',
-              'Duplicate':    'bg-pink-600 text-white border-pink-600',
+              all:            'bg-[#8E288D] text-white border-[#8E288D]',
+              'Exact Match':  'bg-[#8E288D] text-white border-[#8E288D]',
+              'AI Match':     'bg-[#8E288D] text-white border-[#8E288D]',
+              'Manual Review':'bg-[#8E288D] text-white border-[#8E288D]',
+              'Unmatched':    'bg-[#8E288D] text-white border-[#8E288D]',
+              'Duplicate':    'bg-[#8E288D] text-white border-[#8E288D]',
             }
             const inactiveCls = {
               all:            'bg-white text-gray-600 border-gray-300 hover:opacity-80',
-              'Exact Match':  'bg-white text-[#1a3a5c] border-[#1a3a5c] hover:opacity-80',
-              'AI Match':     'bg-white text-purple-700 border-purple-300 hover:opacity-80',
-              'Manual Review':'bg-white text-[#1a3a5c] border-[#1a3a5c] hover:opacity-80',
-              'Unmatched':    'bg-white text-red-600 border-red-300 hover:opacity-80',
-              'Duplicate':    'bg-white text-pink-600 border-pink-300 hover:opacity-80',
+              'Exact Match':  'bg-white text-gray-600 border-gray-300 hover:opacity-80',
+              'AI Match':     'bg-white text-gray-600 border-gray-300 hover:opacity-80',
+              'Manual Review':'bg-white text-gray-600 border-gray-300 hover:opacity-80',
+              'Unmatched':    'bg-white text-gray-600 border-gray-300 hover:opacity-80',
+              'Duplicate':    'bg-white text-gray-600 border-gray-300 hover:opacity-80',
             }
             return (
               <button key={cat.key}
@@ -775,7 +830,7 @@ const ApprovalPage = () => {
                 </tr>
               ) : records.map((rec, idx) => (
                 <tr key={rec.id}
-                  style={{ background: idx % 2 === 0 ? '#ffffff' : '#f4f7fa', borderBottom: '1px solid #e8ecf0' }}
+                  // style={{ background: idx % 2 === 0 ? '#ffffff' : '#f4f7fa', borderBottom: '1px solid #e8ecf0' }}
                   onMouseEnter={e => e.currentTarget.style.background = '#eef4ff'}
                   onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f4f7fa'}>
 
@@ -783,20 +838,21 @@ const ApprovalPage = () => {
                   <td className="px-4 py-2.5 whitespace-nowrap sticky left-0 z-10"
                     style={{ background: 'inherit', borderRight: '1px solid #e2e8f0' }}>
                     <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                      style={{
-                        color: rec.category === 'Exact Match' ? '#1a3a5c' :
-                               rec.category === 'AI Match' ? '#1a3a5c' :
-                               rec.category === 'Manual Review' ? '#1a3a5c' :
-                               rec.category === 'Physical Unmatched' ? '#1a3a5c' :
-                               rec.category === 'ERP Unmatched' ? '#1a3a5c' :
-                               rec.category === 'Duplicate' ? '#1a3a5c' : '#1a3a5c',
-                        background: rec.category === 'Exact Match' ? '#f1f1f1' :
-                                    rec.category === 'AI Match' ? '#f1f1f1' :
-                                    rec.category === 'Manual Review' ? '#f1f1f1' :
-                                    rec.category === 'Physical Unmatched' ? '#f1f1f1' :
-                                    rec.category === 'ERP Unmatched' ? '#f1f1f1' :
-                                    rec.category === 'Duplicate' ? '#f1f1f1' : '#f1f1f1',
-                      }}>
+                      // style={{
+                      //   color: rec.category === 'Exact Match' ? '#1a3a5c' :
+                      //          rec.category === 'AI Match' ? '#1a3a5c' :
+                      //          rec.category === 'Manual Review' ? '#1a3a5c' :
+                      //          rec.category === 'Physical Unmatched' ? '#1a3a5c' :
+                      //          rec.category === 'ERP Unmatched' ? '#1a3a5c' :
+                      //          rec.category === 'Duplicate' ? '#1a3a5c' : '#1a3a5c',
+                      //   background: rec.category === 'Exact Match' ? '#f1f1f1' :
+                      //               rec.category === 'AI Match' ? '#f1f1f1' :
+                      //               rec.category === 'Manual Review' ? '#f1f1f1' :
+                      //               rec.category === 'Physical Unmatched' ? '#f1f1f1' :
+                      //               rec.category === 'ERP Unmatched' ? '#f1f1f1' :
+                      //               rec.category === 'Duplicate' ? '#f1f1f1' : '#f1f1f1',
+                      // }}
+                      >
                       {rec.category}
                     </span>
                   </td>
@@ -808,11 +864,13 @@ const ApprovalPage = () => {
                     return (
                       <React.Fragment key={p.label}>
                         <td className={`px-4 py-2.5 text-xs ${w}`}
-                          style={{ color: '#334155', background: 'rgba(124,58,237,0.02)' }}>
+                          // style={{ color: '#334155', background: 'rgba(124,58,237,0.02)' }}
+                          >
                           {isExpanded ? <span>{rec[p.cKey]}</span> : <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>}
                         </td>
                         <td className={`px-4 py-2.5 text-xs ${w}`}
-                          style={{ color: '#334155', background: 'rgba(15,118,110,0.02)', borderRight: '1px solid #e2e8f0' }}>
+                          // style={{ color: '#334155', background: 'rgba(15,118,110,0.02)', borderRight: '1px solid #e2e8f0' }}
+                          >
                           {isExpanded ? <span>{rec[p.iKey]}</span> : <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>}
                         </td>
                       </React.Fragment>
@@ -821,26 +879,33 @@ const ApprovalPage = () => {
 
                   {/* Match */}
                   <td className="px-4 py-2.5 text-xs whitespace-nowrap font-medium"
-                    style={{ color: '#64748b', borderLeft: '1px solid #e2e8f0' }}>{rec.match_method}</td>
+                    // style={{ color: '#64748b', borderLeft: '1px solid #e2e8f0' }}
+                    >
+                    {rec.match_method}
+                  </td>
 
                   {/* Confidence */}
                   <td className="px-4 py-2.5 text-xs whitespace-nowrap font-bold"
-                    style={{ color: '#8E288D' }}>{rec.confidence}</td>
+                    // style={{ color: '#8E288D' }}
+                    >
+                    {rec.confidence}
+                  </td>
 
                   {/* Dept Reconcile — full cell color */}
                   <td className="px-3 py-2.5 whitespace-nowrap text-center"
                     style={{
                       background:
-                        rec.dept_reconcile === 'Same'                     ? '#f1f1f1' :
-                        rec.dept_reconcile === 'Same Dept, Diff District' ? '#f1f1f1' :
-                        rec.dept_reconcile === 'Diff Dept, Same District' ? '#f1f1f1' :
-                        rec.dept_reconcile === 'Different'                ? '#f1f1f1' : '#f1f1f1',
+                        rec.dept_reconcile === 'Same'                     ? '#ecfdf5' :
+                        rec.dept_reconcile === 'Same Dept, Diff District' ? '#dbeafe' :
+                        rec.dept_reconcile === 'Diff Dept, Same District' ? '#ffedd5' :
+                        rec.dept_reconcile === 'Different'                ? '#fee2e2' : '#f8fafc',
                       color:
                         rec.dept_reconcile === 'Same'                     ? '#1a3a5c' :
                         rec.dept_reconcile === 'Same Dept, Diff District' ? '#1e40af' :
                         rec.dept_reconcile === 'Diff Dept, Same District' ? '#92400e' :
                         rec.dept_reconcile === 'Different'                ? '#991b1b' : '#64748b',
-                    }}>
+                    }}
+                    >
                     <span className="text-xs font-bold">{rec.dept_reconcile || 'N/A'}</span>
                   </td>
 
@@ -848,19 +913,20 @@ const ApprovalPage = () => {
                   <td className="whitespace-nowrap text-center"
                     style={{
                       background: {
-                        reconciled:               '#f1f1f1',
-                        unreconciled:             '#f1f1f1',
-                        surplus_assets:           '#f1f1f1',
-                        exist_in_erp_not_physical:'#f1f1f1',
-                        duplicated:               '#f1f1f1',
-                        unique:                   '#f1f1f1',
-                        pending:                  '#f1f1f1',
-                      }[rec.approval_status] || '#f1f1f1',
+                        reconciled:               '#ecfdf5',
+                        unreconciled:             '#fee2e2',
+                        surplus_assets:           '#ffedd5',
+                        exist_in_erp_not_physical:'#fce7f3',
+                        duplicated:               '#f1f5f9',
+                        unique:                   '#ccfbf1',
+                        pending:                  '#fef3c7',
+                      }[rec.approval_status] || '#f8fafc',
                     }}>
                     {canApprove ? (
                       <div className="px-3 py-2.5">
                         <StatusDropdown
                           recordId={rec.id}
+                          category={rec.category}
                           current={rec.approval_status || 'pending'}
                           onSelect={handleRecordDecision}
                           loading={!!actionLoading[rec.id]}
@@ -900,37 +966,28 @@ const ApprovalPage = () => {
         </div>
 
         {/* Footer — pagination only */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 bg-gray-50/50 px-5 py-3">
           {totalPages > 1 ? (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <p className="text-xs text-gray-500">
                 Showing {((page - 1) * PER_PAGE) + 1}–{Math.min(page * PER_PAGE, totalRecords)} of {totalRecords}
               </p>
-              <div className="flex gap-1 items-center">
+              <div className="flex items-center gap-1">
                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                  className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
-                  <FiChevronLeft className="h-3.5 w-3.5 text-gray-500" />
+                  aria-label="Previous page"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
+                  <FiChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                {[...Array(totalPages)].map((_, i) => {
-                  const pn = i + 1
-                  if (pn === 1 || pn === totalPages || (pn >= page - 1 && pn <= page + 1)) {
-                    return (
-                      <button key={pn} onClick={() => setPage(pn)}
-                        className={`px-2.5 py-1 rounded border text-xs font-medium ${
-                          page === pn ? 'border-[#1a3a5c] text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                        }`}
-                        style={{ background: page === pn ? '#1a3a5c' : undefined }}>
-                        {pn}
-                      </button>
-                    )
-                  } else if (pn === page - 2 || pn === page + 2) {
-                    return <span key={pn} className="text-gray-400 text-xs">…</span>
-                  }
-                  return null
-                })}
+                {getPaginationItems(totalPages, page).map((item, index) => item === 'ellipsis-left' || item === 'ellipsis-right'
+                  ? <span key={`${item}-${index}`} className="flex h-7 w-5 items-center justify-center text-xs text-gray-400">...</span>
+                  : <button key={item} onClick={() => setPage(item)} aria-current={item === page ? 'page' : undefined}
+                    className={`h-7 w-7 rounded-lg border text-xs font-semibold transition ${item === page ? 'border-[#8E288D] bg-[#8E288D] text-white' : 'border-gray-200 text-gray-600 hover:bg-white'}`}>
+                    {item}
+                  </button>)}
                 <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                  className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
-                  <FiChevronRight className="h-3.5 w-3.5 text-gray-500" />
+                  aria-label="Next page"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
+                  <FiChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
@@ -981,7 +1038,7 @@ const ApprovalPage = () => {
         'Duplicate': 'border-gray-250',
       }
       return (
-        <div key={cat.key} className={`bg-white rounded-lg shadow p-4 border-t-4 ${border[cat.key]}`}>
+        <div key={cat.key} className={`bg-white dark:bg-gray-900 rounded-lg shadow p-4 border-t-4 ${border[cat.key]}`}>
           <h3 className="text-sm font-semibold text-gray-700 mb-1">{cat.label}</h3>
           <div className="text-2xl font-bold text-gray-800 mb-1">{s.total}</div>
           <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">

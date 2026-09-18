@@ -273,7 +273,7 @@ const AuditTrail = () => {
 
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
         {filteredLogs.length === 0 ?
           <div className="p-12 text-center text-slate-500">
             <FiActivity className="mx-auto mb-3 h-12 w-12 text-slate-300" />
@@ -281,20 +281,20 @@ const AuditTrail = () => {
             <p className="mt-1 text-sm">Try adjusting your filters or search</p>
           </div> :
           <div className="overflow-x-auto">
-            <table className="min-w-[1050px] w-full text-center">
-              <thead className="bg-slate-50 text-[12px] uppercase tracking-wide text-[#8E288D] text-center">
+            <table className="min-w-[1050px] w-full text-center dark:bg-gray-900">
+              <thead className="bg-slate-50 text-[12px] uppercase tracking-wide text-[#8E288D] text-center dark:bg-gray-800">
                 <tr>
                   {['Timestamp', 'User', 'Action', 'Module', 'Details', 'IP Address', 'Status'].map(header => 
                   <th key={header} className="border-b border-slate-200 px-4 py-3 font-bold">{header}</th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-gray-700">
                 {paginatedLogs.map(log => { const meta = getMeta(log.operation_type); 
                 const Icon = meta.icon; const status = getStatus(log.operation_type);
                 const expanded = expandedLog === log.id; 
                 return <React.Fragment key={log.id}>
-                <tr onClick={() => setExpandedLog(expanded ? null : log.id)} className="cursor-pointer transition-colors hover:bg-slate-50">
+                <tr onClick={() => setExpandedLog(expanded ? null : log.id)} className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-gray-800">
                   <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
                     {new Date(log.timestamp).toLocaleString()}
                   </td>
@@ -343,7 +343,7 @@ const AuditTrail = () => {
               </tbody>
             </table>
           </div>}
-        {filteredLogs.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 px-5 py-3"><span className="text-xs text-gray-500">Showing {(safePage - 1) * LOGS_PER_PAGE + 1}–{Math.min(safePage * LOGS_PER_PAGE, filteredLogs.length)} of {filteredLogs.length} logs</span><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-xs font-semibold text-slate-600">Logs <select value={limit} onChange={event => setLimit(Number(event.target.value))} className="appearance-none rounded-lg border border-[#972b91] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none transition hover:border-[#7d2278] focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D]"><option value="50">50 logs</option><option value="100">100 logs</option><option value="200">200 logs</option><option value="500">500 logs</option><option value="1000">1 000 logs</option></select></label><div className="flex items-center gap-1"><button onClick={() => setPage(current => Math.max(1, current - 1))} disabled={safePage === 1} aria-label="Previous page" className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"><FiChevronLeft className="h-3.5 w-3.5" /></button>{paginationItems.map((item, index) => item === 'ellipsis-left' || item === 'ellipsis-right' ? <span key={`${item}-${index}`} className="flex h-7 w-5 items-center justify-center text-xs text-gray-400">...</span> : <button key={item} onClick={() => setPage(item)} aria-current={item === safePage ? 'page' : undefined} className={`h-7 w-7 rounded-lg border text-xs font-semibold transition ${item === safePage ? 'border-[#8E288D] bg-[#8E288D] text-white' : 'border-gray-200 text-gray-600 hover:bg-white'}`}>{item}</button>)}<button onClick={() => setPage(current => Math.min(totalPages, current + 1))} disabled={safePage === totalPages} aria-label="Next page" className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"><FiChevronRight className="h-3.5 w-3.5" /></button></div></div></div>}
+        {filteredLogs.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 px-5 py-3 dark:border-gray-700 dark:bg-gray-800"><span className="text-xs text-gray-500 dark:text-gray-300">Showing {(safePage - 1) * LOGS_PER_PAGE + 1}–{Math.min(safePage * LOGS_PER_PAGE, filteredLogs.length)} of {filteredLogs.length} logs</span><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-gray-300">Logs <select value={limit} onChange={event => setLimit(Number(event.target.value))} className="appearance-none rounded-lg border border-[#972b91] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none transition hover:border-[#7d2278] focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D] dark:bg-gray-900 dark:text-gray-200"><option value="50">50 logs</option><option value="100">100 logs</option><option value="200">200 logs</option><option value="500">500 logs</option><option value="1000">1 000 logs</option></select></label><div className="flex items-center gap-1"><button onClick={() => setPage(current => Math.max(1, current - 1))} disabled={safePage === 1} aria-label="Previous page" className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"><FiChevronLeft className="h-3.5 w-3.5" /></button>{paginationItems.map((item, index) => item === 'ellipsis-left' || item === 'ellipsis-right' ? <span key={`${item}-${index}`} className="flex h-7 w-5 items-center justify-center text-xs text-gray-400">...</span> : <button key={item} onClick={() => setPage(item)} aria-current={item === safePage ? 'page' : undefined} className={`h-7 w-7 rounded-lg border text-xs font-semibold transition ${item === safePage ? 'border-[#8E288D] bg-[#8E288D] text-white' : 'border-gray-200 text-gray-600 hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'}`}>{item}</button>)}<button onClick={() => setPage(current => Math.min(totalPages, current + 1))} disabled={safePage === totalPages} aria-label="Next page" className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"><FiChevronRight className="h-3.5 w-3.5" /></button></div></div></div>}
       </div>
     </div>
   )

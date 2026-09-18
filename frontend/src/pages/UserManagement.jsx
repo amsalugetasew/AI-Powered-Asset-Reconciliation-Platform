@@ -682,12 +682,23 @@ const UserManagement = () => {
                   </button>
                 </div>
               </Field>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-                <button type="submit"
-                  className="flex-1 px-4 py-2.5 rounded-full bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors">Create Account</button>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="w-36 h-10 rounded-lg bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors"
+                >
+                  Create Account
+                </button>
               </div>
+              
             </form>
           </div>
         </div>
@@ -758,11 +769,12 @@ const UserManagement = () => {
                   </div>
                 </Field>
               </div>
-              <div className="flex gap-3 pt-2">
+              <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowEditModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                  className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
                 <button type="submit"
-                  className="flex-1 px-4 py-2.5 rounded-full bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors">Save Changes</button>
+                  className="w-36 h-10 rounded-lg bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors">
+                    Save Changes</button>
               </div>
             </form>
           </div>
@@ -791,11 +803,11 @@ const UserManagement = () => {
             <p className="text-gray-700 mb-6 text-sm">
               Are you sure you want to {pendingAction === 'deactivate' ? 'deactivate' : 'activate'} <strong>{selectedUser.username}</strong>?
             </p>
-            <div className="flex gap-3">
+            <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => { setShowActionModal(false); setSelectedUser(null); setPendingAction(null) }}
-                className="flex-1 px-4 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
               <button onClick={confirmPendingAction}
-                className={`flex-1 px-4 py-2 rounded-full text-sm font-semibold text-white transition-colors ${pendingAction === 'deactivate' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                className={`w-36 h-10 rounded-lg text-sm font-semibold text-white transition-colors ${pendingAction === 'deactivate' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
                 {pendingAction === 'deactivate' ? 'Deactivate' : 'Activate'}
               </button>
             </div>
@@ -843,11 +855,11 @@ const UserManagement = () => {
                   {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
-              <div className="flex gap-3 pt-2">
+              <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => { setShowResetPasswordModal(false); setSelectedUser(null); setResetForm({ newPassword: '', confirmPassword: '' }) }}
-                  className="flex-1 px-4 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                  className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
                 <button type="submit"
-                  className="flex-1 px-4 py-2 rounded-full bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors">Reset Password</button>
+                  className="w-36 h-10 rounded-lg bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors">Reset Password</button>
               </div>
             </form>
           </div>
@@ -868,13 +880,13 @@ const UserManagement = () => {
               </div>
             </div>
             <p className="text-sm text-gray-700 mb-6">
-              Are you sure you want to delete <strong>{selectedUser.username}</strong>? All associated reconciliations will also be deleted.
+              Are you sure you want to delete <strong>{selectedUser.full_name}</strong>? All associated reconciliations will also be deleted.
             </p>
-            <div className="flex gap-3">
+            <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => { setShowDeleteModal(false); setSelectedUser(null) }}
-                className="flex-1 px-4 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
               <button onClick={handleDeleteUser}
-                className="flex-1 px-4 py-2 rounded-full bg-red-600 text-sm font-semibold text-white hover:bg-red-700 transition-colors">Delete User</button>
+                className="w-36 h-10 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 transition-colors">Delete User</button>
             </div>
           </div>
         </div>

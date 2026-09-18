@@ -4,7 +4,7 @@ import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-toastify'
 import { RoleBadge } from './RoleGuard'
-import iconImage from '../assets/CBE_Logo1.PNG'
+import iconImage from '../assets/MyLogo.jpg'
 import { 
   FiHome, FiUpload, FiBarChart2, FiLogOut, FiMenu, FiX,  FiUser, FiSettings, FiSearch, 
   FiBell, FiChevronDown, FiUsers, FiFileText, FiCheckCircle, FiAlertCircle,  FiXCircle, FiInfo, FiEye, FiTrash2, FiMoon, FiSun,
@@ -84,6 +84,21 @@ const Layout = () => {
     setShowNotifications(false)
   }
 
+  const handleNotificationView = async notification => {
+    dismissOne(notification.id)
+    setShowNotifications(false)
+
+    try {
+      await axios.post('/api/activity/notifications/dismiss', {
+        notification_id: notification.id,
+      })
+    } catch {
+      // Local dismissal keeps the viewed notification hidden if the request fails.
+    }
+
+    if (notification.link) navigate(notification.link)
+  }
+
   const severityIcon = (s) => {
     if (s === 'success') return <FiCheckCircle className="text-green-500 flex-shrink-0" />
     if (s === 'warning') return <FiAlertCircle className="text-yellow-500 flex-shrink-0" />
@@ -95,7 +110,7 @@ const Layout = () => {
     if (s === 'success') return 'border-l-green-500'
     if (s === 'warning') return 'border-l-yellow-500'
     if (s === 'error')   return 'border-l-red-500'
-    return 'border-l-blue-500'
+    return 'border-l-rose-500'
   }
 
   const handleLogout = () => {
@@ -223,12 +238,12 @@ const Layout = () => {
   const menuItems = getMenuItems()
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-gray-900 dark:bg-gray-950 dark:text-gray-100 flex font-sans">
+    <div className="h-screen overflow-hidden bg-[#F8F9FA] text-gray-900 dark:bg-gray-950 dark:text-gray-100 flex font-sans">
       {/* Sidebar */}
       <aside
         className={`${
           sidebarOpen ? 'w-64' : 'w-20'
-        } bg-[#701460] text-white transition-all duration-300 ease-in-out fixed h-full z-30 shadow-2xl flex flex-col justify-between`}
+        } ${theme === 'dark' ? 'bg-[#24132d]' : 'bg-[#701460]'} text-white transition-all duration-300 ease-in-out fixed h-full z-30 shadow-2xl flex flex-col justify-between`}
       >
         {/* Top Branding Section */}
         <div>
@@ -280,11 +295,13 @@ const Layout = () => {
                         sidebarOpen ? 'space-x-3 px-3.5 py-2.5' : 'justify-center py-2.5 px-2'
                       } rounded-xl text-sm font-medium transition-all duration-200 ${
                         active
-                          ? 'bg-white text-[#701460] font-semibold shadow-md'
+                          ? theme === 'dark'
+                            ? 'bg-[#3b2447] text-[#f3d7ff] font-semibold shadow-md'
+                            : 'bg-white text-[#701460] font-semibold shadow-md'
                           : 'text-purple-100/80 hover:bg-white/10 hover:text-white'
                       }`}
                     >
-                      <Icon className={`h-5 w-5 flex-shrink-0 ${active ? 'text-[#701460]' : 'text-purple-200'}`} />
+                      <Icon className={`h-5 w-5 flex-shrink-0 ${active ? (theme === 'dark' ? 'text-[#f3d7ff]' : 'text-[#701460]') : 'text-purple-200'}`} />
                       {sidebarOpen && (
                         <span className="truncate">{item.label}</span>
                       )}
@@ -297,7 +314,7 @@ const Layout = () => {
         </div>
 
         {/* Sidebar Bottom Controls */}
-        <div className="p-3.5 border-t border-white/10 space-y-3 bg-[#641155]">
+        <div className={`p-3.5 border-t border-white/10 space-y-3 ${theme === 'dark' ? 'bg-[#1b1022]' : 'bg-[#641155]'}`}>
           {/* Dark Mode Switch */}
           <div
             onClick={toggleTheme}
@@ -329,7 +346,13 @@ const Layout = () => {
           <button
             onClick={handleLogout}
             className={`w-full flex items-center ${
-              sidebarOpen ? 'justify-between px-3 py-2 bg-white text-gray-800 hover:bg-gray-100' : 'justify-center py-2 bg-white text-gray-800 hover:bg-gray-100'
+              sidebarOpen
+                ? theme === 'dark'
+                  ? 'justify-between px-3 py-2 bg-[#302038] text-gray-100 hover:bg-[#432b4f]'
+                  : 'justify-between px-3 py-2 bg-white text-gray-800 hover:bg-gray-100'
+                : theme === 'dark'
+                  ? 'justify-center py-2 bg-[#302038] text-gray-100 hover:bg-[#432b4f]'
+                  : 'justify-center py-2 bg-white text-gray-800 hover:bg-gray-100'
             } rounded-lg text-xs font-semibold shadow-sm transition-colors`}
             title="Log Out"
           >
@@ -340,9 +363,9 @@ const Layout = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 flex flex-col min-h-screen`}>
+      <div className={`min-w-0 min-h-0 flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300 flex flex-col`}>
         {/* Top Navbar */}
-        <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 px-6 py-3 shadow-sm flex-shrink-0">
+        <nav className="min-w-0 overflow-visible bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 px-6 py-3 shadow-sm flex-shrink-0">
           <div className="flex justify-between items-center gap-4">
             {/* Left: Breadcrumb / Greeting */}
             <div className="flex items-center space-x-2 text-sm">
@@ -351,12 +374,12 @@ const Layout = () => {
               </span>
               <span className="text-gray-400">›</span>
               <span className="text-gray-500 dark:text-gray-400">
-                Welcome back, <span className="font-medium text-gray-700 dark:text-gray-200">{user?.username || 'User'}</span>
+                Welcome, <span className="font-medium text-gray-700 dark:text-gray-200">{user?.full_name || 'User'} </span>
               </span>
             </div>
 
             {/* Middle: Search Input */}
-            <div className="hidden md:flex flex-1 max-w-md mx-6">
+            {/* <div className="hidden md:flex flex-1 max-w-md mx-6">
               <div className="relative w-full">
                 <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
@@ -367,7 +390,7 @@ const Layout = () => {
                   className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full pl-9 pr-4 py-1.5 text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#701460]/40 focus:border-[#701460]"
                 />
               </div>
-            </div>
+            </div> */}
 
             {/* Right: Actions (Notification, Settings, User Profile) */}
             <div className="flex items-center space-x-3">
@@ -380,7 +403,7 @@ const Layout = () => {
                 >
                   <FiBell className="h-5 w-5" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 min-w-[16px] h-[16px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 shadow">
+                    <span className="absolute top-1 right-1 min-w-[16px] h-[16px] bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 shadow">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
@@ -433,8 +456,8 @@ const Layout = () => {
                               <div className="flex gap-1 flex-shrink-0 ml-1">
                                 {notif.link && (
                                   <button
-                                    onClick={() => { navigate(notif.link); setShowNotifications(false) }}
-                                    className="p-1 rounded text-gray-400 hover:text-[#701460] hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors"
+                                    onClick={() => handleNotificationView(notif)}
+                                    className="p-1 rounded text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors"
                                     title="View">
                                     <FiEye className="h-3.5 w-3.5" />
                                   </button>
@@ -474,9 +497,9 @@ const Layout = () => {
                     setShowUserMenu(!showUserMenu)
                     setShowNotifications(false)
                   }}
-                  className="flex items-center space-x-2.5 p-1 pl-2 rounded-full bg-purple-100 hover:bg-purple-200 dark:hover:bg-gray-800 transition-colors"
+                  className={`flex items-center space-x-2.5 p-1 pl-2 rounded-full transition-colors ${theme === 'dark' ? 'bg-[#302038] hover:bg-[#432b4f]' : 'bg-purple-100 hover:bg-purple-200'}`}
                 >
-                  <div className="w-8 h-8 rounded-full overflow-hidden bg-[#701460] text-white flex items-center justify-center font-semibold text-xs border border-purple-200">
+                  <div className={`w-8 h-8 rounded-full overflow-hidden text-white flex items-center justify-center font-semibold text-xs ${theme === 'dark' ? 'bg-[#5b2a68] border border-[#8e5a9e]' : 'bg-[#701460] border border-purple-200'}`}>
                     {avatarSrc ? (
                       <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
@@ -544,8 +567,8 @@ const Layout = () => {
         </nav>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto bg-[#F8F9FA] dark:bg-gray-950">
-          <main className="p-6">
+        <div className="min-w-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto bg-[#F8F9FA] dark:bg-gray-950">
+          <main className="min-w-0 p-6">
             <div className="max-w-[1600px] mx-auto">
               <Outlet />
             </div>
@@ -577,10 +600,10 @@ const Layout = () => {
                   : 'This will disable your access until reactivated.'}
             </p>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setConfirmAction(null)} className="flex-1 max-w-24 h-10 rounded-lg border border-gray-300 text-gray-700">
+              <button onClick={() => setConfirmAction(null)} className="w-28 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
-              <button onClick={confirmAccountAction} className="flex-1 max-w-24 h-10 rounded-lg bg-pink-500 text-white">
+              <button onClick={confirmAccountAction} className="w-28 h-10 rounded-lg bg-pink-500 text-sm font-semibold text-white hover:bg-pink-600 transition-colors">
                 Yes
               </button>
             </div>
@@ -607,13 +630,13 @@ const Layout = () => {
               <div className="px-6 py-4 border-b border-gray-200 flex gap-2">
                 <button
                   onClick={() => setProfileTab('profile')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium ${profileTab === 'profile' ? 'bg-[#8E288D] text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-4 py-2 min-w-36 h-10 rounded-lg text-sm font-medium ${profileTab === 'profile' ? 'bg-[#8E288D] text-white' : 'bg-gray-100 text-gray-700'}`}
                 >
                   Profile
                 </button>
                 <button
                   onClick={() => setProfileTab('settings')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium ${profileTab === 'settings' ? 'bg-[#8E288D] text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-4 py-2 min-w-36 h-10 rounded-lg text-sm font-medium ${profileTab === 'settings' ? 'bg-[#8E288D] text-white' : 'bg-gray-100 text-gray-700'}`}
                 >
                   Password
                 </button>
@@ -660,8 +683,8 @@ const Layout = () => {
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setShowProfileModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancel</button>
-                  <button type="submit" disabled={isSaving} className="px-4 py-2 rounded-lg bg-[#8E288D] text-white disabled:opacity-60">
+                  <button type="button" onClick={() => setShowProfileModal(false)} className="px-4 py-2 min-w-36 h-10 rounded-lg border border-gray-300 text-gray-700">Cancel</button>
+                  <button type="submit" disabled={isSaving} className="px-4 py-2 min-w-36 h-10 rounded-lg bg-[#8E288D] text-white disabled:opacity-60">
                     {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
@@ -745,8 +768,8 @@ const Layout = () => {
                   </div>
 
                   <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={() => setShowProfileModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancel</button>
-                    <button type="submit" disabled={isSaving} className="px-4 py-2 rounded-lg bg-[#8E288D] text-white disabled:opacity-60">
+                    <button type="button" onClick={() => setShowProfileModal(false)} className="px-4 py-2 min-w-36 h-10 rounded-lg border border-gray-300 text-gray-700">Cancel</button>
+                    <button type="submit" disabled={isSaving} className="px-4 py-2 min-w-36 h-10 rounded-lg bg-[#8E288D] text-white disabled:opacity-60">
                       {isSaving ? 'Updating...' : 'Change Password'}
                     </button>
                   </div>

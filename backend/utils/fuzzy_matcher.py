@@ -1,5 +1,5 @@
 import pandas as pd
-from fuzzywuzzy import fuzz
+from rapidfuzz import fuzz
 from typing import Tuple, List, Dict
 
 class FuzzyMatcher:
@@ -11,14 +11,14 @@ class FuzzyMatcher:
         scores = []
         weights = []
         
-        # Description similarity (weight: 0.35)
+        # Description similarity (weight: 0.40)
         if customer_row.get('description') and internal_row.get('description'):
             desc_score = fuzz.token_set_ratio(
                 str(customer_row['description']),
                 str(internal_row['description'])
             ) / 100.0
             scores.append(desc_score)
-            weights.append(0.35)
+            weights.append(0.40)
         
         # # Serial number similarity (weight: 0.20)
         # if customer_row.get('serial_no') and internal_row.get('serial_no'):
@@ -29,23 +29,23 @@ class FuzzyMatcher:
         #     scores.append(serial_score)
         #     weights.append(0.20)
         
-        # Department similarity (weight: 0.10)
+        # Department similarity (weight: 0.15)
         if customer_row.get('department') and internal_row.get('department'):
             dept_score = fuzz.token_set_ratio(
                 str(customer_row['department']),
                 str(internal_row['department'])
             ) / 100.0
             scores.append(dept_score)
-            weights.append(0.10)
+            weights.append(0.15)
         
-        # Asset number similarity (weight: 0.10)
+        # Asset number similarity (weight: 0.05)
         if customer_row.get('asset_number') and internal_row.get('asset_number'):
             asset_score = fuzz.ratio(
                 str(customer_row['asset_number']),
                 str(internal_row['asset_number'])
             ) / 100.0
             scores.append(asset_score)
-            weights.append(0.10)
+            weights.append(0.05)
             
         # Category similarity (weight: 0.15)
         if customer_row.get('category') and internal_row.get('category'):
@@ -56,16 +56,16 @@ class FuzzyMatcher:
             scores.append(cat_score)
             weights.append(0.15)
             
-        # District similarity (weight: 0.10)
+        # District similarity (weight: 0.15)
         if customer_row.get('district') and internal_row.get('district'):
             dist_score = fuzz.token_set_ratio(
                 str(customer_row['district']),
                 str(internal_row['district'])
             ) / 100.0
             scores.append(dist_score)
-            weights.append(0.10)
+            weights.append(0.15)
             
-        # Year similarity (weight: 0.15)
+        # Year similarity (weight: 0.05)
         if pd.notna(customer_row.get('year')) and pd.notna(internal_row.get('year')):
             try:
                 c_year = int(customer_row['year'])
@@ -76,7 +76,7 @@ class FuzzyMatcher:
                     year_diff = abs(c_year - i_year)
                     year_score = max(0.0, 1.0 - (year_diff * 0.1))
                     scores.append(year_score)
-                weights.append(0.15)
+                weights.append(0.05)
             except (ValueError, TypeError):
                 pass
         

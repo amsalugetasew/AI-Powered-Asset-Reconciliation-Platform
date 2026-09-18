@@ -43,6 +43,13 @@ const APPROVAL_LABEL = {
   unique: 'Unique',
 }
 
+const getPaginationItems = (totalPages, currentPage) => {
+  if (totalPages <= 5) return Array.from({ length: totalPages }, (_, index) => index + 1)
+  if (currentPage <= 3) return [1, 2, 3, 4, 'ellipsis-right', totalPages]
+  if (currentPage >= totalPages - 2) return [1, 'ellipsis-left', totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+  return [1, 'ellipsis-left', currentPage - 1, currentPage, currentPage + 1, 'ellipsis-right', totalPages]
+}
+
 const Results = () => {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -370,12 +377,12 @@ const Results = () => {
         {/* Category tabs */}
         <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-white px-4 py-3">
           {[
-            { key: 'all',           label: 'All',                                          cls: 'bg-white text-gray-600 border-gray-300',       active: 'bg-[#1a3a5c] text-white border-[#1a3a5c]' },
-            { key: 'Exact Match',   label: `Exact Match (${stats.rule_matched})`,           cls: 'bg-white text-[#8E288D] border-[#8E288D]',     active: 'bg-[#8E288D] text-white border-[#8E288D]'  },
-            { key: 'AI Match',      label: `AI Match (${stats.ai_matched})`,                cls: 'bg-white text-[#CFB53B] border-[#CFB53B]',   active: 'bg-[#CFB53B] text-white border-[#CFB53B]'  },
-            { key: 'Manual Review', label: `Manual Review (${stats.manual_review})`,           cls: 'bg-white text-[#CFB53B] border-[#CFB53B]',       active: 'bg-[#CFB53B] text-white border-[#CFB53B]'    },
-            { key: 'Unmatched',     label: `Unmatched (${stats.customer_unmatched})`,       cls: 'bg-white text-red-600 border-red-300',         active: 'bg-red-600 text-white border-red-600'      },
-            { key: 'Duplicate',     label: `Duplicates (${(stats.customer_duplicates||0)+(stats.internal_duplicates||0)})`, cls: 'bg-white text-pink-600 border-pink-300', active: 'bg-pink-600 text-white border-pink-600' },
+            { key: 'all',           label: 'All',                                          cls: 'bg-white text-gray-600 border-gray-300',       active: 'bg-[#8E288D] text-white border-[#8E288D]' },
+            { key: 'Exact Match',   label: `Exact Match (${stats.rule_matched})`,           cls: 'bg-white text-gray-600 border-gray-300',     active: 'bg-[#8E288D] text-white border-[#8E288D]'  },
+            { key: 'AI Match',      label: `AI Match (${stats.ai_matched})`,                cls: 'bg-white text-gray-600 border-gray-300',   active: 'bg-[#8E288D] text-white border-[#8E288D]'  },
+            { key: 'Manual Review', label: `Manual Review (${stats.manual_review})`,           cls: 'bg-white text-gray-600 border-gray-300',       active: 'bg-[#8E288D] text-white border-[#8E288D]'    },
+            { key: 'Unmatched',     label: `Unmatched (${stats.customer_unmatched})`,       cls: 'bg-white text-gray-600 border-gray-300',         active: 'bg-[#8E288D] text-white border-[#8E288D]'      },
+            { key: 'Duplicate',     label: `Duplicates (${(stats.customer_duplicates||0)+(stats.internal_duplicates||0)})`, cls: 'bg-white text-gray-600 border-gray-300', active: 'bg-[#8E288D] text-white border-[#8E288D]' },
           ].map(tab => (
             <button key={tab.key}
               onClick={() => handleCategoryChange(tab.key)}
@@ -476,28 +483,31 @@ const Results = () => {
                     </tr>
                   ) : records.map((rec, idx) => (
                     <tr key={rec.id}
-                      style={{ background: idx % 2 === 0 ? '#ffffff' : '#f4f7fa', borderBottom: '1px solid #e8ecf0' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#eef4ff'}
-                      onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f4f7fa'}>
+                      // style={{ background: idx % 2 === 0 ? '#ffffff' : '#f4f7fa', borderBottom: '1px solid #e8ecf0' }}
+                      // onMouseEnter={e => e.currentTarget.style.background = '#eef4ff'}
+                      // onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f4f7fa'}
+                      >
 
                       {/* Category */}
-                      <td className="px-4 py-2.5 whitespace-nowrap sticky left-0 z-10"
-                        style={{ background: 'inherit', borderRight: '1px solid #e2e8f0' }}>
+                      <td className="px-4 py-3 whitespace-nowrap sticky left-0 z-10"
+                        // style={{ background: 'inherit', borderRight: '1px solid #e2e8f0' }}
+                        >
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                          style={{
-                            color: rec.category === 'Exact Match' ? '#1a3a5c' :
-                                   rec.category === 'AI Match' ? '#1a3a5c' :
-                                   rec.category === 'Manual Review' ? '#1a3a5c' :
-                                   rec.category === 'Physical Unmatched' ? '#1a3a5c' :
-                                   rec.category === 'ERP Unmatched' ? '#1a3a5c' :
-                                   rec.category === 'Duplicate' ? '#1a3a5c' : '#1a3a5c',
-                            background: rec.category === 'Exact Match' ? '#fff' :
-                                        rec.category === 'AI Match' ? '#fff' :
-                                        rec.category === 'Manual Review' ? '#fff' :
-                                        rec.category === 'Physical Unmatched' ? '#fff' :
-                                        rec.category === 'ERP Unmatched' ? '#fff' :
-                                        rec.category === 'Duplicate' ? '#fce7f3' : '#f1f5f9',
-                          }}>
+                          // style={{
+                          //   color: rec.category === 'Exact Match' ? '#1a3a5c' :
+                          //          rec.category === 'AI Match' ? '#1a3a5c' :
+                          //          rec.category === 'Manual Review' ? '#1a3a5c' :
+                          //          rec.category === 'Physical Unmatched' ? '#1a3a5c' :
+                          //          rec.category === 'ERP Unmatched' ? '#1a3a5c' :
+                          //          rec.category === 'Duplicate' ? '#1a3a5c' : '#1a3a5c',
+                          //   background: rec.category === 'Exact Match' ? '#fff' :
+                          //               rec.category === 'AI Match' ? '#fff' :
+                          //               rec.category === 'Manual Review' ? '#fff' :
+                          //               rec.category === 'Physical Unmatched' ? '#fff' :
+                          //               rec.category === 'ERP Unmatched' ? '#fff' :
+                          //               rec.category === 'Duplicate' ? '#fce7f3' : '#f1f5f9',
+                          // }}
+                          >
                           {rec.category}
                         </span>
                       </td>
@@ -510,12 +520,14 @@ const Results = () => {
                           : 'max-w-[140px] whitespace-nowrap overflow-hidden'
                         return (
                           <React.Fragment key={p.label}>
-                            <td className={`px-4 py-2.5 text-xs ${w}`}
-                              style={{ color: '#334155', background: 'rgba(124,58,237,0.015)' }}>
+                            <td className={`px-4 py-3 text-xs ${w}`}
+                              // style={{ color: '#334155', background: 'rgba(124,58,237,0.015)' }}
+                              >
                               {isExpanded ? <span>{rec[p.cKey]}</span> : <div className="truncate" title={rec[p.cKey]}>{rec[p.cKey]}</div>}
                             </td>
-                            <td className={`px-4 py-2.5 text-xs ${w}`}
-                              style={{ color: '#334155', background: 'rgba(15,118,110,0.015)', borderRight: '1px solid #e8ecf0' }}>
+                            <td className={`px-4 py-3 text-xs ${w}`}
+                              // style={{ color: '#334155', background: 'rgba(15,118,110,0.015)', borderRight: '1px solid #e8ecf0' }}
+                              >
                               {isExpanded ? <span>{rec[p.iKey]}</span> : <div className="truncate" title={rec[p.iKey]}>{rec[p.iKey]}</div>}
                             </td>
                           </React.Fragment>
@@ -523,19 +535,21 @@ const Results = () => {
                       })}
 
                       {/* Match */}
-                      <td className="px-4 py-2.5 text-xs font-medium whitespace-nowrap"
-                        style={{ color: '#64748b', borderLeft: '1px solid #e2e8f0' }}>
+                      <td className="px-4 py-3 text-xs font-medium whitespace-nowrap"
+                        // style={{ color: '#64748b', borderLeft: '1px solid #e2e8f0' }}
+                        >
                         {rec.match_method}
                       </td>
 
                       {/* Confidence */}
-                      <td className="px-4 py-2.5 text-xs font-bold whitespace-nowrap"
-                        style={{ color: '#8E288D' }}>
+                      <td className="px-4 py-3 text-xs font-bold whitespace-nowrap"
+                        // style={{ color: '#8E288D' }}
+                        >
                         {rec.confidence}
                       </td>
 
                       {/* Dept Reconcile — pastel full-cell */}
-                      <td className="px-3 py-2.5 whitespace-nowrap text-center"
+                      <td className="px-3 py-3 whitespace-nowrap text-center"
                         style={{
                           background: rec.dept_reconcile === 'Same'                     ? '#f1f1f1' :
                                       rec.dept_reconcile === 'Same Dept, Diff District' ? '#dbeafe' :
@@ -550,7 +564,7 @@ const Results = () => {
                       </td>
 
                       {/* Approval — pastel full-cell */}
-                      <td className="px-3 py-2.5 whitespace-nowrap text-center"
+                      <td className="px-3 py-3 whitespace-nowrap text-center"
                         style={{
                           background: {
                             reconciled:               '#f1f1f1',
@@ -580,51 +594,41 @@ const Results = () => {
             </div>
 
             {/* Footer — pagination + download */}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white">
-              {totalPages > 1 ? (
-                <div className="flex items-center gap-3">
-                  <p className="text-xs text-gray-500">
-                    Showing {((currentPage-1)*recordsPerPage)+1}–{Math.min(currentPage*recordsPerPage, totalRecords)} of {totalRecords}
-                  </p>
-                  <div className="flex gap-1 items-center">
-                    <button onClick={() => handlePageChange(currentPage-1)} disabled={currentPage===1}
-                      className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
-                      <FiChevronLeft className="h-3.5 w-3.5 text-gray-500" />
-                    </button>
-                    {[...Array(totalPages)].map((_, i) => {
-                      const pn = i+1
-                      if (pn===1||pn===totalPages||(pn>=currentPage-1&&pn<=currentPage+1)) {
-                        return (
-                          <button key={pn} onClick={() => handlePageChange(pn)}
-                            className={`px-2.5 py-1 rounded border text-xs font-medium ${
-                              currentPage===pn ? 'border-[#1a3a5c] text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                            }`}
-                            style={{ background: currentPage===pn ? '#1a3a5c' : undefined }}>
-                            {pn}
-                          </button>
-                        )
-                      } else if (pn===currentPage-2||pn===currentPage+2) {
-                        return <span key={pn} className="text-gray-400 text-xs">…</span>
-                      }
-                      return null
-                    })}
-                    <button onClick={() => handlePageChange(currentPage+1)} disabled={currentPage===totalPages}
-                      className="p-1.5 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">
-                      <FiChevronRight className="h-3.5 w-3.5 text-gray-500" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <span className="text-xs text-gray-400">{totalRecords} records</span>
-              )}
-              {/* Download CSV */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 px-5 py-3">
               <button
                 onClick={handleDownload}
-                className="text-xs font-semibold hover:underline flex items-center gap-1"
+                className="order-2 text-xs font-semibold hover:underline sm:order-1 flex items-center gap-1"
                 style={{ color: '#1a3a5c' }}>
                 <FiDownload className="h-3.5 w-3.5" />
                 Download Data (CSV/Excel)
               </button>
+              {totalPages > 1 ? (
+                <div className="order-1 flex flex-wrap items-center justify-end gap-3 sm:order-2">
+                  <p className="text-xs text-gray-500">
+                    Showing {((currentPage-1)*recordsPerPage)+1}–{Math.min(currentPage*recordsPerPage, totalRecords)} of {totalRecords}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => handlePageChange(currentPage-1)} disabled={currentPage===1}
+                      aria-label="Previous page"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
+                      <FiChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    {getPaginationItems(totalPages, currentPage).map((item, index) => item === 'ellipsis-left' || item === 'ellipsis-right'
+                      ? <span key={`${item}-${index}`} className="flex h-7 w-5 items-center justify-center text-xs text-gray-400">...</span>
+                      : <button key={item} onClick={() => handlePageChange(item)} aria-current={item === currentPage ? 'page' : undefined}
+                        className={`h-7 w-7 rounded-lg border text-xs font-semibold transition ${item === currentPage ? 'border-[#8E288D] bg-[#8E288D] text-white' : 'border-gray-200 text-gray-600 hover:bg-white'}`}>
+                        {item}
+                      </button>)}
+                    <button onClick={() => handlePageChange(currentPage+1)} disabled={currentPage===totalPages}
+                      aria-label="Next page"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">
+                      <FiChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <span className="order-1 text-xs text-gray-400 sm:order-2">{totalRecords} records</span>
+              )}
             </div>
           </>
         )}

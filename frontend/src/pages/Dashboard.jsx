@@ -1257,18 +1257,18 @@ const Dashboard = () => {
             <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
               Are you sure you want to permanently delete this reconciliation job and all its analyzed asset records? This action cannot be undone.
             </p>
-            <div className="mt-5 flex items-center justify-end space-x-2">
+            <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setDeleteConfirmId(null)}
                 disabled={deleting}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="w-28 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirmId)}
                 disabled={deleting}
-                className="px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-colors flex items-center space-x-1.5"
+                className="w-28 h-10 rounded-lg bg-rose-600 text-sm font-semibold text-white hover:bg-rose-700 transition-colors flex items-center justify-center space-x-1.5"
               >
                 {deleting ? <FiLoader className="animate-spin h-3.5 w-3.5" /> : <FiTrash2 className="h-3.5 w-3.5" />}
                 <span>{deleting ? 'Deleting...' : 'Delete Job'}</span>

@@ -11,6 +11,9 @@
   --app-text: #111827;
   --app-muted: #6b7280;
   --app-border: #e5e7eb;
+  --app-table-header: #f8fafc;
+  --app-table-hover: #fff8fc;
+  --app-input: #ffffff;
 }
 
 html.dark {
@@ -22,6 +25,9 @@ html.dark {
   --app-text: #f9fafb;
   --app-muted: #9ca3af;
   --app-border: #4b5563;
+  --app-table-header: #1f2937;
+  --app-table-hover: #31213a;
+  --app-input: #111827;
 }
 
 * {
@@ -51,6 +57,48 @@ html.dark .bg-white {
   background-color: var(--app-surface) !important;
 }
 
+html.dark .bg-slate-50,
+html.dark .bg-gray-50,
+html.dark [class*="bg-[#f7f9fc"] {
+  background-color: var(--app-bg) !important;
+}
+
+html.dark .bg-slate-100,
+html.dark .bg-gray-100,
+html.dark [class*="bg-[#f8f9fa"] {
+  background-color: var(--app-surface-alt) !important;
+}
+
+html.dark .bg-slate-200,
+html.dark .bg-gray-200 {
+  background-color: var(--app-surface-muted) !important;
+}
+
+html.dark .bg-gray-50\/50,
+html.dark .bg-slate-50\/50,
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover {
+  background-color: var(--app-surface-alt) !important;
+}
+
+html.dark .bg-purple-50,
+html.dark .bg-teal-50,
+html.dark .bg-yellow-50,
+html.dark .bg-red-50,
+html.dark .bg-pink-50 {
+  background-color: var(--app-surface-alt) !important;
+}
+
+html.dark [class*="bg-[#fbfaff"],
+html.dark [class*="bg-[#fcf8fd"],
+html.dark [class*="bg-[#f7fffc"],
+html.dark [class*="bg-[#f5fffb"],
+html.dark [class*="bg-[#fffdf5"],
+html.dark [class*="bg-[#f1f5f9"],
+html.dark [class*="bg-[#f8fafc"] {
+  background-color: var(--app-surface-alt) !important;
+}
+
 html.dark .bg-gray-50 {
   background-color: var(--app-bg) !important;
 }
@@ -69,6 +117,21 @@ html.dark .text-gray-700 {
   color: var(--app-muted) !important;
 }
 
+html.dark .text-slate-400,
+html.dark .text-slate-500,
+html.dark .text-slate-600,
+html.dark .text-slate-700,
+html.dark .text-slate-800,
+html.dark .text-gray-400 {
+  color: var(--app-muted) !important;
+}
+
+html.dark .text-gray-800,
+html.dark .text-gray-900,
+html.dark .text-slate-900 {
+  color: var(--app-text) !important;
+}
+
 html.dark .text-gray-800,
 html.dark .text-gray-900 {
   color: var(--app-text) !important;
@@ -78,6 +141,31 @@ html.dark .border-gray-100,
 html.dark .border-gray-200,
 html.dark .border-gray-300 {
   border-color: var(--app-border) !important;
+}
+
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+html.dark [class*="border-[#"] {
+  border-color: var(--app-border) !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: var(--app-input) !important;
+  border-color: var(--app-border) !important;
+  color: var(--app-text) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--app-muted) !important;
+}
+
+html.dark option {
+  background-color: var(--app-surface) !important;
+  color: var(--app-text) !important;
 }
 
 html.dark .hover\:bg-gray-50:hover,
@@ -106,6 +194,107 @@ code {
   background-color: #ffffff;
   color: #17324d;
   table-layout: auto;
+}
+
+html.dark .reconciliation-table,
+html.dark .reconciliation-table tbody tr,
+html.dark .reconciliation-table tbody td,
+html.dark .reconciliation-table thead th {
+  background-color: var(--app-surface) !important;
+  color: var(--app-text) !important;
+  border-color: var(--app-border) !important;
+}
+
+html.dark .reconciliation-table thead th {
+  background-color: var(--app-table-header) !important;
+  color: #d8b4fe !important;
+}
+
+html.dark .reconciliation-table tbody tr:hover,
+html.dark .reconciliation-table tbody tr:hover td {
+  background-color: var(--app-table-hover) !important;
+}
+
+html.dark .reconciliation-table .sticky {
+  background-color: var(--app-surface) !important;
+}
+
+html.dark .reconciliation-table td[style*="#ecfdf5"],
+html.dark .reconciliation-table td[style*="#ccfbf1"] {
+  background-color: #12352f !important;
+  color: #a7f3d0 !important;
+}
+
+html.dark .reconciliation-table td[style*="#dbeafe"] {
+  background-color: #172d4d !important;
+  color: #bfdbfe !important;
+}
+
+html.dark .reconciliation-table td[style*="#ffedd5"],
+html.dark .reconciliation-table td[style*="#fef3c7"] {
+  background-color: #4a3218 !important;
+  color: #fed7aa !important;
+}
+
+html.dark .reconciliation-table td[style*="#fee2e2"] {
+  background-color: #4a2028 !important;
+  color: #fecaca !important;
+}
+
+html.dark .reconciliation-table td[style*="#fce7f3"] {
+  background-color: #4a263d !important;
+  color: #fbcfe8 !important;
+}
+
+html.dark .reconciliation-table td[style*="#ede9fe"],
+html.dark .reconciliation-table td[style*="#f1f5f9"],
+html.dark .reconciliation-table td[style*="#f8fafc"],
+html.dark .reconciliation-table td[style*="#f1f1f1"] {
+  background-color: var(--app-surface-alt) !important;
+  color: var(--app-muted) !important;
+}
+
+html.dark .recharts-cartesian-grid line,
+html.dark .recharts-cartesian-axis-line,
+html.dark .recharts-cartesian-axis-tick-line {
+  stroke: #4b5563 !important;
+}
+
+html.dark .recharts-text,
+html.dark .recharts-cartesian-axis-tick-value,
+html.dark .recharts-legend-item-text {
+  fill: #d1d5db !important;
+  color: #d1d5db !important;
+}
+
+html.dark .recharts-default-tooltip,
+html.dark .recharts-tooltip-wrapper > div {
+  background-color: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+  color: var(--app-text) !important;
+}
+
+html.dark .shadow-sm,
+html.dark .shadow,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl,
+html.dark .shadow-2xl {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28) !important;
+}
+
+html.dark button.border-gray-200,
+html.dark button.border-gray-300,
+html.dark button.border-gray-100 {
+  background-color: var(--app-surface-alt);
+  border-color: var(--app-border);
+  color: var(--app-text);
+}
+
+html.dark button.border-gray-200:hover,
+html.dark button.border-gray-300:hover,
+html.dark button.border-gray-100:hover {
+  background-color: var(--app-surface-muted);
 }
 
 .reconciliation-table thead th {
