@@ -23,11 +23,14 @@ const ROLE_COLORS = {
 }
 
 const STATUS_COLORS = {
-  active:   'bg-emerald-50 text-emerald-700',
-  inactive: 'bg-amber-50 text-amber-600',
+  active:    'bg-emerald-50 text-emerald-700',
+  pending:   'bg-amber-50 text-amber-600',
+  suspended: 'bg-rose-50 text-rose-600',
 }
 
-const ITEMS_PER_PAGE = 8
+const getUserStatus = user => user.status || (user.is_active ? 'active' : 'suspended')
+
+const ITEMS_PER_PAGE = 5
 
 // ── Tooltip icon button ───────────────────────────────────────────────────────
 const IconBtn = ({ onClick, title, className, children, disabled }) => (
@@ -249,10 +252,7 @@ const UserManagement = () => {
 
   const filtered = users.filter(u => {
     if (filterRole   !== 'all' && u.role !== filterRole) return false
-    if (filterStatus !== 'all') {
-      if (filterStatus === 'active'   && !u.is_active) return false
-      if (filterStatus === 'inactive' &&  u.is_active) return false
-    }
+    if (filterStatus !== 'all' && filterStatus !== getUserStatus(u)) return false
     if (filterDept !== 'all' && u.department !== filterDept) return false
     if (search) {
       const q = search.toLowerCase()
@@ -271,8 +271,9 @@ const UserManagement = () => {
   const paginated   = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
 
   const totalUsers    = users.length
-  const activeUsers   = users.filter(u => u.is_active).length
-  const suspendedUsers = users.filter(u => !u.is_active).length
+  const activeUsers = users.filter(u => getUserStatus(u) === 'active').length
+  const pendingUsers = users.filter(u => getUserStatus(u) === 'pending').length
+  const suspendedUsers = users.filter(u => getUserStatus(u) === 'suspended').length
 
   if (loading) {
     return (
@@ -292,7 +293,7 @@ const UserManagement = () => {
       </div>
 
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
-      <div className="grid w-full grid-cols-1 gap-4 p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid w-full grid-cols-1 gap-4 p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
 
         {/* Total */}
         <div className="w-full min-h-[160px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
@@ -401,6 +402,23 @@ const UserManagement = () => {
           </div>
         </div>
 
+        {/* Pending */}
+        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-2 py-1 text-xs font-bold uppercase tracking-wider text-amber-600">
+            <FiUserCheck className="text-sm" />
+            Pending Approval
+          </div>
+          <div className="mt-4 flex w-full items-baseline justify-between">
+            <div className="flex items-baseline gap-2">
+              <p className="text-4xl font-extrabold text-gray-900">{pendingUsers}</p>
+              <p className="text-xl font-semibold text-gray-500">Users</p>
+            </div>
+            <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[14px] font-extrabold text-amber-700">
+              Pending
+            </span>
+          </div>
+        </div>
+
       </div>
 
       {/* ── Filter bar ───────────────────────────────────────────────────── */}
@@ -423,7 +441,8 @@ const UserManagement = () => {
             className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 bg-white min-w-[130px]">
             <option value="all">All Statuses</option>
             <option value="active">Active</option>
-            <option value="inactive">Suspended</option>
+            <option value="pending">Pending</option>
+            <option value="suspended">Suspended</option>
           </select>
         </div>
         {/* Department */}
@@ -516,8 +535,8 @@ const UserManagement = () => {
 
                   {/* Status */}
                   <td className="px-5 py-3.5">
-                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${user.is_active ? STATUS_COLORS.active : STATUS_COLORS.inactive}`}>
-                      {user.is_active ? 'Active' : 'Suspended'}
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[getUserStatus(user)]}`}>
+                      {getUserStatus(user).charAt(0).toUpperCase() + getUserStatus(user).slice(1)}
                     </span>
                   </td>
 

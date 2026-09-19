@@ -79,6 +79,14 @@ def require_role(required_role):
                 # Get user role from token
                 claims = get_jwt()
                 user_role = claims.get('role')
+
+                user = get_user_from_token()
+                user_status = getattr(user, 'status', None) or ('active' if user.is_active else 'suspended')
+                if user_status != 'active' or not user.is_active:
+                    return jsonify({
+                        'error': 'Account is not active',
+                        'message': 'Your account must be active to access the system.'
+                    }), 403
                 
                 # Check if role claim exists
                 if not user_role:

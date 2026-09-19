@@ -1,18 +1,27 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-toastify'
 import { Lock, Eye, EyeOff, Mail } from 'lucide-react'
-import iconImage from '../assets/images.jpg'
+import iconImage from '../assets/CBE_Logo.png'
 
 const Login = () => {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
+  const [username, setUsername] = useState(() => localStorage.getItem('rememberedUsername') || '')
+  const [password, setPassword] = useState(() => localStorage.getItem('rememberedPassword') || '')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState('')
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('rememberMe') === 'true')
   const { login } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!rememberMe) {
+      localStorage.removeItem('rememberedUsername')
+      localStorage.removeItem('rememberedPassword')
+      localStorage.removeItem('rememberMe')
+    }
+  }, [rememberMe])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -20,6 +29,11 @@ const Login = () => {
 
     try {
       await login(username, password)
+      if (rememberMe) {
+        localStorage.setItem('rememberedUsername', username)
+        localStorage.setItem('rememberedPassword', password)
+        localStorage.setItem('rememberMe', 'true')
+      }
       toast.success('Login successful!')
       navigate('/')
     } catch (error) {
@@ -64,11 +78,11 @@ const Login = () => {
           </svg>
         </div>
 
-        <div className="relative z-10 flex flex-col items-center text-center pt-6">
-          <img src={iconImage} alt="Commercial Bank of Ethiopia" className="h-24 w-24 object-contain drop-shadow-lg" />
-          <p className="mt-4 text-[#E8C547] font-bold tracking-[0.18em] text-sm uppercase">
+        <div className="relative z-10 flex flex-col items-center text-center pt-2">
+          <img src={iconImage} alt="Commercial Bank of Ethiopia" className="h-26 w-64 object-contain drop-shadow-lg" />
+          {/* <p className="mt-4 text-[#E8C547] font-bold tracking-[0.18em] text-sm uppercase">
             Commercial Bank of Ethiopia
-          </p>
+          </p> */}
         </div>
 
         <div className="relative z-10 max-w-lg mx-auto text-center">
@@ -76,7 +90,7 @@ const Login = () => {
             AI-Enabled Asset Reconciliation
           </h1>
           <p className="mt-5 text-white/90 text-base xl:text-lg leading-relaxed">
-            Built exclusively for the Commercial Bank of Ethiopia to manage 560,000+ assets with precision and speed.
+            Built exclusively for the Commercial Bank of Ethiopia to reconcile 560,000+ assets with precision and speed.
           </p>
         </div>
 
@@ -85,7 +99,7 @@ const Login = () => {
             <p className="text-white text-sm mb-3">Don&apos;t have an account?</p>
             <Link
               to="/register"
-              className="inline-flex items-center justify-center px-10 py-2.5 rounded-full border border-white text-white text-sm font-medium hover:bg-white/10 transition-colors"
+              className="inline-flex items-center justify-center px-10 py-2.5 rounded-lg border border-white text-white text-sm font-medium hover:bg-white/10 transition-colors"
             >
               Sign Up
             </Link>
@@ -110,8 +124,8 @@ const Login = () => {
             <h2 className="text-3xl sm:text-4xl font-extrabold text-[#5A1468]">Welcome Back</h2>
             <Lock className="text-[#8E288D]" size={22} />
           </div>
-          <p className="text-gray-500 text-sm leading-relaxed mb-8">
-            Enter your credentials to access the Commercial Bank of Ethiopia asset reconciliation platform.
+          <p className="text-gray-500 text-sm leading-relaxed mb-6">
+            Enter your credentials to access the CBE asset reconciliation platform.
           </p>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
@@ -137,7 +151,7 @@ const Login = () => {
 
             <div>
               <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-                Security Password
+                Password
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -173,19 +187,26 @@ const Login = () => {
                 />
                 Remember me
               </label>
-              <button
-                type="button"
-                className="text-sm font-medium text-[#8E288D] hover:text-[#6B1A78]"
-                onClick={() => toast.info('Please contact your administrator to reset your password.')}
-              >
-                Forgot Password?
-              </button>
+              <div className="flex flex-col items-end">
+                <button
+                  type="button"
+                  className="text-sm font-medium text-[#8E288D] hover:text-[#6B1A78]"
+                  onClick={() => setForgotPasswordMessage('Please contact your administrator to reset your password.')}
+                >
+                  Forgot Password?
+                </button>
+                {forgotPasswordMessage && (
+                  <p className="mt-1 max-w-[250px] text-right text-xs font-medium text-rose-600" role="status">
+                    {forgotPasswordMessage}
+                  </p>
+                )}
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-full bg-[#8E288D] py-3.5 px-4 text-sm font-semibold text-white hover:bg-[#7A1E79] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8E288D] disabled:opacity-50 transition-colors"
+              className="w-full rounded-lg bg-[#8E288D] py-3.5 px-4 text-sm font-semibold text-white hover:bg-[#7A1E79] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8E288D] disabled:opacity-50 transition-colors"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-toastify'
 import { Lock, Eye, EyeOff, Mail, Hash, Building2 } from 'lucide-react'
-import iconImage from '../assets/CBE_Logo.jpg'
+import iconImage from '../assets/CBE_Logo.png'
 
 const DEPARTMENTS = [
   'Asset Management',
@@ -47,8 +47,8 @@ const Register = () => {
         full_name: formData.fullName,
         department: formData.department,
       })
-      toast.success('Account created successfully!')
-      navigate('/')
+      toast.success('Account created and sent for administrator approval.')
+      navigate('/login')
     } catch (error) {
       toast.error(error.response?.data?.error || 'Registration failed')
     } finally {
@@ -62,11 +62,11 @@ const Register = () => {
       <main className="flex-1 flex items-center justify-center px-8 py-12 sm:px-12 lg:px-16">
         <div className="w-full max-w-[420px]">
           {/* Mobile logo */}
-          <div className="lg:hidden flex flex-col items-center mb-8">
-            <img src={iconImage} alt="CBE" className="h-14 w-14 object-contain" />
-            <p className="mt-2 text-[#8E288D] font-bold tracking-wider text-xs uppercase text-center">
-              Commercial Bank of Ethiopia
-            </p>
+          <div className="relative z-10 flex flex-col items-center text-center pt-2">
+            <img src={iconImage} alt="Commercial Bank of Ethiopia" className="h-26 w-64 object-contain drop-shadow-lg" />
+            {/* <p className="mt-4 text-[#E8C547] font-bold tracking-[0.18em] text-sm uppercase">
+                      Commercial Bank of Ethiopia
+                    </p> */}
           </div>
 
           {/* Heading */}
@@ -75,7 +75,7 @@ const Register = () => {
             <Lock className="text-[#8E288D]" size={20} />
           </div>
           <p className="text-gray-500 text-sm mb-7">
-            Register to access the Commercial Bank of Ethiopia asset reconciliation platform.
+            Register to access the CBE asset reconciliation platform.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -211,7 +211,7 @@ const Register = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 rounded-full bg-[#8E288D] py-3 text-sm font-semibold text-white hover:bg-[#7A1E79] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8E288D] disabled:opacity-50 transition-colors"
+              className="w-full mt-2 rounded-xl bg-[#8E288D] py-3 text-sm font-semibold text-white hover:bg-[#7A1E79] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8E288D] disabled:opacity-50 transition-colors"
             >
               {loading ? 'Creating Account…' : 'Create Account'}
             </button>
@@ -255,11 +255,11 @@ const Register = () => {
         </div>
 
         {/* Logo + brand */}
-        <div className="relative z-10 flex flex-col items-center text-center pt-6">
-          <img src={iconImage} alt="Commercial Bank of Ethiopia" className="h-24 w-24 object-contain drop-shadow-lg" />
-          <p className="mt-4 text-[#E8C547] font-bold tracking-[0.18em] text-sm uppercase">
-            Commercial Bank of Ethiopia
-          </p>
+        <div className="relative z-10 flex flex-col items-center text-center pt-2">
+          <img src={iconImage} alt="Commercial Bank of Ethiopia" className="h-26 w-64 object-contain drop-shadow-lg" />
+          {/* <p className="mt-4 text-[#E8C547] font-bold tracking-[0.18em] text-sm uppercase">
+                    Commercial Bank of Ethiopia
+                  </p> */}
         </div>
 
         {/* Headline */}
@@ -278,7 +278,7 @@ const Register = () => {
             <p className="text-white text-sm mb-3">Already have an account?</p>
             <Link
               to="/login"
-              className="inline-flex items-center justify-center px-10 py-2.5 rounded-full border border-white text-white text-sm font-medium hover:bg-white/10 transition-colors"
+              className="inline-flex items-center justify-center px-10 py-2.5 rounded-xl border border-white text-white text-sm font-medium hover:bg-white/10 transition-colors"
             >
               Log In
             </Link>

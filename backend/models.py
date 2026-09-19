@@ -19,6 +19,8 @@ class User(db.Model):
     role = db.Column(db.Enum('officer', 'manager', 'admin', name='user_role'), 
                      default='officer', nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    status = db.Column(db.Enum('pending', 'active', 'suspended', name='user_status'),
+                       default='active', nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -45,6 +47,7 @@ class User(db.Model):
             'profile_picture': self.profile_picture,
             'role': self.role,
             'is_active': self.is_active,
+            'status': self.status or ('active' if self.is_active else 'suspended'),
             'created_at': self.created_at.isoformat()
         }
 

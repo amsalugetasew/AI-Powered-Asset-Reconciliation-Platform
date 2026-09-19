@@ -4,7 +4,7 @@ import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-toastify'
 import { RoleBadge } from './RoleGuard'
-import iconImage from '../assets/MyLogo.jpg'
+import iconImage from '../assets/CBE_Logo.png'
 import { 
   FiHome, FiUpload, FiBarChart2, FiLogOut, FiMenu, FiX,  FiUser, FiSettings, FiSearch, 
   FiBell, FiChevronDown, FiUsers, FiFileText, FiCheckCircle, FiAlertCircle,  FiXCircle, FiInfo, FiEye, FiTrash2, FiMoon, FiSun,
@@ -243,25 +243,22 @@ const Layout = () => {
       <aside
         className={`${
           sidebarOpen ? 'w-64' : 'w-20'
-        } ${theme === 'dark' ? 'bg-[#24132d]' : 'bg-[#701460]'} text-white transition-all duration-300 ease-in-out fixed h-full z-30 shadow-2xl flex flex-col justify-between`}
+        } ${theme === 'dark' ? 'bg-[#24132d]' : 'bg-[#701460]'} 
+        text-white transition-all duration-300 ease-in-out fixed h-full z-30 shadow-2xl flex flex-col justify-between`}
       >
         {/* Top Branding Section */}
         <div>
-          <div className="flex items-center justify-between px-4 py-5 border-b border-white/10">
-            <div className="flex items-center space-x-3 overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-3 border-b border-white/10">
+            <div className="flex items-center space-x-1 overflow-hidden">
               <img
                 src={iconImage}
                 alt="CBE Logo"
-                className="w-9 h-9 object-contain rounded-md bg-white/10 p-0.5 flex-shrink-0"
+                className="w-36 h-20 object-contain p-0 flex-shrink-0"
               />
+
               {sidebarOpen && (
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[15px] font-bold tracking-tight text-white leading-tight truncate">
-                    AssetReconcile AI
-                  </span>
-                  <span className="text-[8.5px] font-semibold tracking-wider text-[#E8D18C] uppercase truncate">
-                    Commercial Bank of Ethiopia
-                  </span>
+                  {/* Optional sidebar title */}
                 </div>
               )}
             </div>
@@ -278,7 +275,7 @@ const Layout = () => {
                 <FiChevronsRight className="h-4 w-4" />
               )}
             </button>
-          </div>
+</div>
 
           {/* Navigation Menu */}
           <nav className="mt-4 px-3">

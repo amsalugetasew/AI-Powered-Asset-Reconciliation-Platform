@@ -43,6 +43,24 @@ def create_app(config_name='default'):
             'message': 'The token has expired. Please login again.'
         }), 401
     
+    @jwt.token_verification_loader
+    def verify_account_status(jwt_header, jwt_payload):
+        """Require every authenticated request to belong to an active user."""
+        try:
+            from models import User
+            user = User.query.get(int(jwt_payload['sub']))
+            status = (getattr(user, 'status', None) or
+                      ('active' if user and user.is_active else 'suspended')) if user else 'suspended'
+            return bool(user and user.is_active and status == 'active')
+        except (KeyError, TypeError, ValueError):
+            return False
+
+    @jwt.token_verification_failed_loader
+    def inactive_account_callback(jwt_header, jwt_payload):
+        return jsonify({
+            'error': 'Account is not active',
+            'message': 'Your account must be active to access the system.'
+        }), 403
     @jwt.invalid_token_loader
     def invalid_token_callback(error):
         logger.error(f"Invalid token: {error}")
@@ -102,6 +120,34 @@ def create_app(config_name='default'):
             if 'department' not in user_columns:
                 with db.engine.begin() as connection:
                     connection.execute(text('ALTER TABLE users ADD COLUMN department VARCHAR(100)'))
+            if 'status' not in user_columns:
+                with db.engine.begin() as connection:
+                    if db.engine.dialect.name == 'mysql':
+                        connection.execute(text(
+                            "ALTER TABLE users ADD COLUMN status "
+                            "ENUM('pending','active','suspended') NOT NULL DEFAULT 'active'"
+                        ))
+                    else:
+                        connection.execute(text(
+                            "ALTER TABLE users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'"
+                        ))
+                    connection.execute(text(
+                        "UPDATE users SET status = CASE "
+                        "WHEN is_active = 1 THEN 'active' ELSE 'suspended' END"
+                    ))
+            else:
+                # Repair only legacy rows made inconsistent during the status rollout.
+                # Valid active/suspended users and new inactive pending users are preserved.
+                with db.engine.begin() as connection:
+                    connection.execute(text(
+                        "UPDATE users SET status = 'active' "
+                        "WHERE status = 'pending' AND is_active = 1"
+                    ))
+                    connection.execute(text(
+                        "UPDATE users SET status = 'suspended' "
+                        "WHERE status = 'pending' AND is_active = 0 "
+                        "AND created_at < '2026-09-19 00:00:00'"
+                    ))
     
         # Health check endpoint
         @app.route('/api/health', methods=['GET'])

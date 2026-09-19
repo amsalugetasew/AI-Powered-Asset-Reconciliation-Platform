@@ -88,6 +88,8 @@ def create_user():
             full_name=data.get('full_name', '').strip() or None,
             employee_id=data.get('employee_id', '').strip() or None,
             department=data.get('department', '').strip() or None,
+            status='active',
+            is_active=True,
         )
         user.set_password(data['password'])
         
@@ -269,10 +271,11 @@ def deactivate_user(user_id):
         if not user:
             return jsonify({'error': 'User not found'}), 404
 
-        if not user.is_active:
-            return jsonify({'message': 'User is already deactivated', 'user': user.to_dict()}), 200
+        if user.status == 'suspended' and not user.is_active:
+            return jsonify({'message': 'User is already suspended', 'user': user.to_dict()}), 200
 
         user.is_active = False
+        user.status = 'suspended'
         db.session.commit()
 
         AuditService.log_operation(
@@ -301,10 +304,11 @@ def activate_user(user_id):
         if not user:
             return jsonify({'error': 'User not found'}), 404
 
-        if user.is_active:
+        if user.is_active and user.status == 'active':
             return jsonify({'message': 'User is already active', 'user': user.to_dict()}), 200
 
         user.is_active = True
+        user.status = 'active'
         db.session.commit()
 
         AuditService.log_operation(

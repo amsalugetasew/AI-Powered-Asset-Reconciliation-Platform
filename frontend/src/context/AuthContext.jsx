@@ -127,6 +127,10 @@ export const AuthProvider = ({ children }) => {
       ...extraFields,
     })
     const { access_token, user } = response.data
+
+    if (!access_token) {
+      return response.data
+    }
     
     // Store token
     localStorage.setItem('token', access_token)

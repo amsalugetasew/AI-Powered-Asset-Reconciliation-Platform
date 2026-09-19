@@ -29,6 +29,8 @@ def register():
             full_name=data.get('full_name', '').strip() or None,
             employee_id=data.get('employee_id', '').strip() or None,
             department=data.get('department', '').strip() or None,
+            status='pending',
+            is_active=False,
         )
         user.set_password(data['password'])
         # Default role is 'officer' (set in model)
@@ -45,17 +47,9 @@ def register():
             details={'username': user.username, 'email': user.email, 'role': user.role}
         )
 
-        # Generate access token with string identity and role claim
-        additional_claims = {'role': user.role}
-        access_token = create_access_token(
-            identity=str(user.id),
-            additional_claims=additional_claims
-        )
-        
         return jsonify({
-            'message': 'User registered successfully',
+            'message': 'Registration submitted. An administrator must activate your account before you can log in.',
             'user': user.to_dict(),
-            'access_token': access_token
         }), 201
         
     except Exception as e:
@@ -87,8 +81,10 @@ def login():
             )
             return jsonify({'error': 'Invalid username or password'}), 401
 
-        if not getattr(user, 'is_active', True):
-            return jsonify({'error': 'Account is deactivated'}), 403
+        account_status = getattr(user, 'status', None) or ('active' if getattr(user, 'is_active', True) else 'suspended')
+        if account_status != 'active' or not getattr(user, 'is_active', True):
+            message = 'Account is pending administrator approval' if account_status == 'pending' else 'Account is suspended'
+            return jsonify({'error': message, 'status': account_status}), 403
         
         # Audit: successful login
         AuditService.log_operation(
@@ -125,6 +121,9 @@ def get_current_user():
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
+
+        if (getattr(user, 'status', None) or ('active' if user.is_active else 'suspended')) != 'active' or not user.is_active:
+            return jsonify({'error': 'Account is not active'}), 403
         
         return jsonify({'user': user.to_dict()}), 200
         
