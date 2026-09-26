@@ -47,10 +47,10 @@ def _get_reconciliation(reconciliation_id, user_id):
     except Exception:
         role = 'officer'
     if role in ('manager', 'admin'):
-        recon = Reconciliation.query.get(int(reconciliation_id))
+        recon = Reconciliation.query.filter_by(id=int(reconciliation_id), is_deleted=False).first()
     else:
         recon = Reconciliation.query.filter_by(
-            id=int(reconciliation_id), user_id=user_id
+            id=int(reconciliation_id), user_id=user_id, is_deleted=False
         ).first()
     if not recon:
         return None, (jsonify({'error': 'Reconciliation not found', 'success': False}), 404)

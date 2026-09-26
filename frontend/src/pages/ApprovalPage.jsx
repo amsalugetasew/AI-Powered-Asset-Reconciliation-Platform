@@ -163,7 +163,7 @@ const StatusDropdown = ({ recordId, category, current, onSelect, loading }) => {
 }
 
 // ── Bulk action dropdown ──────────────────────────────────────────────────────
-const BulkDropdown = ({ category, onSelect, loading, approvalSummary, className = '' }) => {
+const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = [], stage = 'check', className = '', actionLabel = 'Bulk Approve' }) => {
   const [open, setOpen] = useState(false)
   const [subCat, setSubCat] = useState(null) // for Unmatched sub-category step
   const isDuplicate = category === 'Duplicate'
@@ -183,22 +183,71 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, className 
     : isUnmatched ? optionsForSubCat
       : BULK_OPTIONS_MATCHED
 
+  const getStatusValue = (record) => {
+    if (stage === 'approve') {
+      return record?.approver_status || record?.approval_status || record?.check_status || record?.checker_status || 'pending'
+    }
+    return record?.check_status || record?.checker_status || 'pending'
+  }
+
   const getTargetSummary = targetCategory => {
     if (targetCategory === 'Unmatched') {
-      return ['Physical Unmatched', 'ERP Unmatched'].reduce((result, key) => {
-        const categorySummary = approvalSummary[key] || {}
-        Object.keys(categorySummary).forEach(status => {
-          result[status] = (result[status] || 0) + (categorySummary[status] || 0)
+      const keys = ['Physical Unmatched', 'ERP Unmatched']
+      const summary = { total: 0, pending: 0, reconciled: 0, unreconciled: 0, surplus_assets: 0, exist_in_erp_not_physical: 0, duplicated: 0, unique: 0 }
+      keys.forEach(key => {
+        const categoryRecords = Array.isArray(records) ? records.filter(record => record.category === key) : []
+        categoryRecords.forEach(record => {
+          const value = getStatusValue(record)
+          summary.total += 1
+          if (value === 'pending' || value === 'checking' || !value) summary.pending += 1
+          else if (value in summary) summary[value] = (summary[value] || 0) + 1
         })
-        return result
-      }, { total: 0 })
+      })
+      return summary
     }
-    return approvalSummary[targetCategory] || {}
+
+    const categoryRecords = Array.isArray(records) ? records.filter(record => record.category === targetCategory) : []
+    return categoryRecords.reduce((result, record) => {
+      const value = getStatusValue(record)
+      result.total = (result.total || 0) + 1
+      if (value === 'pending' || value === 'checking' || !value) {
+        result.pending = (result.pending || 0) + 1
+      } else {
+        result[value] = (result[value] || 0) + 1
+      }
+      return result
+    }, { total: 0, pending: 0, reconciled: 0, unreconciled: 0, surplus_assets: 0, exist_in_erp_not_physical: 0, duplicated: 0, unique: 0 })
+  }
+
+  const getAllowedBulkValues = (targetCategory) => {
+    if (targetCategory === 'Physical Unmatched') return new Set(['surplus_assets', 'reconciled', 'unreconciled'])
+    if (targetCategory === 'ERP Unmatched') return new Set(['exist_in_erp_not_physical', 'reconciled', 'unreconciled'])
+    if (targetCategory === 'Duplicate') return new Set(['duplicated', 'unique'])
+    return new Set(['reconciled', 'unreconciled'])
   }
 
   const isOptionDisabled = (targetCategory, option) => {
     const targetSummary = getTargetSummary(targetCategory)
-    return !targetSummary.total || (targetSummary[option.value] || 0) >= targetSummary.total
+    const allowed = getAllowedBulkValues(targetCategory)
+    if (!allowed.has(option.value)) return true
+    if (!targetSummary.total) return true
+
+    const selectedCount = Number(targetSummary[option.value] || 0)
+    const pendingCount = Number(targetSummary.pending || 0)
+
+    if (pendingCount > 0) return false
+
+    const expectedValueForCategory = targetCategory === 'Physical Unmatched'
+      ? 'surplus_assets'
+      : targetCategory === 'ERP Unmatched'
+        ? 'exist_in_erp_not_physical'
+        : null
+
+    if (expectedValueForCategory && option.value === expectedValueForCategory) {
+      return selectedCount >= targetSummary.total
+    }
+
+    return selectedCount >= targetSummary.total
   }
 
   const loadingKey = loading && Object.keys(loading).find(k => k.startsWith(category) && loading[k])
@@ -222,7 +271,7 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, className 
         className={`inline-flex items-center justify-center gap-1 rounded text-xs font-medium text-white bg-[#8E288D] hover:bg-[#7A1E79] disabled:cursor-not-allowed disabled:opacity-50 transition-colors ${className}`}
       >
         {loadingKey ? <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" /> : null}
-        Bulk Approve <FiChevronDown className="w-3 h-3" />
+        {actionLabel} <FiChevronDown className="w-3 h-3" />
       </button>
 
       {open && (
@@ -303,13 +352,82 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, className 
 const ApprovalPage = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { hasRole } = useAuth()
-  const canApprove = hasRole('manager')
-
+  const { hasRole, user } = useAuth()
   const [reconciliation, setReconciliation] = useState(null)
+
   const [records, setRecords] = useState([])
+  const [allCategoryRecords, setAllCategoryRecords] = useState([])
   const [summary, setSummary] = useState({})
   const [loading, setLoading] = useState(true)
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [expandedCols, setExpandedCols] = useState({}) // { [colLabel]: true }
+  const [tableCollapsed, setTableCollapsed] = useState(false)
+
+  const isPrivilegedReviewer = hasRole('manager') || hasRole('admin')
+  const canCheck = user?.role === 'officer' && reconciliation && user.id !== reconciliation.user_id && (
+    reconciliation.assigned_to === user.id ||
+    reconciliation.assignment_scope === 'all_officers'
+  )
+  const canApprove = isPrivilegedReviewer
+  const canReview = isPrivilegedReviewer || canCheck
+
+  const getCategoryValues = (categoryKey) => {
+    if (!categoryKey || categoryKey === 'all') return new Set(['Exact Match', 'AI Match', 'Manual Review', 'Physical Unmatched', 'ERP Unmatched', 'Duplicate'])
+    if (categoryKey === 'Unmatched') return new Set(['Physical Unmatched', 'ERP Unmatched'])
+    return new Set([categoryKey])
+  }
+
+  const getRecordsForCategory = (categoryKey) => {
+    const sourceRecords = allCategoryRecords.length > 0 ? allCategoryRecords : records
+    if (!categoryKey || categoryKey === 'all') return sourceRecords
+    const allowed = getCategoryValues(categoryKey)
+    return sourceRecords.filter(item => allowed.has(item.category))
+  }
+
+  const categoryRecords = getRecordsForCategory(selectedCategory)
+  const isRecordChecked = (record) => {
+    const value = record?.checker_status || record?.check_status || 'pending'
+    return value !== 'pending' && value !== 'checking' && value !== '' && value !== null
+  }
+
+  const getSummary = (cat) => {
+    const empty = {
+      total: 0, pending: 0, reconciled: 0, unreconciled: 0,
+      surplus_assets: 0, exist_in_erp_not_physical: 0,
+      duplicated: 0, unique: 0
+    }
+    if (cat === 'all') {
+      const SKIP_KEYS = new Set(['Physical Unmatched', 'ERP Unmatched', 'Duplicate'])
+      return Object.entries(summary)
+        .filter(([k]) => !SKIP_KEYS.has(k))
+        .reduce((a, [, s]) => {
+          Object.keys(empty).forEach(k => { a[k] = (a[k] || 0) + (s[k] || 0) })
+          return a
+        }, { ...empty })
+    }
+    if (cat === 'Unmatched') {
+      return ['Physical Unmatched', 'ERP Unmatched'].reduce((a, k) => {
+        const s = summary[k] || {}
+        Object.keys(empty).forEach(f => { a[f] = (a[f] || 0) + (s[f] || 0) })
+        return a
+      }, { ...empty })
+    }
+    return { ...empty, ...(summary[cat] || {}) }
+  }
+
+  const isCategoryFullyChecked = (categoryKey) => {
+    if (!categoryKey || categoryKey === 'all') return false
+    const catRecords = getRecordsForCategory(categoryKey)
+    return catRecords.length > 0 && catRecords.every(isRecordChecked)
+  }
+
+  const allCategoryChecked = isCategoryFullyChecked(selectedCategory)
+  const bulkActionLabel = canReview && allCategoryChecked && isPrivilegedReviewer ? 'Bulk Approve' : 'Bulk Check'
+  const showBulkAction = canReview && selectedCategory !== 'all' && getRecordsForCategory(selectedCategory).length > 0
   const [recordsLoading, setRecordsLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState({}) // { [recordId]: true }
   const [bulkLoading, setBulkLoading] = useState({}) // { [category-decision]: true }
@@ -343,13 +461,6 @@ const ApprovalPage = () => {
     setShowAIContextMenu(false)
   }
 
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalRecords, setTotalRecords] = useState(0)
-  const [expandedCols, setExpandedCols] = useState({}) // { [colLabel]: true }
-  const [tableCollapsed, setTableCollapsed] = useState(false)
   const approvalTableRef = useRef(null)
   const approvalDragState = useRef({ active: false, startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 })
   const PER_PAGE = 10
@@ -388,9 +499,17 @@ const ApprovalPage = () => {
     logActivity(`/approval/${id}`, `PAGE_VISIT_APPROVAL_${id}`)
     axios.get(`/api/reconciliation/${id}`)
       .then(r => setReconciliation(r.data.reconciliation))
-      .catch(() => { toast.error('Failed to load reconciliation'); navigate('/') })
+      .catch((error) => {
+        if (error.response?.status === 403) {
+          toast.error('This record is not assigned to you for review.')
+          navigate('/')
+          return
+        }
+        toast.error('Failed to load reconciliation')
+        navigate('/')
+      })
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, navigate])
 
   // ── fetch summary ──────────────────────────────────────────────────────────
   const fetchSummary = useCallback(async () => {
@@ -415,6 +534,15 @@ const ApprovalPage = () => {
       setRecords(r.data.records || [])
       setTotalRecords(r.data.pagination.total_records)
       setTotalPages(r.data.pagination.total_pages)
+
+      const fullParams = {
+        page: 1,
+        per_page: 10000,
+        category: selectedCategory === 'all' ? 'all' : selectedCategory,
+        ...(statusFilter !== 'all' && { approval_status: statusFilter }),
+      }
+      const fullResponse = await axios.get(`/api/reconciliation/records/${id}`, { params: fullParams })
+      setAllCategoryRecords(fullResponse.data.records || [])
     } catch { toast.error('Failed to load records') }
     finally { setRecordsLoading(false) }
   }, [id, page, selectedCategory, statusFilter])
@@ -425,13 +553,23 @@ const ApprovalPage = () => {
   const handleRecordDecision = async (recordId, decision) => {
     try {
       setActionLoading(p => ({ ...p, [recordId]: true }))
+      const record = records.find(item => item.id === recordId)
+      const isPrivilegedReviewer = hasRole('manager') || hasRole('admin')
+      const recordChecked = isRecordChecked(record)
+      if (isPrivilegedReviewer && !recordChecked) {
+        toast.error('This record must be checked before approval can be completed.')
+        return
+      }
+      const decisionStage = isPrivilegedReviewer && recordChecked ? 'approve' : 'check'
+
       await axios.post('/api/reconciliation/records/approve-record', {
         record_id: recordId,
         approval_decision: decision,
+        decision_stage: decisionStage,
       })
       clearCachedGets()
-      logActivity(`/approval/${id}`, `APPROVE_RECORD_${recordId}_AS_${decision.toUpperCase()}`)
-      toast.success(`Marked as "${STATUS_MAP[decision]?.label || decision}"`)
+      logActivity(`/approval/${id}`, `APPROVE_RECORD_${recordId}_AS_${decision.toUpperCase()}_${decisionStage.toUpperCase()}`)
+      toast.success(`Marked as "${STATUS_MAP[decision]?.label || decision}" (${decisionStage})`)
       await fetchRecords()
       await fetchSummary()
     } catch (e) {
@@ -446,14 +584,24 @@ const ApprovalPage = () => {
     const key = `${category}-${decision}`
     try {
       setBulkLoading(p => ({ ...p, [key]: true }))
+      const isPrivilegedReviewer = hasRole('manager') || hasRole('admin')
+      const allRecordsForCategory = getRecordsForCategory(category)
+      const allChecked = allRecordsForCategory.length > 0 && allRecordsForCategory.every(isRecordChecked)
+      if (isPrivilegedReviewer && !allChecked) {
+        toast.error('All records in this category must be checked before bulk approval can be done.')
+        return
+      }
+      const decisionStage = isPrivilegedReviewer && allChecked ? 'approve' : 'check'
+
       await axios.post('/api/reconciliation/records/approve-group', {
         reconciliation_id: parseInt(id),
         category,
         approval_decision: decision,
+        decision_stage: decisionStage,
       })
       clearCachedGets()
-      logActivity(`/approval/${id}`, `BULK_APPROVE_${category.toUpperCase()}_AS_${decision.toUpperCase()}`)
-      toast.success(`All "${category}" → "${STATUS_MAP[decision]?.label || decision}"`)
+      logActivity(`/approval/${id}`, `BULK_${decisionStage.toUpperCase()}_${category.toUpperCase()}_AS_${decision.toUpperCase()}`)
+      toast.success(`All "${category}" → "${STATUS_MAP[decision]?.label || decision}" (${decisionStage})`)
       await fetchRecords()
       await fetchSummary()
     } catch (e) {
@@ -461,35 +609,6 @@ const ApprovalPage = () => {
     } finally {
       setBulkLoading(p => { const n = { ...p }; delete n[key]; return n })
     }
-  }
-
-  // ── summary helpers ────────────────────────────────────────────────────────
-  const getSummary = (cat) => {
-    const empty = {
-      total: 0, pending: 0, reconciled: 0, unreconciled: 0,
-      surplus_assets: 0, exist_in_erp_not_physical: 0,
-      duplicated: 0, unique: 0
-    }
-    if (cat === 'all') {
-      // Use only canonical keys — skip raw sub-keys that are already grouped
-      // 'Unmatched' = Physical Unmatched + ERP Unmatched (already combined by backend)
-      // Skip 'Duplicate' — separate workflow
-      const SKIP_KEYS = new Set(['Physical Unmatched', 'ERP Unmatched', 'Duplicate'])
-      return Object.entries(summary)
-        .filter(([k]) => !SKIP_KEYS.has(k))
-        .reduce((a, [, s]) => {
-          Object.keys(empty).forEach(k => { a[k] = (a[k] || 0) + (s[k] || 0) })
-          return a
-        }, { ...empty })
-    }
-    if (cat === 'Unmatched') {
-      return ['Physical Unmatched', 'ERP Unmatched'].reduce((a, k) => {
-        const s = summary[k] || {}
-        Object.keys(empty).forEach(f => { a[f] = (a[f] || 0) + (s[f] || 0) })
-        return a
-      }, { ...empty })
-    }
-    return { ...empty, ...(summary[cat] || {}) }
   }
 
   // Customer / Finance unmatched split for display
@@ -550,11 +669,13 @@ const ApprovalPage = () => {
       <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">
-            {canApprove ? 'Approval Review' : 'Approval Status'} — Reconciliation #{id}
+            {canReview ? (user?.role === 'officer' ? 'Assigned Review' : 'Approval Review') : 'Approval Status'} — Reconciliation #{id}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            {canApprove
-              ? 'Click the status badge on each record to change it, or use Bulk Approve for a whole category'
+            {canReview
+              ? (user?.role === 'officer'
+                ? 'You are allowed to check this delegated reconciliation update.'
+                : 'Managers and admins can approve only after the checker stage has been completed.')
               : 'View approval status for this reconciliation'}
           </p>
         </div>
@@ -651,14 +772,17 @@ const ApprovalPage = () => {
           ))}
         </div>
 
-        {/* Bulk action (manager only, non-all category) */}
-        {canApprove && selectedCategory !== 'all' && (
+        {/* Bulk action stays available for the selected category: Bulk Check first, then Bulk Approve after the checker step is complete */}
+        {showBulkAction && (
           <BulkDropdown
             category={selectedCategory}
             onSelect={handleBulkDecision}
             loading={bulkLoading}
             approvalSummary={summary}
+            records={getRecordsForCategory(selectedCategory)}
+            stage={isPrivilegedReviewer && allCategoryChecked ? 'approve' : 'check'}
             className="h-10 w-44"
+            actionLabel={bulkActionLabel}
           />
         )}
       </div>
@@ -781,13 +905,25 @@ const ApprovalPage = () => {
                   Dept. Reconcile
                 </th>
                 <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
+                  style={{ letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                  Maker
+                </th>
+                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
+                  style={{ letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                  Checker
+                </th>
+                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
+                  style={{ letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                  Checker Status
+                </th>
+                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
                   style={{ letterSpacing: '0.07em', borderRight: canApprove ? '1px solid rgba(255,255,255,0.15)' : 'none' }}>
-                  Approval Status
+                  Approver Status
                 </th>
                 {canApprove && (
                   <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-[#1a3a5c] uppercase whitespace-nowrap"
                     style={{ letterSpacing: '0.07em' }}>
-                    Approved By
+                    Approver
                   </th>
                 )}
               </tr>
@@ -909,7 +1045,38 @@ const ApprovalPage = () => {
                     <span className="text-xs font-bold">{rec.dept_reconcile || 'N/A'}</span>
                   </td>
 
-                  {/* Approval Status — full cell color */}
+                  {/* Maker */}
+                  <td className="px-4 py-2.5 text-xs whitespace-nowrap font-medium" style={{ color: '#64748b' }}>
+                    {rec.maker_username || rec.maker_user_id || '—'}
+                  </td>
+
+                  {/* Checker */}
+                  <td className="px-4 py-2.5 text-xs whitespace-nowrap font-medium" style={{ color: '#64748b' }}>
+                    {rec.checker_username || rec.checked_by_username || rec.checked_by || '—'}
+                  </td>
+
+                  {/* Checker Status */}
+                  <td className="whitespace-nowrap text-center" style={{ background: '#f8fafc' }}>
+                    {canCheck && Number(rec.maker_user_id) !== Number(user?.id) ? (
+                      <div className="px-3 py-2.5">
+                        <StatusDropdown
+                          recordId={rec.id}
+                          category={rec.category}
+                          current={rec.checker_status || rec.check_status || 'pending'}
+                          onSelect={handleRecordDecision}
+                          loading={!!actionLoading[rec.id]}
+                        />
+                      </div>
+                    ) : (
+                      <div className="px-4 py-2.5">
+                        <span className="text-xs font-bold" style={{ color: '#475569' }}>
+                          {STATUS_MAP[rec.checker_status || rec.check_status || 'pending']?.label || 'Pending'}
+                        </span>
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Approver Status — full cell color */}
                   <td className="whitespace-nowrap text-center"
                     style={{
                       background: {
@@ -920,14 +1087,14 @@ const ApprovalPage = () => {
                         duplicated:               '#f1f5f9',
                         unique:                   '#ccfbf1',
                         pending:                  '#fef3c7',
-                      }[rec.approval_status] || '#f8fafc',
+                      }[rec.approver_status || rec.approval_status || 'pending'] || '#f8fafc',
                     }}>
-                    {canApprove ? (
+                    {canApprove && isRecordChecked(rec) && Number(rec.maker_user_id) !== Number(user?.id) ? (
                       <div className="px-3 py-2.5">
                         <StatusDropdown
                           recordId={rec.id}
                           category={rec.category}
-                          current={rec.approval_status || 'pending'}
+                          current={rec.approver_status || rec.approval_status || 'pending'}
                           onSelect={handleRecordDecision}
                           loading={!!actionLoading[rec.id]}
                         />
@@ -939,9 +1106,11 @@ const ApprovalPage = () => {
                             reconciled: '#1a3a5c', unreconciled: '#991b1b',
                             surplus_assets: '#4c1d95', exist_in_erp_not_physical: '#831843',
                             duplicated: '#334155', unique: '#134e4a', pending: '#6B7280',
-                          }[rec.approval_status] || '#475569'
+                          }[rec.approver_status || rec.approval_status || 'pending'] || '#475569'
                         }}>
-                          {STATUS_MAP[rec.approval_status || 'pending']?.label || 'Pending'}
+                          {!isRecordChecked(rec) && canApprove
+                            ? 'Awaiting check'
+                            : (STATUS_MAP[rec.approver_status || rec.approval_status || 'pending']?.label || 'Pending')}
                         </span>
                       </div>
                     )}
@@ -952,11 +1121,11 @@ const ApprovalPage = () => {
                     )}
                   </td>
 
-                  {/* Approved by */}
+                  {/* Approver */}
                   {canApprove && (
                     <td className="px-4 py-2.5 text-xs whitespace-nowrap font-medium"
                       style={{ color: '#64748b' }}>
-                      {rec.approved_by || '—'}
+                      {rec.approver_username || rec.approved_by_username || rec.approved_by || '—'}
                     </td>
                   )}
                 </tr>

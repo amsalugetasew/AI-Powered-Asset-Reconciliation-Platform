@@ -24,7 +24,19 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
-    reconciliations = db.relationship('Reconciliation', backref='user', lazy=True, cascade='all, delete-orphan')
+    reconciliations = db.relationship(
+        'Reconciliation',
+        foreign_keys='Reconciliation.user_id',
+        backref='user',
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
+    assigned_reconciliations = db.relationship(
+        'Reconciliation',
+        foreign_keys='Reconciliation.assigned_to',
+        backref='assignee',
+        lazy=True,
+    )
     audit_logs = db.relationship('AuditLog', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
@@ -57,10 +69,23 @@ class Reconciliation(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    requester = db.relationship('User', foreign_keys=[user_id], lazy='joined')
+    requester = db.relationship(
+        'User',
+        foreign_keys=[user_id],
+        lazy='joined',
+        overlaps='reconciliations,user'
+    )
     customer_file = db.Column(db.String(255), nullable=False)
     internal_file = db.Column(db.String(255), nullable=False)
     status = db.Column(db.String(50), default='pending')  # pending, processing, completed, failed
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    deleted_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    assignment_scope = db.Column(db.String(50), default='none', nullable=False)
+    assigned_to = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    assigned_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    assignment_note = db.Column(db.Text, nullable=True)
+    assigned_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     completed_at = db.Column(db.DateTime)
     
@@ -89,6 +114,14 @@ class Reconciliation(db.Model):
             'customer_file': self.customer_file,
             'internal_file': self.internal_file,
             'status': self.status,
+            'is_deleted': self.is_deleted,
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
+            'assignment_scope': self.assignment_scope,
+            'assigned_to': self.assigned_to,
+            'assigned_to_username': self.assignee.username if self.assignee else None,
+            'assigned_by': self.assigned_by,
+            'assignment_note': self.assignment_note,
+            'assigned_at': self.assigned_at.isoformat() if self.assigned_at else None,
             'created_at': self.created_at.isoformat(),
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'statistics': {
@@ -131,9 +164,19 @@ class ReconciliationRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     reconciliation_id = db.Column(db.Integer, db.ForeignKey('reconciliations.id', ondelete='CASCADE'), nullable=False)
     match_category = db.Column(db.String(100), nullable=False)
-    
-    # Approval status (with defaults for backward compatibility)
+
+    # Maker is the original uploader / creator of the reconciliation job.
+    maker_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    # Checker stage (maker -> checker -> approver)
+    check_status = db.Column(db.String(50), default='pending', nullable=True)
+    checker_status = db.Column(db.String(50), default='pending', nullable=True)
+    checked_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    checked_at = db.Column(db.DateTime, nullable=True)
+
+    # Final approval status (approver stage)
     approval_status = db.Column(db.String(50), default='pending', nullable=True)
+    approver_status = db.Column(db.String(50), default='pending', nullable=True)
     # Values: 'pending', 'reconciled', 'unreconciled', 'surplus_assets',
     #         'exist_in_erp_not_physical'
     approved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
@@ -174,15 +217,30 @@ class ReconciliationRecord(db.Model):
     
     # Relationships
     reconciliation = db.relationship('Reconciliation', backref=db.backref('records', cascade='all, delete-orphan'))
+    maker = db.relationship('User', foreign_keys=[maker_user_id])
+    checker = db.relationship('User', foreign_keys=[checked_by])
     approver = db.relationship('User', foreign_keys=[approved_by])
     
     def to_dict(self):
+        maker_user_id = self.maker_user_id or (self.reconciliation.user_id if self.reconciliation else None)
+        maker_user = self.maker or (self.reconciliation.user if self.reconciliation else None)
         return {
             'id': self.id,
             'reconciliation_id': self.reconciliation_id,
             'match_category': self.match_category,
-            'approval_status': self.approval_status or 'pending',
+            'maker_user_id': maker_user_id,
+            'maker_username': maker_user.username if maker_user else None,
+            'check_status': self.check_status or self.checker_status or 'pending',
+            'checker_status': self.checker_status or self.check_status or 'pending',
+            'checked_by': self.checked_by,
+            'checked_by_username': self.checker.username if self.checker else None,
+            'checker_username': self.checker.username if self.checker else None,
+            'checked_at': self.checked_at.isoformat() if self.checked_at else None,
+            'approval_status': self.approval_status or self.approver_status or 'pending',
+            'approver_status': self.approver_status or self.approval_status or 'pending',
             'approved_by': self.approved_by,
+            'approved_by_username': self.approver.username if self.approver else None,
+            'approver_username': self.approver.username if self.approver else None,
             'approved_at': self.approved_at.isoformat() if self.approved_at else None,
             'full_record_json': self.full_record_json,
             'internal_old_tag': self.internal_old_tag,

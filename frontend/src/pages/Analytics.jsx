@@ -46,7 +46,8 @@ const KpiCard = ({
   textColor = 'text-gray-900',
 }) => {
   return (
-    <div className="w-full min-h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+    <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+
       {/* KPI Label + Icon */}
       <div
         className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
@@ -61,14 +62,16 @@ const KpiCard = ({
         </span>
 
         {/* Right Corner Icon */}
-        <span className="absolute right-2 text-base">
-          <Icon />
-        </span>
+        {Icon && (
+          <span className="absolute right-2 text-base">
+            <Icon />
+          </span>
+        )}
       </div>
 
       {/* KPI Value */}
       <p
-        className={`mt-4 text-2xl font-extrabold tracking-tight text-center ${textColor}`}
+        className={`mt-4 text-center text-2xl font-extrabold tracking-tight ${textColor}`}
       >
         {value}
       </p>
@@ -300,11 +303,13 @@ const Analytics = () => {
     </div>
   )
 
-  if (!data || data.total_reconciliations === 0) return (
+  const totalRecordSet = Number((data?.total_customer_records || 0) + (data?.total_internal_records || 0))
+
+  if (!data || totalRecordSet === 0) return (
     <div className="px-4 py-16 text-center">
       <FiBarChart2 className="mx-auto h-14 w-14 text-gray-300 mb-4" />
       <h3 className="text-lg font-medium text-gray-700">No analytics data yet</h3>
-      <p className="text-sm text-gray-400 mt-1">Complete and approve reconciliations to see insights here.</p>
+      <p className="text-sm text-gray-400 mt-1">Complete and approve reconciliations to see insight records here.</p>
     </div>
   )
 
@@ -312,6 +317,7 @@ const Analytics = () => {
 
   const totalERP = Number(kpi.total_erp_assets || 0)
   const totalPhysical = Number(kpi.physical_count || 0)
+  const totalRecords = Number((data.total_customer_records || 0) + (data.total_internal_records || 0))
   const erp = kpi.side_counts?.erp || {}
   const physical = kpi.side_counts?.physical || {}
   const resolvedCount = Number(erp.resolved || 0)
@@ -398,21 +404,19 @@ const Analytics = () => {
         <h1 className="text-3xl font-semibold text-gray-900">Analytics Dashboard</h1>
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#8E288D] text-white">
-            📊 {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''} combined
+            📊 {totalRecords.toLocaleString()} records combined
           </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
             {data.scope === 'all' ? '🌐 System-wide — all reconciliations' : '👤 Your reconciliations only'}
           </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
-            🗄️ {(Object.values(kpi).filter(v => typeof v === 'number').reduce((s, v) => 0, 0), 
-              (kpi.reconciled || 0) + (kpi.unreconciled || 0) + (kpi.surplus_assets || 0) +
-              (kpi.exist_erp_not_physical || 0) + (kpi.duplicated || 0) + (kpi.unique || 0) + (kpi.pending || 0)
-            ).toLocaleString()} total records
+            🗄️ {totalRecords.toLocaleString()} total records
           </span>
         </div>
       </div>
 
       <div className="mb-8 grid w-full grid-cols-1 gap-4 p-2 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+
         <KpiCard
           label="ERP Records"
           value={fmt(totalERP)}
@@ -487,8 +491,8 @@ const Analytics = () => {
                   <FiLayers className="text-[#8E288D]" /> Asset Reconciliation by Category
                 </h3>
                 <p className="text-xs text-gray-400 mb-5">
-                  Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''} ·{' '}
-                  {((kpi.reconciled||0)+(kpi.unreconciled||0)+(kpi.surplus_assets||0)+(kpi.exist_erp_not_physical||0)+(kpi.duplicated||0)+(kpi.unique||0)+(kpi.pending||0)).toLocaleString()} total records
+                  Aggregated across {totalRecords.toLocaleString()} records ·{' '}
+                  {((kpi.reconciled||0)+(kpi.unreconciled||0)+(kpi.surplus_assets||0)+(kpi.exist_erp_not_physical||0)+(kpi.duplicated||0)+(kpi.unique||0)+(kpi.pending||0)).toLocaleString()} total records in view
                 </p>
                 {sideBreakdowns.category.length ? (
                   (() => {
@@ -532,7 +536,7 @@ const Analytics = () => {
                   <FiMapPin className="text-[#8E288D]" /> Department / Branch Performance
                 </h3>
                 <p className="text-xs text-gray-400 mb-5">
-                  Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''}
+                  Aggregated across {totalRecords.toLocaleString()} records
                 </p>
                 {sideBreakdowns.departmentBranch.length ? (
                   (() => {
@@ -576,7 +580,7 @@ const Analytics = () => {
                   <FiBarChart2 className="text-[#8E288D]" /> Division / District Performance
                 </h3>
                 <p className="text-xs text-gray-400 mb-5">
-                  Aggregated across all {data.total_reconciliations} reconciliation{data.total_reconciliations !== 1 ? 's' : ''}
+                  Aggregated across {totalRecords.toLocaleString()} records
                 </p>
                 {sideBreakdowns.divisionDistrict.length ? (
                   (() => {

@@ -37,7 +37,21 @@ const Login = () => {
       toast.success('Login successful!')
       navigate('/')
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Login failed')
+      const backendError = error?.response?.data || {}
+      const status = backendError.status
+      const message = backendError.error || 'Login failed'
+
+      if (status === 'pending') {
+        toast.error('Your account is waiting for administrator approval.')
+      } else if (status === 'suspended') {
+        toast.error('This account is suspended. Please contact your system administrator.')
+      } else if (message === 'Invalid username or password') {
+        toast.error('Invalid username or password. Please check the credentials and try again.')
+      } else if (message) {
+        toast.error(message)
+      } else {
+        toast.error('Unable to sign in. Please check the server connection or credentials.')
+      }
     } finally {
       setLoading(false)
     }

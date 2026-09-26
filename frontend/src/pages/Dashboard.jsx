@@ -460,6 +460,12 @@ const Dashboard = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [deleteConfirmId, setDeleteConfirmId] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [showTrash, setShowTrash] = useState(false)
+  const [trashedReconciliations, setTrashedReconciliations] = useState([])
+  const [recovering, setRecovering] = useState(false)
+  const [assignmentModal, setAssignmentModal] = useState(null)
+  const [assignableUsers, setAssignableUsers] = useState([])
+  const [assignmentSubmitting, setAssignmentSubmitting] = useState(false)
 
   // AI Insights State
   const [showAIModal, setShowAIModal] = useState(false)
@@ -479,6 +485,32 @@ const Dashboard = () => {
   useEffect(() => {
     fetchDashboardData()
   }, [dashboardSide])
+
+  useEffect(() => {
+    if (showTrash && hasRole('admin')) fetchTrash()
+    if (userRole === 'officer' || userRole === 'manager' || userRole === 'admin') {
+      fetchAssignableUsers()
+    }
+    setCurrentPage(1)
+  }, [showTrash, userRole])
+
+  const fetchTrash = async () => {
+    try {
+      const response = await cachedGet('/api/reconciliation/trash')
+      setTrashedReconciliations(response.data.reconciliations || [])
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to load trash')
+    }
+  }
+
+  const fetchAssignableUsers = async () => {
+    try {
+      const response = await axios.get('/api/reconciliation/assignable-users')
+      setAssignableUsers(response.data.users || [])
+    } catch (error) {
+      console.error('Failed to load assignable users:', error)
+    }
+  }
 
   const fetchDashboardData = async () => {
     setLoading(true)
@@ -550,6 +582,7 @@ const Dashboard = () => {
   const totalERPRecords = activeMonthReconciliations.reduce(
     (s, r) => s + (r.statistics?.total_internal_records || r.total_internal_records || 0), 0
   )
+  const totalRecordCount = totalERPRecords + totalPhysicalRecords
 
   // Pull approval_kpis from analyticsData (server-computed, role-scoped)
   // Falls back to 0 while data loads
@@ -647,7 +680,7 @@ const Dashboard = () => {
       await axios.delete(`/api/reconciliation/${id}`)
       clearCachedGets()
       logActivity('/', `DELETE_RECONCILIATION_ID_${id}`)
-      toast.success('Reconciliation deleted successfully')
+      toast.success('Reconciliation moved to trash')
       setDeleteConfirmId(null)
 
       const updated = reconciliations.filter(r => r.id !== id)
@@ -667,6 +700,42 @@ const Dashboard = () => {
     }
   }
 
+  const handleRecover = async (id) => {
+    setRecovering(true)
+    try {
+      await axios.post(`/api/reconciliation/${id}/recover`)
+      clearCachedGets()
+      toast.success('Reconciliation recovered successfully')
+      setTrashedReconciliations(items => items.filter(item => item.id !== id))
+      fetchDashboardData()
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to recover reconciliation')
+    } finally {
+      setRecovering(false)
+    }
+  }
+
+  const handleAssignReconciliation = async () => {
+    if (!assignmentModal) return
+    setAssignmentSubmitting(true)
+    try {
+      const payload = {
+        assignment_scope: assignmentModal.assignment_scope,
+        assignment_note: assignmentModal.assignment_note,
+        ...(assignmentModal.assignment_scope === 'specific_user' ? { assignee_id: assignmentModal.assignee_id } : {})
+      }
+      await axios.post(`/api/reconciliation/${assignmentModal.id}/assign`, payload)
+      toast.success('Review assignment updated successfully')
+      clearCachedGets()
+      setAssignmentModal(null)
+      fetchDashboardData()
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to update assignment')
+    } finally {
+      setAssignmentSubmitting(false)
+    }
+  }
+
   // Filter and pagination for table scoped to user's access privilege
   const filteredReconciliations = scopedReconciliations.filter(recon => {
     const matchesSearch = (recon.customer_file || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -677,6 +746,12 @@ const Dashboard = () => {
 
   const totalPages = Math.max(1, Math.ceil(filteredReconciliations.length / ITEMS_PER_PAGE))
   const paginatedReconciliations = filteredReconciliations.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+  const visibleReconciliations = showTrash ? trashedReconciliations : filteredReconciliations
+  const visibleTotalPages = Math.max(1, Math.ceil(visibleReconciliations.length / ITEMS_PER_PAGE))
+  const visiblePageItems = visibleReconciliations.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   )
@@ -727,12 +802,12 @@ const Dashboard = () => {
           {(userRole === 'admin' || userRole === 'manager') ? (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 font-bold text-[#701460] dark:bg-purple-950/50 dark:text-purple-300">
               <FiUser className="h-3 w-3" />
-              All Officers(Users) Uploads
+              All Officers(Users) Records
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-400">
               <FiUser className="h-3 w-3" />
-              My Uploads Only
+              My Records Only
             </span>
           )}
         </div>
@@ -740,7 +815,7 @@ const Dashboard = () => {
           Showing: <span className="font-semibold text-gray-600 dark:text-gray-300">{activeMonthLabel}</span>
           &nbsp;·&nbsp; ERP: <span className="font-semibold text-gray-700 dark:text-gray-200">{erpTotal.toLocaleString()}</span>
           &nbsp;·&nbsp; Physical: <span className="font-semibold text-gray-700 dark:text-gray-200">{physicalTotal.toLocaleString()}</span>
-          &nbsp;·&nbsp; Jobs: <span className="font-semibold text-gray-700 dark:text-gray-200">{activeMonthReconciliations.length}</span>
+          &nbsp;·&nbsp; Records: <span className="font-semibold text-gray-700 dark:text-gray-200">{totalRecordCount.toLocaleString()}</span>
         </span>
       </div>
 
@@ -748,7 +823,7 @@ const Dashboard = () => {
       <div className="grid w-full grid-cols-1 gap-4 p-2 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
 
         {/* Card 1: Reconciled */}
-        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
 
           {/* KPI Label + Icon */}
           <div
@@ -770,13 +845,13 @@ const Dashboard = () => {
           </div>
 
           {/* KPI Value */}
-          <p className="mt-4 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white text-center">
+          <p className="mt-4 text-center text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             {reconciledCount.toLocaleString()}
           </p>
 
           {/* KPI Note + Percentage */}
           <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
-            <span className="truncate text-gray-600">
+            <span className="truncate text-gray-600 dark:text-gray-400">
               {reconciledCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
             </span>
 
@@ -787,8 +862,9 @@ const Dashboard = () => {
         </div>
 
 
-        {/* Card 2: Unmatched ERP records */}
-        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+        {/* Card 2: Unmatched ERP Records */}
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+
           {/* KPI Label + Icon */}
           <div
             className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
@@ -809,13 +885,13 @@ const Dashboard = () => {
           </div>
 
           {/* KPI Value */}
-          <p className="mt-4 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white text-center">
+          <p className="mt-4 text-center text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             {unmatchedERPCount.toLocaleString()}
           </p>
 
           {/* KPI Note + Percentage */}
           <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
-            <span className="truncate text-gray-600">
+            <span className="truncate text-gray-600 dark:text-gray-400">
               {unmatchedERPCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
             </span>
 
@@ -823,12 +899,12 @@ const Dashboard = () => {
               {unmatchedRate}%
             </span>
           </div>
-
         </div>
 
 
         {/* Card 3: Surplus Assets */}
-        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+
           {/* KPI Label + Icon */}
           <div
             className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
@@ -850,14 +926,14 @@ const Dashboard = () => {
           </div>
 
           {/* KPI Value */}
-          <p className="mt-4 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white text-center">
+          <p className="mt-4 text-center text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             {surplusCount.toLocaleString()}
           </p>
 
           {/* KPI Note + Percentage */}
           <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
             <span
-              className="truncate text-gray-600"
+              className="truncate text-gray-600 dark:text-gray-400"
               title="Physical/Customer records not found in ERP"
             >
               {surplusCount.toLocaleString()} / {physicalTotal.toLocaleString()} Physical Records
@@ -867,11 +943,11 @@ const Dashboard = () => {
               {surplusRate}%
             </span>
           </div>
-
         </div>
 
+
         {/* Card 4: Shortage Assets */}
-        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
 
           {/* KPI Label + Icon */}
           <div
@@ -880,22 +956,28 @@ const Dashboard = () => {
               color: '#F33838',
               backgroundColor: '#F3383810',
             }}
-            title="ERP records not found in the physical count">
-            Shortage Assets ({activeMonthLabel})
+            title="ERP records not found in the physical count"
+          >
+            {/* Centered Title */}
+            <span className="text-center">
+              Shortage Assets ({activeMonthLabel})
+            </span>
+
+            {/* Right Corner Icon */}
             <span className="absolute right-2 text-base">
               <FiMinusCircle />
             </span>
           </div>
 
           {/* KPI Value */}
-          <p className="mt-4 text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white text-center">
+          <p className="mt-4 text-center text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
             {shortageCount.toLocaleString()}
           </p>
 
           {/* KPI Note + Percentage */}
           <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
             <span
-              className="truncate text-gray-600"
+              className="truncate text-gray-600 dark:text-gray-400"
               title="ERP records not found in physical count"
             >
               {shortageCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
@@ -1045,18 +1127,34 @@ const Dashboard = () => {
               className="inline-flex items-center px-4 py-1.5 text-xs font-semibold text-white bg-[#701460] hover:bg-[#5c104e] rounded-lg shadow-sm transition-all transform hover:scale-[1.02]"
             >
               <FiPlus className="mr-1.5 h-3.5 w-3.5" />
-              New Reconciliation
+              New Upload
             </Link>
+
+            {hasRole('admin') && (
+              <button
+                type="button"
+                onClick={() => setShowTrash(value => !value)}
+                className={`inline-flex items-center px-4 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${showTrash
+                  ? 'border-[#701460] bg-[#701460] text-white'
+                  : 'border-gray-200 text-gray-600 hover:border-[#701460] hover:text-[#701460] dark:border-gray-700 dark:text-gray-300'
+                }`}
+              >
+                <FiTrash2 className="mr-1.5 h-3.5 w-3.5" />
+                {showTrash ? 'Back to Reports' : 'Trash'}
+              </button>
+            )}
           </div>
         </div>
 
         {/* Table Content */}
-        {filteredReconciliations.length === 0 ? (
+        {visibleReconciliations.length === 0 ? (
           <div className="py-12 text-center">
             <FiFileText className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">No reconciliations found</h3>
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              {showTrash ? 'Trash is empty' : 'No reconciliations found'}
+            </h3>
             <p className="text-xs text-gray-400 mt-1">
-              {searchTerm || filterStatus !== 'all' ? 'Try adjusting search or status filter' : 'Upload files to start reconciliation'}
+              {showTrash ? 'Deleted reports can be recovered by an administrator' : searchTerm || filterStatus !== 'all' ? 'Try adjusting search or status filter' : 'Upload files to start reconciliation'}
             </p>
           </div>
         ) : (
@@ -1073,7 +1171,7 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50 dark:divide-gray-800 text-xs">
-                {paginatedReconciliations.map((recon) => {
+                {visiblePageItems.map((recon) => {
                   const totalRecords = recon.statistics?.total_customer_records || recon.total_customer_records || 0
                   const ruleMatched = recon.statistics?.rule_matched || 0
                   const aiMatched = recon.statistics?.ai_matched || 0
@@ -1135,6 +1233,7 @@ const Dashboard = () => {
                       {/* Action Buttons: View, Dashboard, Review & Approve, Download, Delete */}
                       <td className="py-3.5 px-3 text-right">
                         <div className="flex items-center justify-end space-x-1.5">
+                          {!showTrash && <>
                           {/* 1. View Results Button */}
                           <button
                             onClick={() => {
@@ -1181,15 +1280,41 @@ const Dashboard = () => {
                               <FiDownload className="h-4 w-4" />
                             </button>
                           )}
+                          </>}
 
-                          {/* 5. Delete Button */}
-                          <button
-                            onClick={() => setDeleteConfirmId(recon.id)}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
-                            title="Delete Reconciliation Job"
-                          >
-                            <FiTrash2 className="h-4 w-4" />
-                          </button>
+                          {!showTrash && (
+                            <button
+                              onClick={() => setAssignmentModal({
+                                id: recon.id,
+                                assignment_scope: recon.assignment_scope || 'all_officers',
+                                assignee_id: recon.assigned_to || (assignableUsers[0]?.id || ''),
+                                assignment_note: recon.assignment_note || '',
+                              })}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors"
+                              title="Assign review to another officer"
+                            >
+                              <FiUser className="h-4 w-4" />
+                            </button>
+                          )}
+
+                          {showTrash ? (
+                            <button
+                              onClick={() => handleRecover(recon.id)}
+                              disabled={recovering}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors disabled:opacity-50"
+                              title="Recover Reconciliation Job"
+                            >
+                              <FiRefreshCw className={`h-4 w-4 ${recovering ? 'animate-spin' : ''}`} />
+                            </button>
+                          ) : hasRole('admin') && (
+                            <button
+                              onClick={() => setDeleteConfirmId(recon.id)}
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                              title="Move Reconciliation to Trash"
+                            >
+                              <FiTrash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1201,12 +1326,12 @@ const Dashboard = () => {
         )}
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {visibleTotalPages > 1 && (
           <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs">
             <span className="text-gray-500">
               Showing <strong className="font-semibold text-gray-700 dark:text-gray-200">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</strong>–
-              <strong className="font-semibold text-gray-700 dark:text-gray-200">{Math.min(currentPage * ITEMS_PER_PAGE, filteredReconciliations.length)}</strong> of{' '}
-              <strong className="font-semibold text-gray-700 dark:text-gray-200">{filteredReconciliations.length}</strong> reconciliations
+              <strong className="font-semibold text-gray-700 dark:text-gray-200">{Math.min(currentPage * ITEMS_PER_PAGE, visibleReconciliations.length)}</strong> of{' '}
+              <strong className="font-semibold text-gray-700 dark:text-gray-200">{visibleReconciliations.length}</strong> {showTrash ? 'deleted reports' : 'reconciliations'}
             </span>
             <div className="flex items-center space-x-1">
               <button
@@ -1216,7 +1341,7 @@ const Dashboard = () => {
               >
                 <FiChevronLeft className="h-4 w-4" />
               </button>
-              {[...Array(totalPages)].map((_, i) => (
+              {[...Array(visibleTotalPages)].map((_, i) => (
                 <button
                   key={i + 1}
                   onClick={() => setCurrentPage(i + 1)}
@@ -1230,8 +1355,8 @@ const Dashboard = () => {
                 </button>
               ))}
               <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(visibleTotalPages, p + 1))}
+                disabled={currentPage === visibleTotalPages}
                 className="p-1.5 rounded-md border border-gray-200 dark:border-gray-700 disabled:opacity-30 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 <FiChevronRight className="h-4 w-4" />
@@ -1240,6 +1365,83 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
+      {/* ── Assignment Modal ─────────────────────────────────────────────── */}
+      {assignmentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-lg border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2.5 bg-indigo-100 dark:bg-indigo-950/60 rounded-xl">
+                <FiUser className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white">Assign Review</h3>
+                <p className="text-xs text-gray-400">Reconciliation #{assignmentModal.id}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Assignment type</label>
+                <select
+                  value={assignmentModal.assignment_scope}
+                  onChange={e => setAssignmentModal({ ...assignmentModal, assignment_scope: e.target.value, assignee_id: e.target.value === 'all_officers' ? '' : assignmentModal.assignee_id || assignableUsers[0]?.id || '' })}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm text-gray-700 dark:text-gray-200"
+                >
+                  <option value="all_officers">All officers</option>
+                  <option value="specific_user">Specific officer</option>
+                </select>
+              </div>
+
+              {assignmentModal.assignment_scope === 'specific_user' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Assign to</label>
+                  <select
+                    value={assignmentModal.assignee_id || ''}
+                    onChange={e => setAssignmentModal({ ...assignmentModal, assignee_id: e.target.value })}
+                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm text-gray-700 dark:text-gray-200"
+                  >
+                    <option value="">Select an officer</option>
+                    {assignableUsers
+                      .filter(option => option.role === 'officer' && Number(option.id) !== Number(user?.id))
+                      .map(option => (
+                        <option key={option.id} value={option.id}>{option.full_name || option.username} ({option.username})</option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Note</label>
+                <textarea
+                  rows={3}
+                  value={assignmentModal.assignment_note || ''}
+                  onChange={e => setAssignmentModal({ ...assignmentModal, assignment_note: e.target.value })}
+                  placeholder="Add review note or check instruction"
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm text-gray-700 dark:text-gray-200"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <button
+                onClick={() => setAssignmentModal(null)}
+                disabled={assignmentSubmitting}
+                className="w-28 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignReconciliation}
+                disabled={assignmentSubmitting || (assignmentModal.assignment_scope === 'specific_user' && !assignmentModal.assignee_id)}
+                className="w-32 h-10 rounded-lg bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center"
+              >
+                {assignmentSubmitting ? <FiLoader className="animate-spin h-3.5 w-3.5" /> : 'Save assignment'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Delete Confirmation Modal ─────────────────────────────────────── */}
       {deleteConfirmId && (
@@ -1255,7 +1457,7 @@ const Dashboard = () => {
               </div>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-              Are you sure you want to permanently delete this reconciliation job and all its analyzed asset records? This action cannot be undone.
+              Are you sure you want to move this reconciliation job to trash? Its analyzed asset records will be kept and the job can be recovered by an administrator.
             </p>
             <div className="flex justify-end gap-3 pt-2">
               <button

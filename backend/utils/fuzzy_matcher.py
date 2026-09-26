@@ -18,7 +18,7 @@ class FuzzyMatcher:
                 str(internal_row['description'])
             ) / 100.0
             scores.append(desc_score)
-            weights.append(0.40)
+            weights.append(0.45)
         
         # # Serial number similarity (weight: 0.20)
         # if customer_row.get('serial_no') and internal_row.get('serial_no'):
@@ -36,16 +36,16 @@ class FuzzyMatcher:
                 str(internal_row['department'])
             ) / 100.0
             scores.append(dept_score)
-            weights.append(0.15)
+            weights.append(0.20)
         
         # Asset number similarity (weight: 0.05)
-        if customer_row.get('asset_number') and internal_row.get('asset_number'):
-            asset_score = fuzz.ratio(
-                str(customer_row['asset_number']),
-                str(internal_row['asset_number'])
-            ) / 100.0
-            scores.append(asset_score)
-            weights.append(0.05)
+        # if customer_row.get('asset_number') and internal_row.get('asset_number'):
+        #     asset_score = fuzz.ratio(
+        #         str(customer_row['asset_number']),
+        #         str(internal_row['asset_number'])
+        #     ) / 100.0
+        #     scores.append(asset_score)
+        #     weights.append(0.05)
             
         # Category similarity (weight: 0.15)
         if customer_row.get('category') and internal_row.get('category'):
@@ -54,7 +54,7 @@ class FuzzyMatcher:
                 str(internal_row['category'])
             ) / 100.0
             scores.append(cat_score)
-            weights.append(0.15)
+            weights.append(0.20)
             
         # District similarity (weight: 0.15)
         if customer_row.get('district') and internal_row.get('district'):
@@ -66,32 +66,32 @@ class FuzzyMatcher:
             weights.append(0.15)
             
         # Year similarity (weight: 0.05)
-        if pd.notna(customer_row.get('year')) and pd.notna(internal_row.get('year')):
-            try:
-                c_year = int(customer_row['year'])
-                i_year = int(internal_row['year'])
-                if c_year == i_year:
-                    scores.append(1.0)
-                else:
-                    year_diff = abs(c_year - i_year)
-                    year_score = max(0.0, 1.0 - (year_diff * 0.1))
-                    scores.append(year_score)
-                weights.append(0.05)
-            except (ValueError, TypeError):
-                pass
+        # if pd.notna(customer_row.get('year')) and pd.notna(internal_row.get('year')):
+        #     try:
+        #         c_year = int(customer_row['year'])
+        #         i_year = int(internal_row['year'])
+        #         if c_year == i_year:
+        #             scores.append(1.0)
+        #         else:
+        #             year_diff = abs(c_year - i_year)
+        #             year_score = max(0.0, 1.0 - (year_diff * 0.1))
+        #             scores.append(year_score)
+        #         weights.append(0.05)
+        #     except (ValueError, TypeError):
+        #         pass
         
         # Book value similarity (weight: 0.05)
-        if pd.notna(customer_row.get('book_value')) and pd.notna(internal_row.get('book_value')):
-            try:
-                c_value = float(customer_row['book_value'])
-                i_value = float(internal_row['book_value'])
-                if c_value > 0 and i_value > 0:
-                    value_diff = abs(c_value - i_value) / max(c_value, i_value)
-                    value_score = 1.0 - min(value_diff, 1.0)
-                    scores.append(value_score)
-                    weights.append(0.05)
-            except (ValueError, TypeError):
-                pass
+        # if pd.notna(customer_row.get('book_value')) and pd.notna(internal_row.get('book_value')):
+        #     try:
+        #         c_value = float(customer_row['book_value'])
+        #         i_value = float(internal_row['book_value'])
+        #         if c_value > 0 and i_value > 0:
+        #             value_diff = abs(c_value - i_value) / max(c_value, i_value)
+        #             value_score = 1.0 - min(value_diff, 1.0)
+        #             scores.append(value_score)
+        #             weights.append(0.05)
+        #     except (ValueError, TypeError):
+        #         pass
         
         # Calculate weighted average
         if not scores:

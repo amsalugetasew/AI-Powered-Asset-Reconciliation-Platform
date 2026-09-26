@@ -141,53 +141,58 @@ const AuditTrail = () => {
             value: totalEvents.toLocaleString(),
             note: `${todayEvents.toLocaleString()} events today`,
             icon: <FiActivity />,
-            color: '#8E288D'
+            color: '#8E288D',
           },
           {
             label: 'User Actions',
             value: `${userActions.toLocaleString()} Logged`,
             note: `${new Set(logs.map(log => log.user_id)).size} unique users`,
             icon: <FiUser />,
-            color: '#CFB53B'
+            color: '#CFB53B',
           },
           {
             label: 'System Events',
             value: `${systemEvents.toLocaleString()} Automated`,
             note: 'No failure alerts',
             icon: <FiSettings />,
-            color: '#10B981'
+            color: '#10B981',
           },
           {
             label: 'Flagged Items',
             value: `${flaggedItems.toLocaleString()} critical`,
-            note: flaggedItems ? 'Requires security review' : 'No security alerts',
+            note: flaggedItems
+              ? 'Requires security review'
+              : 'No security alerts',
             icon: <FiAlertTriangle />,
-            color: '#DC2626'
+            color: '#DC2626',
           },
         ].map(card => (
           <div
             key={card.label}
-            className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+            className="h-[140px] w-full rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md"
           >
-
             {/* KPI Label + Icon */}
             <div
-              className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold uppercase"
+              className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
               style={{
                 color: card.color,
                 backgroundColor: `${card.color}10`,
               }}
             >
-              <span className="text-sm">
-                {card.icon}
+              {/* Centered Label */}
+              <span className="text-center">
+                {card.label}
               </span>
 
-              {card.label}
+              {/* Right Corner Icon */}
+              <span className="absolute right-2 text-sm">
+                {card.icon}
+              </span>
             </div>
 
             {/* KPI Value */}
             <div
-              className="mt-4 text-3xl font-extrabold"
+              className="mt-4 text-center text-2xl font-extrabold tracking-tight"
               style={{ color: card.color }}
             >
               {card.value}
@@ -195,12 +200,11 @@ const AuditTrail = () => {
 
             {/* KPI Note */}
             <div
-              className="mt-4 text-right text-xs font-bold"
+              className="mt-3 text-center text-xs font-bold"
               style={{ color: card.color }}
             >
               {card.note}
             </div>
-
           </div>
         ))}
       </div>

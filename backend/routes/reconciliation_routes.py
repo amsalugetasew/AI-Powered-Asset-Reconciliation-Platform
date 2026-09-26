@@ -11,6 +11,38 @@ from models import db, Reconciliation, ReconciliationRecord, User
 from services.reconciliation_service import ReconciliationService
 from services.audit_service import AuditService
 from utils.rbac import require_role, get_user_from_token, get_user_role
+
+
+def _user_can_access_reconciliation(reconciliation, user_id, user_role):
+    """Return whether a user can view or act on a reconciliation."""
+    if not reconciliation or reconciliation.is_deleted:
+        return False
+    if user_role in ['manager', 'admin']:
+        return True
+    if user_role != 'officer':
+        return False
+    if reconciliation.user_id == user_id:
+        return True
+    if reconciliation.assigned_to == user_id:
+        return True
+    if reconciliation.assignment_scope == 'all_officers':
+        return True
+    return False
+
+
+def _user_can_approve_reconciliation(reconciliation, user_id, user_role):
+    """Allow manager/admin or delegated officers to review approval records."""
+    if user_role in ['manager', 'admin']:
+        return True
+    if user_role != 'officer':
+        return False
+    if reconciliation.user_id == user_id:
+        return True
+    if reconciliation.assigned_to == user_id:
+        return True
+    if reconciliation.assignment_scope == 'all_officers':
+        return True
+    return False
 from config import Config
 from utils.data_cleaner import DataCleaner
 
@@ -46,6 +78,11 @@ def _auto_save_records(reconciliation_id, report_path):
         print(f"_auto_save_records: report not found at {report_path}")
         return 0
 
+    reconciliation = Reconciliation.query.get(reconciliation_id)
+    if not reconciliation:
+        print(f"_auto_save_records: reconciliation {reconciliation_id} not found")
+        return 0
+
     # Delete existing records (re-run safe)
     ReconciliationRecord.query.filter_by(reconciliation_id=reconciliation_id).delete()
     db.session.flush()
@@ -73,12 +110,17 @@ def _auto_save_records(reconciliation_id, report_path):
         for _, row in df.iterrows():
             row_dict = row.to_dict()
             cleaned = {k: (None if pd.isna(v) else v) for k, v in row_dict.items()}
+            default_approval = 'duplicated' if match_type == 'Duplicate' else 'pending'
 
             record = ReconciliationRecord(
                 reconciliation_id=reconciliation_id,
                 match_category=match_type,
+                maker_user_id=reconciliation.user_id,
                 full_record_json=cleaned,
-                approval_status='duplicated' if match_type == 'Duplicate' else 'pending'
+                check_status='pending',
+                checker_status='pending',
+                approval_status=default_approval,
+                approver_status='pending'
             )
             records_to_insert.append(record)
 
@@ -189,10 +231,11 @@ def process_reconciliation(reconciliation_id):
         # Get reconciliation record
         reconciliation = Reconciliation.query.filter_by(
             id=reconciliation_id,
-            user_id=user_id
+            user_id=user_id,
+            is_deleted=False
         ).first()
         
-        if not reconciliation:
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
         
         if reconciliation.status != 'pending':
@@ -283,37 +326,146 @@ def process_reconciliation(reconciliation_id):
         
         return jsonify({'error': str(e)}), 500
 
+@reconciliation_bp.route('/assignable-users', methods=['GET'])
+@jwt_required()
+@require_role('officer')
+def list_assignable_users():
+    """Return active officer users available for delegated check assignments."""
+    try:
+        user_id = int(get_jwt_identity())
+        users = User.query.filter(
+            User.is_active.is_(True),
+            User.role == 'officer',
+            User.id != user_id
+        ).order_by(User.username.asc()).all()
+        return jsonify({
+            'users': [{
+                'id': user.id,
+                'username': user.username,
+                'full_name': user.full_name,
+                'email': user.email,
+                'role': user.role,
+                'department': user.department,
+            } for user in users],
+            'total': len(users)
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@reconciliation_bp.route('/<int:reconciliation_id>/assign', methods=['POST'])
+@jwt_required()
+@require_role('officer')
+def assign_reconciliation(reconciliation_id):
+    """Assign a report to another officer or make it visible to all officers."""
+    try:
+        user_id = int(get_jwt_identity())
+        user_role = get_user_role()
+        data = request.get_json(silent=True) or {}
+
+        reconciliation = Reconciliation.query.get(reconciliation_id)
+        if not reconciliation or reconciliation.is_deleted:
+            return jsonify({'error': 'Reconciliation not found'}), 404
+
+        if user_role == 'officer' and reconciliation.user_id != user_id:
+            return jsonify({
+                'error': 'Access denied',
+                'message': 'You can only assign your own reconciliation jobs.'
+            }), 403
+
+        assignment_scope = (data.get('assignment_scope') or 'all_officers').strip()
+        if assignment_scope not in ['all_officers', 'specific_user']:
+            return jsonify({'error': 'Invalid assignment_scope. Must be all_officers or specific_user'}), 400
+
+        assignee_id = data.get('assignee_id')
+        if assignment_scope == 'specific_user':
+            if assignee_id in [None, '', 'null']:
+                return jsonify({'error': 'assignee_id is required for specific_user assignments'}), 400
+            try:
+                assignee_id = int(assignee_id)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'assignee_id must be a valid user id'}), 400
+
+            if assignee_id == reconciliation.user_id:
+                return jsonify({'error': 'The maker cannot be assigned as checker for their own reconciliation.'}), 400
+            if user_role == 'officer' and assignee_id == user_id:
+                return jsonify({'error': 'You cannot assign a reconciliation back to yourself. Choose another officer.'}), 400
+            assignee = User.query.get(assignee_id)
+            if not assignee or not assignee.is_active or assignee.role != 'officer':
+                return jsonify({'error': 'Selected assignee must be an active officer.'}), 404
+            reconciliation.assigned_to = assignee.id
+            reconciliation.assignment_scope = 'specific_user'
+            ReconciliationRecord.query.filter_by(reconciliation_id=reconciliation.id).update({
+                'check_status': 'checking',
+                'checked_by': assignee.id,
+                'checked_at': datetime.utcnow()
+            })
+        else:
+            reconciliation.assigned_to = None
+            reconciliation.assignment_scope = 'all_officers'
+            ReconciliationRecord.query.filter_by(reconciliation_id=reconciliation.id).update({
+                'check_status': 'pending',
+                'checked_by': None,
+                'checked_at': None
+            })
+
+        reconciliation.assigned_by = user_id
+        reconciliation.assignment_note = data.get('assignment_note') or reconciliation.assignment_note
+        reconciliation.assigned_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Reconciliation assignment updated successfully',
+            'assignment': {
+                'reconciliation_id': reconciliation.id,
+                'assignment_scope': reconciliation.assignment_scope,
+                'assigned_to': reconciliation.assigned_to,
+                'assigned_by': reconciliation.assigned_by,
+                'assignment_note': reconciliation.assignment_note,
+                'assigned_at': reconciliation.assigned_at.isoformat() if reconciliation.assigned_at else None,
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @reconciliation_bp.route('/list', methods=['GET'])
 @jwt_required()
 def list_reconciliations():
     """
     List reconciliations based on user role.
-    
-    Officers: See only their own reconciliations
-    Managers/Admins: See all reconciliations system-wide
+
+    Officers: See their own reconciliations and any delegated assignments.
+    Managers/Admins: See all reconciliations system-wide.
     """
     try:
-        user_id = int(get_jwt_identity())  # Convert to int
+        user_id = int(get_jwt_identity())
         user_role = get_user_role()
-        
-        # Role-based filtering
+
         if user_role in ['manager', 'admin']:
-            # Managers and admins see all reconciliations
-            reconciliations = Reconciliation.query\
+            reconciliations = Reconciliation.query.filter_by(is_deleted=False)\
                 .order_by(Reconciliation.created_at.desc()).all()
             scope = 'all'
         else:
-            # Officers see only their own
-            reconciliations = Reconciliation.query.filter_by(user_id=user_id)\
+            reconciliations = Reconciliation.query.filter_by(is_deleted=False)\
+                .filter(
+                    db.or_(
+                        Reconciliation.user_id == user_id,
+                        Reconciliation.assigned_to == user_id,
+                        Reconciliation.assignment_scope == 'all_officers'
+                    )
+                )\
                 .order_by(Reconciliation.created_at.desc()).all()
-            scope = 'own'
-        
+            scope = 'assigned_or_own'
+
         return jsonify({
             'reconciliations': [r.to_dict() for r in reconciliations],
             'scope': scope,
             'role': user_role
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -322,30 +474,29 @@ def list_reconciliations():
 def get_reconciliation(reconciliation_id):
     """
     Get specific reconciliation details.
-    
-    Officers: Can only view their own reconciliations
-    Managers/Admins: Can view any reconciliation
+
+    Officers can view their own reconciliations or delegated ones.
+    Managers/Admins: Can view any reconciliation.
     """
     try:
-        user_id = int(get_jwt_identity())  # Convert to int
+        user_id = int(get_jwt_identity())
         user_role = get_user_role()
-        
+
         reconciliation = Reconciliation.query.get(reconciliation_id)
-        
-        if not reconciliation:
+
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
-        
-        # Role-based access control
-        if user_role == 'officer' and reconciliation.user_id != user_id:
+
+        if not _user_can_access_reconciliation(reconciliation, user_id, user_role):
             return jsonify({
                 'error': 'Access denied',
-                'message': 'You can only view your own reconciliations.'
+                'message': 'You can only view your own or assigned reconciliations.'
             }), 403
-        
+
         return jsonify({
             'reconciliation': reconciliation.to_dict()
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -354,26 +505,25 @@ def get_reconciliation(reconciliation_id):
 def download_report(reconciliation_id):
     """
     Download reconciliation report.
-    
-    Officers: Can only download their own reports
-    Managers/Admins: Can download any report
+
+    Officers can download their own reports and delegated review assignments.
+    Managers/Admins: Can download any report.
     """
     try:
-        user_id = int(get_jwt_identity())  # Convert to int
+        user_id = int(get_jwt_identity())
         user_role = get_user_role()
-        
+
         reconciliation = Reconciliation.query.get(reconciliation_id)
-        
-        if not reconciliation:
+
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
-        
-        # Role-based access control
-        if user_role == 'officer' and reconciliation.user_id != user_id:
+
+        if not _user_can_access_reconciliation(reconciliation, user_id, user_role):
             return jsonify({
                 'error': 'Access denied',
-                'message': 'You can only download your own reports.'
+                'message': 'You can only download your own or assigned reports.'
             }), 403
-        
+
         if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
             return jsonify({'error': 'Report not found'}), 404
         
@@ -409,10 +559,10 @@ def download_enriched_report(reconciliation_id):
         user_role = get_user_role()
 
         reconciliation = Reconciliation.query.get(reconciliation_id)
-        if not reconciliation:
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
 
-        if user_role == 'officer' and reconciliation.user_id != user_id:
+        if not _user_can_access_reconciliation(reconciliation, user_id, user_role):
             return jsonify({'error': 'Access denied'}), 403
 
         if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
@@ -420,12 +570,21 @@ def download_enriched_report(reconciliation_id):
 
         # ── Approval label map ────────────────────────────────────────────────
         APPROVAL_LABELS = {
-            'pending':                    'Pending',
             'reconciled':                'Reconciled',
             'unreconciled':              'Unreconciled',
             'surplus_assets':            'Surplus Assets',
             'exist_in_erp_not_physical': 'Shortage Assets',
         }
+
+        def _status_value(record, legacy_field, explicit_field):
+            if record is None:
+                return None
+            return getattr(record, explicit_field, None) or getattr(record, legacy_field, None) or None
+
+        def _status_label(status):
+            if status in (None, '', 'pending', 'Pending'):
+                return ''
+            return APPROVAL_LABELS.get(status, status)
 
         # ── Dept Reconcile helper ─────────────────────────────────────────────
         def _norm(val):
@@ -482,16 +641,35 @@ def download_enriched_report(reconciliation_id):
                 if category and not (len(df.columns) == 1 and 'Message' in df.columns):
                     recs = approval_by_category.get(category, [])
 
-                    approval_col    = []
-                    dept_rec_col    = []
+                    approval_col      = []
+                    checker_status_col= []
+                    approver_status_col = []
+                    maker_col         = []
+                    checker_col       = []
+                    approver_col      = []
+                    dept_rec_col      = []
 
                     for i, row in df.iterrows():
                         db_rec = recs[i] if i < len(recs) else None
                         json_data = db_rec.full_record_json or {} if db_rec else {}
 
-                        # Approval label
-                        status = db_rec.approval_status if db_rec else 'pending'
-                        approval_col.append(APPROVAL_LABELS.get(status or 'pending', 'Pending'))
+                        maker_user = db_rec.maker or (db_rec.reconciliation.user if db_rec and db_rec.reconciliation else None) if db_rec else None
+                        checker_user = db_rec.checker if db_rec else None
+                        approver_user = db_rec.approver if db_rec else None
+
+                        maker_name = maker_user.username if maker_user else ''
+                        checker_name = checker_user.username if checker_user else ''
+                        approver_name = approver_user.username if approver_user else ''
+
+                        # Status labels
+                        checker_status = _status_value(db_rec, 'check_status', 'checker_status')
+                        approver_status = _status_value(db_rec, 'approval_status', 'approver_status')
+                        approval_col.append(_status_label(approver_status))
+                        checker_status_col.append(_status_label(checker_status))
+                        approver_status_col.append(_status_label(approver_status))
+                        maker_col.append(maker_name)
+                        checker_col.append(checker_name)
+                        approver_col.append(approver_name)
 
                         # Dept reconcile — pick fields from json or df columns
                         def _pick(keys):
@@ -508,6 +686,11 @@ def download_enriched_report(reconciliation_id):
 
                         dept_rec_col.append(_dept_reconcile(c_dept, i_dept, c_dist, i_dist))
 
+                    df.insert(len(df.columns), 'Maker', maker_col)
+                    df.insert(len(df.columns), 'Checker', checker_col)
+                    df.insert(len(df.columns), 'Checker Status', checker_status_col)
+                    df.insert(len(df.columns), 'Approver', approver_col)
+                    df.insert(len(df.columns), 'Approver Status', approver_status_col)
                     df.insert(len(df.columns), 'Approval Status', approval_col)
                     df.insert(len(df.columns), 'Dept. Reconcile',  dept_rec_col)
 
@@ -553,12 +736,12 @@ def get_analytics():
         now = datetime.utcnow()
         # ── scope filter ───────────────────────────────────────────────────────
         if user_role in ['manager', 'admin']:
-            reconciliations = Reconciliation.query.filter_by(status='completed').all()
+            reconciliations = Reconciliation.query.filter_by(status='completed', is_deleted=False).all()
             recon_ids = [r.id for r in reconciliations]
             scope = 'all'
         else:
             reconciliations = Reconciliation.query.filter_by(
-                user_id=user_id, status='completed').all()
+                user_id=user_id, status='completed', is_deleted=False).all()
             recon_ids = [r.id for r in reconciliations]
             scope = 'own'
 
@@ -1010,7 +1193,7 @@ def approve_exception(reconciliation_id):
         # Verify reconciliation exists
         reconciliation = Reconciliation.query.get(reconciliation_id)
         
-        if not reconciliation:
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
         
         if reconciliation.status != 'completed':
@@ -1046,16 +1229,11 @@ def approve_exception(reconciliation_id):
 
 @reconciliation_bp.route('/records/approve-record', methods=['POST'])
 @jwt_required()
-@require_role('manager')
 def approve_record():
     """
-    Approve or reject a single record by ID (Manager/Admin only).
-
-    Request body:
-    {
-        "record_id": 42,
-        "approval_decision": "reconciled" | "unreconciled" | "surplus_assets" | "exist_in_erp_not_physical" | "pending"
-    }
+    Check or approve a single record in a maker -> checker -> approver flow.
+    Officers check records; managers/admins approve them. The existing UI still
+    sends a single approval_decision, and the stage is inferred from role.
     """
     VALID_DECISIONS = [
         'pending', 'reconciled', 'unreconciled',
@@ -1066,6 +1244,7 @@ def approve_record():
         data = request.get_json()
         record_id = data.get('record_id')
         approval_decision = data.get('approval_decision')
+        decision_stage = (data.get('decision_stage') or data.get('stage') or '').strip().lower()
 
         if not record_id or not approval_decision:
             return jsonify({'error': 'Missing required fields: record_id, approval_decision'}), 400
@@ -1076,23 +1255,61 @@ def approve_record():
                 'allowed': VALID_DECISIONS
             }), 400
 
+        if decision_stage not in ['', 'check', 'checker', 'approve', 'approver']:
+            return jsonify({'error': 'Invalid decision_stage. Use check or approve'}), 400
+
         record = ReconciliationRecord.query.get(record_id)
         if not record:
             return jsonify({'error': 'Record not found'}), 404
 
-        manager_user = get_user_from_token()
+        reconciliation = Reconciliation.query.get(record.reconciliation_id)
+        if not reconciliation or reconciliation.is_deleted:
+            return jsonify({'error': 'Reconciliation not found'}), 404
 
-        record.approval_status = approval_decision
-        record.approved_by = manager_user.id
-        record.approved_at = datetime.utcnow()
+        current_user = get_user_from_token()
+        if not _user_can_approve_reconciliation(reconciliation, current_user.id, current_user.role):
+            return jsonify({'error': 'Access denied', 'message': 'Only managers/admins or the assigned officer can review these records.'}), 403
+
+        if current_user.role not in ['manager', 'admin'] and current_user.id == record.maker_user_id:
+            return jsonify({'error': 'The maker cannot check or approve their own record.'}), 403
+
+        if current_user.role in ['manager', 'admin']:
+            stage = 'approver' if (decision_stage or '').lower() in ['approve', 'approver'] else 'checker'
+        else:
+            stage = 'checker'
+
+        if stage == 'approver' and current_user.role not in ['manager', 'admin']:
+            return jsonify({'error': 'Only managers or admins may approve checked records.'}), 403
+
+        if stage == 'approver' and (record.checker_status or record.check_status or 'pending') in [None, '', 'pending', 'checking']:
+            return jsonify({'error': 'This record must be checked before it can be approved.'}), 400
+
+        if stage == 'checker':
+            record.check_status = approval_decision
+            record.checker_status = approval_decision
+            record.checked_by = current_user.id
+            record.checked_at = datetime.utcnow()
+            actor_name = current_user.username
+            action_type = 'CHECK_RECORD'
+        else:
+            if (record.checker_status or record.check_status or 'pending') in [None, '', 'pending', 'checking']:
+                return jsonify({'error': 'This record must be checked before it can be approved'}), 400
+            record.approval_status = approval_decision
+            record.approver_status = approval_decision
+            record.approved_by = current_user.id
+            record.approved_at = datetime.utcnow()
+            actor_name = current_user.username
+            action_type = 'APPROVE_RECORD'
+
         db.session.commit()
 
         AuditService.log_operation(
-            user_id=manager_user.id,
-            operation_type='APPROVE_RECORD',
+            user_id=current_user.id,
+            operation_type=action_type,
             resource_type='reconciliation_records',
             resource_id=record_id,
             details={
+                'decision_stage': stage,
                 'approval_decision': approval_decision,
                 'reconciliation_id': record.reconciliation_id,
                 'match_category': record.match_category
@@ -1100,10 +1317,15 @@ def approve_record():
         )
 
         return jsonify({
-            'message': f'Record {record_id} marked as {approval_decision}',
+            'message': f'Record {record_id} marked as {approval_decision} by {stage}',
             'record_id': record_id,
-            'approval_status': approval_decision,
-            'approved_by': manager_user.username
+            'decision_stage': stage,
+            'approval_status': record.approval_status or record.approver_status or 'pending',
+            'approver_status': record.approver_status or record.approval_status or 'pending',
+            'check_status': record.check_status or record.checker_status or 'pending',
+            'checker_status': record.checker_status or record.check_status or 'pending',
+            'actor': actor_name,
+            'actor_role': current_user.role
         }), 200
 
     except Exception as e:
@@ -1113,32 +1335,24 @@ def approve_record():
 
 @reconciliation_bp.route('/records/approve-group', methods=['POST'])
 @jwt_required()
-@require_role('manager')
 def approve_group():
     """
-    Approve a group of records by category (Manager+ only).
-    This also saves records to database if not already saved.
-    
-    Request body:
-    {
-        "reconciliation_id": 123,
-        "category": "Exact Match",
-        "approval_decision": "reconciled" or "not_reconciled"
-    }
+    Check or approve a group of records by category in the maker -> checker -> approver flow.
+    Officers perform checker-review, managers/admins final approver action.
     """
     try:
         data = request.get_json()
         reconciliation_id = data.get('reconciliation_id')
         category = data.get('category')
         approval_decision = data.get('approval_decision')
-        
-        # Validation
+        decision_stage = (data.get('decision_stage') or data.get('stage') or '').strip().lower()
+
         if not all([reconciliation_id, category, approval_decision]):
             return jsonify({
                 'error': 'Missing required fields',
                 'required': ['reconciliation_id', 'category', 'approval_decision']
             }), 400
-        
+
         VALID_DECISIONS = [
             'reconciled', 'unreconciled', 'surplus_assets',
             'exist_in_erp_not_physical', 'duplicated', 'unique'
@@ -1148,26 +1362,54 @@ def approve_group():
                 'error': 'Invalid approval_decision',
                 'allowed': VALID_DECISIONS
             }), 400
-        
-        # Verify reconciliation exists
+
+        if decision_stage not in ['', 'check', 'checker', 'approve', 'approver']:
+            return jsonify({'error': 'Invalid decision_stage. Use check or approve'}), 400
+
         reconciliation = Reconciliation.query.get(reconciliation_id)
-        if not reconciliation:
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
-        
+
         if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
             return jsonify({'error': 'Report file not found'}), 404
-        
-        # Get manager user
-        manager_user = get_user_from_token()
-        
-        # Check if records already exist in database for this reconciliation
+
+        current_user = get_user_from_token()
+        if not _user_can_approve_reconciliation(reconciliation, current_user.id, current_user.role):
+            return jsonify({'error': 'Access denied', 'message': 'Only managers/admins or the assigned officer can review these records.'}), 403
+
+        if current_user.role not in ['manager', 'admin'] and current_user.id == reconciliation.user_id:
+            return jsonify({'error': 'The maker cannot check or approve records they created.'}), 403
+
+        stage = 'approver' if current_user.role in ['manager', 'admin'] and (decision_stage or '').lower() in ['approve', 'approver'] else 'checker'
+        if current_user.role not in ['manager', 'admin']:
+            stage = 'checker'
+
+        if stage == 'approver':
+            if category == 'Unmatched':
+                category_filter = db.or_(
+                    ReconciliationRecord.match_category == 'Physical Unmatched',
+                    ReconciliationRecord.match_category == 'ERP Unmatched'
+                )
+            else:
+                category_filter = ReconciliationRecord.match_category == category
+
+            pending_checked = ReconciliationRecord.query.filter(
+                ReconciliationRecord.reconciliation_id == reconciliation_id,
+                category_filter,
+                db.or_(
+                    ReconciliationRecord.check_status.in_([None, '', 'pending', 'checking']),
+                    ReconciliationRecord.checker_status.in_([None, '', 'pending', 'checking'])
+                )
+            ).count()
+            if pending_checked > 0:
+                return jsonify({'error': 'This category still contains unchecked records. Complete the checker stage before approving.'}), 400
+
         existing_count = ReconciliationRecord.query.filter_by(
             reconciliation_id=reconciliation_id
         ).count()
         
         records_created = 0
         
-        # If no records exist, parse from Excel and save
         if existing_count == 0:
             print(f"No records in DB, parsing from Excel file...")
             excel_file = pd.ExcelFile(reconciliation.report_path)
@@ -1200,7 +1442,9 @@ def approve_group():
                         record = ReconciliationRecord(
                             reconciliation_id=reconciliation_id,
                             match_category=match_type,
+                            maker_user_id=reconciliation.user_id,
                             full_record_json=cleaned_dict,
+                            check_status='pending',
                             approval_status='duplicated' if match_type == 'Duplicate' else 'pending'
                         )
                         db.session.add(record)
@@ -1209,7 +1453,6 @@ def approve_group():
             db.session.flush()
             print(f"Created {records_created} records in database")
         
-        # Now update the specific category with approval
         if category == 'Unmatched':
             records = ReconciliationRecord.query.filter(
                 ReconciliationRecord.reconciliation_id == reconciliation_id,
@@ -1230,23 +1473,31 @@ def approve_group():
                 'message': f'No records found for category: {category}'
             }), 404
         
-        # Update all records in the group
         updated_count = 0
         for record in records:
-            record.approval_status = approval_decision
-            record.approved_by = manager_user.id
-            record.approved_at = datetime.utcnow()
+            if stage == 'checker':
+                record.check_status = approval_decision
+                record.checker_status = approval_decision
+                record.checked_by = current_user.id
+                record.checked_at = datetime.utcnow()
+            else:
+                if (record.checker_status or record.check_status or 'pending') in [None, '', 'pending', 'checking']:
+                    return jsonify({'error': 'All records in this category must be checked before approval'}), 400
+                record.approval_status = approval_decision
+                record.approver_status = approval_decision
+                record.approved_by = current_user.id
+                record.approved_at = datetime.utcnow()
             updated_count += 1
-        
+
         db.session.commit()
-        
-        # Log to audit trail
+
         AuditService.log_operation(
-            user_id=manager_user.id,
+            user_id=current_user.id,
             operation_type='APPROVE_RECORD_GROUP',
             resource_type='reconciliation_records',
             resource_id=reconciliation_id,
             details={
+                'decision_stage': stage,
                 'category': category,
                 'approval_decision': approval_decision,
                 'records_count': updated_count,
@@ -1254,18 +1505,19 @@ def approve_group():
                 'reconciliation_user_id': reconciliation.user_id
             }
         )
-        
-        message = f'Successfully approved {updated_count} records'
+
+        message = f'Successfully {stage}ed {updated_count} records'
         if records_created > 0:
             message += f' and saved {records_created} total records to database'
-        
+
         return jsonify({
             'message': message,
             'category': category,
+            'decision_stage': stage,
             'approval_decision': approval_decision,
             'records_updated': updated_count,
             'records_created': records_created,
-            'approved_by': manager_user.username
+            'actor': current_user.username
         }), 200
         
     except Exception as e:
@@ -1288,13 +1540,12 @@ def get_approval_summary(reconciliation_id):
 
         # Verify reconciliation exists
         reconciliation = Reconciliation.query.get(reconciliation_id)
-        if not reconciliation:
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
 
-        # Role-based access control
-        if user_role == 'officer' and reconciliation.user_id != user_id:
+        if not _user_can_access_reconciliation(reconciliation, user_id, user_role):
             return jsonify({'error': 'Access denied',
-                            'message': 'You can only view your own reconciliation records.'}), 403
+                            'message': 'You can only view your own or assigned reconciliation records.'}), 403
 
         # Get counts by category and approval status
         from sqlalchemy import func
@@ -1370,7 +1621,7 @@ def finalize_reconciliation(reconciliation_id):
         # Verify reconciliation exists
         reconciliation = Reconciliation.query.get(reconciliation_id)
         
-        if not reconciliation:
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
         
         if reconciliation.status != 'completed':
@@ -1419,16 +1670,16 @@ def get_records_from_file(reconciliation_id):
         # Get reconciliation and check access
         reconciliation = Reconciliation.query.get(reconciliation_id)
         
-        if not reconciliation:
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
         
         # Role-based access control
-        if user_role == 'officer' and reconciliation.user_id != user_id:
+        if user_role == 'officer' and not _user_can_access_reconciliation(reconciliation, user_id, user_role):
             return jsonify({
                 'error': 'Access denied',
-                'message': 'You can only view your own reconciliation records.'
+                'message': 'You can only view your own or assigned reconciliation records.'
             }), 403
-        
+
         if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
             return jsonify({'error': 'Report file not found'}), 404
         
@@ -1530,16 +1781,16 @@ def get_records(reconciliation_id):
         # Get reconciliation and check access
         reconciliation = Reconciliation.query.get(reconciliation_id)
         
-        if not reconciliation:
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
         
         # Role-based access control
-        if user_role == 'officer' and reconciliation.user_id != user_id:
+        if user_role == 'officer' and not _user_can_access_reconciliation(reconciliation, user_id, user_role):
             return jsonify({
                 'error': 'Access denied',
-                'message': 'You can only view your own reconciliation records.'
+                'message': 'You can only view your own or assigned reconciliation records.'
             }), 403
-        
+
         # Get pagination parameters
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
@@ -1599,16 +1850,14 @@ def get_records(reconciliation_id):
             # Extract relevant fields from full_record_json
             json_data = record.full_record_json or {}
             
-            # Get approver info if approved (handle None gracefully)
-            approver_name = None
-            try:
-                if hasattr(record, 'approved_by') and record.approved_by:
-                    approver = db.session.query(User.username).filter_by(id=record.approved_by).first()
-                    if approver:
-                        approver_name = approver[0]
-            except Exception as e:
-                print(f"Warning: Could not fetch approver name: {e}")
-            
+            maker_user = record.maker or (record.reconciliation.user if record.reconciliation else None)
+            checker_user = record.checker
+            approver_user = record.approver
+
+            maker_name = maker_user.username if maker_user else None
+            checker_name = checker_user.username if checker_user else None
+            approver_name = approver_user.username if approver_user else None
+
             # Get approval status (default to 'pending' if column doesn't exist yet)
             approval_status = getattr(record, 'approval_status', 'pending') or 'pending'
             approved_at = getattr(record, 'approved_at', None)
@@ -1766,9 +2015,19 @@ def get_records(reconciliation_id):
                     'Unmatched'
                 ),
                 'approval_status': approval_status,
-                'approved_by':     approver_name,
-                'approved_at':     approved_at.isoformat() if approved_at else None,
-                'full_data':       json_data
+                'approver_status': getattr(record, 'approver_status', None) or approval_status,
+                'check_status': getattr(record, 'check_status', None) or getattr(record, 'checker_status', None) or 'pending',
+                'checker_status': getattr(record, 'checker_status', None) or getattr(record, 'check_status', None) or 'pending',
+                'maker_user_id': record.maker_user_id or (record.reconciliation.user_id if record.reconciliation else None),
+                'maker_username': maker_name,
+                'checked_by': record.checked_by,
+                'checked_by_username': checker_name,
+                'checker_username': checker_name,
+                'approved_by': record.approved_by,
+                'approved_by_username': approver_name,
+                'approver_username': approver_name,
+                'approved_at': approved_at.isoformat() if approved_at else None,
+                'full_data': json_data
             })
         
         print(f"=== END DEBUG ===\n")
@@ -1802,14 +2061,14 @@ def record_results(reconciliation_id):
         # Get reconciliation and check access
         reconciliation = Reconciliation.query.get(reconciliation_id)
         
-        if not reconciliation:
+        if not reconciliation or reconciliation.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
         
         # Role-based access control
-        if user_role == 'officer' and reconciliation.user_id != user_id:
+        if user_role == 'officer' and not _user_can_access_reconciliation(reconciliation, user_id, user_role):
             return jsonify({
                 'error': 'Access denied',
-                'message': 'You can only record your own reconciliation results.'
+                'message': 'You can only record your own or assigned reconciliation results.'
             }), 403
             
         if not reconciliation.report_path or not os.path.exists(reconciliation.report_path):
@@ -1984,7 +2243,7 @@ def get_reconciliation_analytics(reconciliation_id):
         user_role = get_user_role()
 
         recon = Reconciliation.query.get(reconciliation_id)
-        if not recon:
+        if not recon or recon.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
 
         if user_role == 'officer' and recon.user_id != user_id:
@@ -2304,11 +2563,11 @@ def get_aging_analysis():
         user_role = get_user_role()
 
         if user_role in ['manager', 'admin']:
-            reconciliations = Reconciliation.query.filter_by(status='completed').all()
+            reconciliations = Reconciliation.query.filter_by(status='completed', is_deleted=False).all()
             recon_ids = [r.id for r in reconciliations]
         else:
             reconciliations = Reconciliation.query.filter_by(
-                user_id=user_id, status='completed').all()
+                user_id=user_id, status='completed', is_deleted=False).all()
             recon_ids = [r.id for r in reconciliations]
 
         if period == 'current_month':
@@ -2421,7 +2680,7 @@ def get_reconciliation_aging(reconciliation_id):
         user_role = get_user_role()
 
         recon = Reconciliation.query.get(reconciliation_id)
-        if not recon:
+        if not recon or recon.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
         if user_role == 'officer' and recon.user_id != user_id:
             return jsonify({'error': 'Access denied'}), 403
@@ -2537,60 +2796,27 @@ def get_reconciliation_aging(reconciliation_id):
         return jsonify({'error': str(e)}), 500
 
 
-# ── Delete reconciliation ─────────────────────────────────────────────────────
+# ── Admin trash and recovery ──────────────────────────────────────────────────
 @reconciliation_bp.route('/<int:reconciliation_id>', methods=['DELETE'])
 @jwt_required()
+@require_role('admin')
 def delete_reconciliation(reconciliation_id):
     """
-    Delete a reconciliation and all associated data:
-    - ReconciliationRecord rows (cascade)
-    - The Excel report file from disk
-    - The uploaded source files from disk
-    - The Reconciliation row itself
-    Managers/Admins can delete any; Officers can only delete their own.
+    Move a reconciliation to the admin trash without deleting its data.
     """
     try:
         user_id   = int(get_jwt_identity())
         user_role = get_user_role()
 
         recon = Reconciliation.query.get(reconciliation_id)
-        if not recon:
+        if not recon or recon.is_deleted:
             return jsonify({'error': 'Reconciliation not found'}), 404
 
-        if user_role == 'officer' and recon.user_id != user_id:
-            return jsonify({'error': 'Access denied'}), 403
-
-        # ── Delete files from disk ──────────────────────────────────────
-        deleted_files = []
-
-        # Report (Excel)
-        if recon.report_path and os.path.exists(recon.report_path):
-            try:
-                os.remove(recon.report_path)
-                deleted_files.append(recon.report_path)
-            except OSError as e:
-                print(f"Warning: could not delete report file: {e}")
-
-        # Uploaded source files
-        for fname in [recon.customer_file, recon.internal_file]:
-            if fname:
-                full = os.path.join(Config.UPLOAD_FOLDER, fname)
-                if os.path.exists(full):
-                    try:
-                        os.remove(full)
-                        deleted_files.append(full)
-                    except OSError as e:
-                        print(f"Warning: could not delete upload file: {e}")
-
-        # ── Delete DB rows (records cascade via FK) ─────────────────────
-        ReconciliationRecord.query.filter_by(
-            reconciliation_id=reconciliation_id
-        ).delete()
-
-        db.session.delete(recon)
+        recon.is_deleted = True
+        recon.deleted_at = datetime.utcnow()
+        recon.deleted_by = user_id
         db.session.commit()
 
-        # Audit: reconciliation deleted
         AuditService.log_operation(
             user_id=user_id,
             operation_type='DELETE_RECONCILIATION',
@@ -2599,17 +2825,55 @@ def delete_reconciliation(reconciliation_id):
             details={
                 'customer_file': recon.customer_file,
                 'internal_file': recon.internal_file,
-                'deleted_files_count': len(deleted_files),
-                'deleted_by_role': user_role
+                'deleted_by_role': user_role,
+                'soft_deleted': True,
             }
         )
 
         return jsonify({
-            'message': f'Reconciliation #{reconciliation_id} deleted successfully',
-            'deleted_files': deleted_files,
+            'message': f'Reconciliation #{reconciliation_id} moved to trash',
         }), 200
 
     except Exception as e:
         db.session.rollback()
         import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@reconciliation_bp.route('/trash', methods=['GET'])
+@jwt_required()
+@require_role('admin')
+def list_deleted_reconciliations():
+    """List soft-deleted reconciliations for administrators only."""
+    reconciliations = Reconciliation.query.filter_by(is_deleted=True) \
+        .order_by(Reconciliation.deleted_at.desc()).all()
+    return jsonify({'reconciliations': [r.to_dict() for r in reconciliations]}), 200
+
+
+@reconciliation_bp.route('/<int:reconciliation_id>/recover', methods=['POST'])
+@jwt_required()
+@require_role('admin')
+def recover_reconciliation(reconciliation_id):
+    """Restore a soft-deleted reconciliation and its existing records."""
+    try:
+        user_id = int(get_jwt_identity())
+        recon = Reconciliation.query.get(reconciliation_id)
+        if not recon or not recon.is_deleted:
+            return jsonify({'error': 'Deleted reconciliation not found'}), 404
+
+        recon.is_deleted = False
+        recon.deleted_at = None
+        recon.deleted_by = None
+        db.session.commit()
+
+        AuditService.log_operation(
+            user_id=user_id,
+            operation_type='RECOVER_RECONCILIATION',
+            resource_type='reconciliation',
+            resource_id=reconciliation_id,
+            details={'customer_file': recon.customer_file, 'internal_file': recon.internal_file}
+        )
+        return jsonify({'message': f'Reconciliation #{reconciliation_id} recovered'}), 200
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500

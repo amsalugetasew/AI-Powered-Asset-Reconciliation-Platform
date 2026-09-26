@@ -81,28 +81,73 @@ def get_notifications():
 
         # ── fetch relevant reconciliations ────────────────────────────────
         if user_role in ['manager', 'admin']:
-            recons = Reconciliation.query.order_by(
+            recons = Reconciliation.query.filter_by(is_deleted=False).order_by(
                 Reconciliation.created_at.desc()).limit(100).all()
         else:
-            recons = Reconciliation.query.filter_by(
-                user_id=user_id).order_by(
-                Reconciliation.created_at.desc()).limit(50).all()
+            recons = Reconciliation.query.filter(
+                Reconciliation.is_deleted.is_(False),
+                db.or_(
+                    Reconciliation.user_id == user_id,
+                    Reconciliation.assigned_to == user_id,
+                    Reconciliation.assignment_scope == 'all_officers'
+                )
+            ).order_by(
+                Reconciliation.created_at.desc()
+            ).limit(100).all()
 
         for r in recons:
-            # Completed but not yet approved (pending records exist)
+            # Active checker/approver work remains until all relevant records are resolved.
             if r.status == 'completed':
-                pending_count = ReconciliationRecord.query.filter_by(
-                    reconciliation_id=r.id,
-                    approval_status='pending'
-                ).count()
+                def _status_value(record, legacy_field, explicit_field):
+                    return getattr(record, explicit_field, None) or getattr(record, legacy_field, None) or 'pending'
 
-                if pending_count > 0:
-                    who = 'your' if r.user_id == user_id else f"Reconciliation #{r.id}"
+                def _is_pending_check(record):
+                    status = _status_value(record, 'check_status', 'checker_status')
+                    return status in [None, '', 'pending', 'checking']
+
+                def _is_pending_approval(record):
+                    status = _status_value(record, 'approval_status', 'approver_status')
+                    return status in [None, '', 'pending']
+
+                records = ReconciliationRecord.query.filter_by(reconciliation_id=r.id).all()
+
+                check_pending_records = [rec for rec in records if _is_pending_check(rec)]
+                check_pending_count = len(check_pending_records)
+
+                if user_role == 'officer' and (r.assigned_to == user_id or r.assignment_scope == 'all_officers') and check_pending_count > 0:
                     notifications.append(notif(
-                        nid=f'pending-{r.id}',
+                        nid=f'pending-check-{r.id}',
+                        ntype='pending_check',
+                        title=f'Pending Check — #{r.id}',
+                        message=f'{check_pending_count} assigned records still need your review.',
+                        link=f'/approval/{r.id}',
+                        severity='warning'
+                    ))
+
+                approval_pending_records = [
+                    rec for rec in records
+                    if _is_pending_approval(rec)
+                    and (
+                        _status_value(rec, 'check_status', 'checker_status') not in [None, '', 'pending', 'checking']
+                        or user_role in ['manager', 'admin']
+                    )
+                ]
+                approval_pending_count = len(approval_pending_records)
+
+                if user_role in ['manager', 'admin']:
+                    approval_target = True
+                elif user_role == 'officer':
+                    approval_target = (r.user_id == user_id or r.assigned_to == user_id or r.assignment_scope == 'all_officers')
+                else:
+                    approval_target = False
+
+                if approval_target and approval_pending_count > 0:
+                    who = 'your' if r.user_id == user_id else ('your assigned reconciliation' if r.assigned_to == user_id else f"Reconciliation #{r.id}")
+                    notifications.append(notif(
+                        nid=f'pending-approval-{r.id}',
                         ntype='pending_approval',
                         title=f'Pending Approval — #{r.id}',
-                        message=f'{pending_count} records waiting for approval in {who} reconciliation.',
+                        message=f'{approval_pending_count} records are ready for approval in {who}.',
                         link=f'/approval/{r.id}',
                         severity='warning'
                     ))

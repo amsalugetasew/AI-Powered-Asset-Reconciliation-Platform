@@ -196,6 +196,22 @@ code {
   table-layout: auto;
 }
 
+.reconciliation-table thead tr:first-child th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.reconciliation-table thead tr:nth-child(2) th {
+  position: sticky;
+  top: 48px;
+  z-index: 19;
+}
+
+.reconciliation-table thead tr:first-child th.sticky.left-0 {
+  z-index: 30;
+}
+
 html.dark .reconciliation-table,
 html.dark .reconciliation-table tbody tr,
 html.dark .reconciliation-table tbody td,

@@ -295,22 +295,23 @@ const UserManagement = () => {
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
       <div className="grid w-full grid-cols-1 gap-4 p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
 
-        {/* Total */}
-        <div className="w-full min-h-[160px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+        {/* Total Users */}
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
 
           {/* KPI Label + Icon */}
           <div
-            className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
             style={{
               color: '#8E288D',
               backgroundColor: '#8E288D10',
-            }}
-          >
-            <span className="text-sm">
-              <FiUsers />
+            }}>
+            <span className="text-center">
+              Total Users
             </span>
 
-            Total Users
+            <span className="absolute right-2 text-sm">
+              <FiUsers />
+            </span>
           </div>
 
           {/* KPI Value */}
@@ -319,6 +320,7 @@ const UserManagement = () => {
               <p className="text-4xl font-extrabold text-gray-900">
                 {totalUsers}
               </p>
+
               <p className="text-xl font-semibold text-gray-500">
                 Users
               </p>
@@ -331,22 +333,24 @@ const UserManagement = () => {
         </div>
 
 
-        {/* Active */}
-        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+        {/* Active Users */}
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
 
           {/* KPI Label + Icon */}
           <div
-            className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
             style={{
               color: '#059669',
               backgroundColor: '#10B98110',
             }}
           >
-            <span className="text-sm">
-              <FiUserCheck />
+            <span className="text-center">
+              Active Users
             </span>
 
-            Active Users
+            <span className="absolute right-2 text-sm">
+              <FiUserCheck />
+            </span>
           </div>
 
           {/* KPI Value */}
@@ -355,6 +359,7 @@ const UserManagement = () => {
               <p className="text-4xl font-extrabold text-gray-900">
                 {activeUsers}
               </p>
+
               <p className="text-xl font-semibold text-gray-500">
                 Users
               </p>
@@ -367,22 +372,24 @@ const UserManagement = () => {
         </div>
 
 
-        {/* Suspended */}
-        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+        {/* Suspended Users */}
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
 
           {/* KPI Label + Icon */}
           <div
-            className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
             style={{
-              color: '#EF4444',
+              color: '#DC2626',
               backgroundColor: '#DC262610',
             }}
           >
-            <span className="text-sm">
-              <FiUserX />
+            <span className="text-center">
+              Suspended Users
             </span>
 
-            Suspended Users
+            <span className="absolute right-2 text-sm">
+              <FiUserX />
+            </span>
           </div>
 
           {/* KPI Value */}
@@ -391,6 +398,7 @@ const UserManagement = () => {
               <p className="text-4xl font-extrabold text-gray-900">
                 {suspendedUsers}
               </p>
+
               <p className="text-xl font-semibold text-gray-500">
                 Users
               </p>
@@ -402,17 +410,39 @@ const UserManagement = () => {
           </div>
         </div>
 
-        {/* Pending */}
-        <div className="w-full rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-2 py-1 text-xs font-bold uppercase tracking-wider text-amber-600">
-            <FiUserCheck className="text-sm" />
-            Pending Approval
+
+        {/* Pending Approval */}
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+
+          {/* KPI Label + Icon */}
+          <div
+            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            style={{
+              color: '#D97706',
+              backgroundColor: '#D9770610',
+            }}
+          >
+            <span className="text-center">
+              Pending Approval
+            </span>
+
+            <span className="absolute right-2 text-sm">
+              <FiUserCheck />
+            </span>
           </div>
+
+          {/* KPI Value */}
           <div className="mt-4 flex w-full items-baseline justify-between">
             <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-extrabold text-gray-900">{pendingUsers}</p>
-              <p className="text-xl font-semibold text-gray-500">Users</p>
+              <p className="text-4xl font-extrabold text-gray-900">
+                {pendingUsers}
+              </p>
+
+              <p className="text-xl font-semibold text-gray-500">
+                Users
+              </p>
             </div>
+
             <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[14px] font-extrabold text-amber-700">
               Pending
             </span>

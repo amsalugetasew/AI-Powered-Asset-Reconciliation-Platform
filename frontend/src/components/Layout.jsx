@@ -38,15 +38,13 @@ const Layout = () => {
 
   // ── Real notifications from backend ──────────────────────────────────────
   const [notifications, setNotifications] = useState([])
-  const [dismissedIds, setDismissedIds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('dismissedNotifs') || '[]') }
-    catch { return [] }
-  })
+  const [dismissedIds, setDismissedIds] = useState([])
 
   const fetchNotifications = useCallback(async () => {
     try {
       const r = await axios.get('/api/activity/notifications')
       setNotifications(r.data.notifications || [])
+      setDismissedIds([])
     } catch { /* non-fatal */ }
   }, [])
 
@@ -72,15 +70,11 @@ const Layout = () => {
   const unreadCount = activeNotifications.length
 
   const dismissOne = (id) => {
-    const updated = [...dismissedIds, id]
-    setDismissedIds(updated)
-    localStorage.setItem('dismissedNotifs', JSON.stringify(updated))
+    setDismissedIds(prev => [...prev, id])
   }
 
   const dismissAll = () => {
-    const updated = [...dismissedIds, ...activeNotifications.map(n => n.id)]
-    setDismissedIds(updated)
-    localStorage.setItem('dismissedNotifs', JSON.stringify(updated))
+    setDismissedIds(prev => [...prev, ...activeNotifications.map(n => n.id)])
     setShowNotifications(false)
   }
 

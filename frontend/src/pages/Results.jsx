@@ -445,8 +445,24 @@ const Results = () => {
                       Dept. Reconcile ⇅
                     </th>
                     <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap"
+                      style={{ background: '#E0E0E0', letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                      Maker
+                    </th>
+                    <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap"
+                      style={{ background: '#E0E0E0', letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                      Checker
+                    </th>
+                    <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap"
+                      style={{ background: '#E0E0E0', letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                      Checker Status
+                    </th>
+                    <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap"
+                      style={{ background: '#E0E0E0', letterSpacing: '0.07em', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
+                      Approver Status
+                    </th>
+                    <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase whitespace-nowrap"
                       style={{ background: '#E0E0E0', letterSpacing: '0.07em' }}>
-                      Approval ⇅
+                      Approver
                     </th>
                   </tr>
                   {/* Row 2 — Physical / ERP sub-headers */}
@@ -563,18 +579,28 @@ const Results = () => {
                         <span className="text-xs font-bold">{rec.dept_reconcile || 'N/A'}</span>
                       </td>
 
-                      {/* Approval — pastel full-cell */}
+                      {/* Maker */}
+                      <td className="px-4 py-3 text-xs whitespace-nowrap font-medium" style={{ color: '#64748b' }}>
+                        {rec.maker_username || rec.maker_user_id || '—'}
+                      </td>
+
+                      {/* Checker */}
+                      <td className="px-4 py-3 text-xs whitespace-nowrap font-medium" style={{ color: '#64748b' }}>
+                        {rec.checker_username || rec.checked_by_username || rec.checked_by || '—'}
+                      </td>
+
+                      {/* Checker Status */}
                       <td className="px-3 py-3 whitespace-nowrap text-center"
                         style={{
                           background: {
-                            reconciled:               '#f1f1f1',
-                            unreconciled:             '#fee2e2',
-                            surplus_assets:           '#ede9fe',
-                            exist_in_erp_not_physical:'#fce7f3',
-                            duplicated:               '#f1f5f9',
-                            unique:                   '#ccfbf1',
-                            pending:                  '#e7e3cfff',
-                          }[rec.approval_status] || '#f8fafc',
+                            reconciled: '#f1f1f1',
+                            unreconciled: '#fee2e2',
+                            surplus_assets: '#ede9fe',
+                            exist_in_erp_not_physical: '#fce7f3',
+                            duplicated: '#f1f5f9',
+                            unique: '#ccfbf1',
+                            pending: '#e7e3cf',
+                          }[rec.checker_status || rec.check_status || 'pending'] || '#f8fafc',
                         }}>
                         <span className="text-xs font-bold"
                           style={{
@@ -582,10 +608,40 @@ const Results = () => {
                               reconciled: '#1a3a5c', unreconciled: '#991b1b',
                               surplus_assets: '#3c4349ff', exist_in_erp_not_physical: '#9c5b75ff',
                               duplicated: '#334155', unique: '#134e4a', pending: '#6B7280',
-                            }[rec.approval_status] || '#64748b'
+                            }[rec.checker_status || rec.check_status || 'pending'] || '#64748b'
                           }}>
-                          {APPROVAL_LABEL[rec.approval_status] || 'Pending'}
+                          {APPROVAL_LABEL[rec.checker_status || rec.check_status || 'pending'] || 'Pending'}
                         </span>
+                      </td>
+
+                      {/* Approver Status */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center"
+                        style={{
+                          background: {
+                            reconciled: '#f1f1f1',
+                            unreconciled: '#fee2e2',
+                            surplus_assets: '#ede9fe',
+                            exist_in_erp_not_physical: '#fce7f3',
+                            duplicated: '#f1f5f9',
+                            unique: '#ccfbf1',
+                            pending: '#fef3c7',
+                          }[rec.approver_status || rec.approval_status || 'pending'] || '#f8fafc',
+                        }}>
+                        <span className="text-xs font-bold"
+                          style={{
+                            color: {
+                              reconciled: '#1a3a5c', unreconciled: '#991b1b',
+                              surplus_assets: '#3c4349ff', exist_in_erp_not_physical: '#9c5b75ff',
+                              duplicated: '#334155', unique: '#134e4a', pending: '#6B7280',
+                            }[rec.approver_status || rec.approval_status || 'pending'] || '#64748b'
+                          }}>
+                          {APPROVAL_LABEL[rec.approver_status || rec.approval_status || 'pending'] || 'Pending'}
+                        </span>
+                      </td>
+
+                      {/* Approver */}
+                      <td className="px-4 py-3 text-xs whitespace-nowrap font-medium" style={{ color: '#64748b' }}>
+                        {rec.approver_username || rec.approved_by_username || rec.approved_by || '—'}
                       </td>
                     </tr>
                   ))}

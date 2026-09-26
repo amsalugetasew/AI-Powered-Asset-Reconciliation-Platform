@@ -165,6 +165,23 @@ class DataCleaner:
             return float(value)
         except:
             return 0.0
+
+    @staticmethod
+    def extract_year_from_tag(value) -> int:
+        """Derive a year from a tag number such as HA-00000339-15 -> 2015."""
+        if pd.isna(value):
+            return None
+
+        text = str(value).strip().upper()
+        if not text:
+            return None
+
+        match = re.search(r'(\d{2})\s*$', text)
+        if not match:
+            return None
+
+        year_suffix = int(match.group(1))
+        return int(f"20{year_suffix:02d}")
     
     @staticmethod
     def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -182,7 +199,28 @@ class DataCleaner:
             df['book_value'] = df['book_value'].apply(DataCleaner.clean_numeric)
         
         if 'year' in df.columns:
-            df['year'] = df['year'].apply(lambda x: int(DataCleaner.clean_numeric(x)) if DataCleaner.clean_numeric(x) > 0 else None)
+            def fill_year(row):
+                value = row.get('year')
+                if value is not None:
+                    try:
+                        if not pd.isna(value):
+                            value_text = str(value).strip()
+                            if value_text and value_text.lower() not in {'nan', 'none', '<na>'}:
+                                try:
+                                    return int(float(value_text))
+                                except (TypeError, ValueError):
+                                    pass
+                    except TypeError:
+                        pass
+
+                for tag_column in ['old_tag_number', 'new_tag_number']:
+                    derived = DataCleaner.extract_year_from_tag(row.get(tag_column))
+                    if derived is not None:
+                        return derived
+
+                return None
+
+            df['year'] = df.apply(fill_year, axis=1)
         
         # Replace empty strings with NA temporarily to drop completely empty rows
         # We only consider rows where text is empty and numerics are NaN/0 as empty
