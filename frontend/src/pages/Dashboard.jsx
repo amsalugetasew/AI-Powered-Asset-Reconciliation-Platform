@@ -17,12 +17,12 @@ import {
 // ── Palette for charts ─────────────────────────────────────────────────────────
 const AGING_BUCKET_CONFIG = [
   { key: '< 1 yr',    label: '< 1 yr',    color: '#22c55e' },  // green  – fresh
-  { key: '1 – 3 yr',  label: '1 – 3 yr',  color: '#8E288D' },  // blue
-  { key: '3 – 5 yr',  label: '3 – 5 yr',  color: '#f59e0b' },  // brand purple
-  { key: '5 – 10 yr', label: '5 – 10 yr', color: '#CFB53B' },  // amber
-  { key: '10 – 20 yr',label: '10 – 20 yr',color: '#f08eee' },  // red – aging
-  { key: '> 20 yr',   label: '> 20 yr',   color: '#bbb38d' },  // gray – very old
-  { key: 'Unknown',   label: 'Unknown',   color: '#000000' },  // light gray
+  { key: '1 – 3 yr',  label: '1 – 3 yr',  color: '#95298E' },  // blue
+  { key: '3 – 5 yr',  label: '3 – 5 yr',  color: '#a34d9c' },  // brand purple
+  { key: '5 – 10 yr', label: '5 – 10 yr', color: '#c387be' },  // amber
+  { key: '10 – 20 yr',label: '10 – 20 yr',color: '#dcb9d8' },  // red – aging
+  { key: '> 20 yr',   label: '> 20 yr',   color: '#f0d7ed' },  // gray – very old
+  { key: 'Unknown',   label: 'Unknown',   color: '#8c8c8c' },  // light gray
 ]
 
 // ── Category Distribution Bar Component ─────────────────────────────────────
@@ -104,7 +104,7 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
                 <div key={segment.key} className="flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
                   style={{ width: `${(segment.value / item.total) * 100}%`, backgroundColor: segment.color }}
                   title={`${segment.label}: ${segment.value.toLocaleString()}`}>
-                  {segment.value / item.total > 0.12 && <span className={`truncate px-1 text-[10px] font-semibold ${segment.key === 'pending' ? 'text-white' : 'text-[#6B7280]'}`}>{segment.label}</span>}
+                  {segment.value / item.total > 0.12 && <span className={`truncate px-1 text-[10px] font-semibold ${segment.key === 'pending' ? 'text-white' : 'text-white'}`}>{segment.label}</span>}
                 </div>
               ))}
             </div>
@@ -138,9 +138,9 @@ const BREAKDOWN_COLORS = {
   reconciled: '#8E288D',
   unreconciled: '#BE123C',
   pending: '#6B7280',
-  surplus_assets: '#BE123C',
-  exist_in_erp_not_physical: '#BE123C',
-  duplicated: '#000000',
+  surplus_assets: '#B45309',
+  exist_in_erp_not_physical: '#F33838',
+  duplicated: '#8c8c8c',
   unique: '#8E288D',
 }
 
@@ -350,14 +350,17 @@ const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount, side
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-4 h-full flex flex-col gap-4">
+    <div className="w-full max-w-[616px] min-h-[462px] bg-white dark:bg-gray-900 rounded-[8px] border border-[#E2E8F0] dark:border-gray-800 p-6 flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xs font-bold tracking-wider text-gray-800 dark:text-gray-100 uppercase">
             Asset Aging Analysis
           </h2>
-          <p className="text-[10px] text-gray-400 mt-0.5">ERP assets by acquisition age</p>
+          {/* <p className="text-[10px] text-gray-400 mt-0.5">ERP assets by acquisition age</p>
+          <p className="mb-0 text-xs text-gray-400">
+                {reportSide === 'erp' ? 'ERP' : 'Physical'} assets by acquisition age
+              </p> */}
         </div>
         <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/50 px-2 py-0.5 rounded-md">
           {monthLabel || `FY ${agingYear || new Date().getFullYear()}`}
@@ -514,6 +517,10 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData()
+  }, [])
+
+  useEffect(() => {
+    fetchAgingData()
   }, [dashboardSide])
 
   useEffect(() => {
@@ -543,20 +550,14 @@ const Dashboard = () => {
   }
 
   const fetchDashboardData = async () => {
-    setLoading(true)
     try {
-      const [reconRes, agingRes, analyticsRes] = await Promise.allSettled([
+      const [reconRes, analyticsRes] = await Promise.allSettled([
         cachedGet('/api/reconciliation/list'),
-        cachedGet(`/api/reconciliation/analytics/aging?side=${dashboardSide}&period=current_month`),
         cachedGet('/api/reconciliation/analytics?period=current_month')
       ])
 
       if (reconRes.status === 'fulfilled') {
         setReconciliations(reconRes.value.data.reconciliations || [])
-      }
-      if (agingRes.status === 'fulfilled') {
-        setAgingData(agingRes.value.data?.buckets || [])
-        setAgingYear(agingRes.value.data?.current_year || new Date().getFullYear())
       }
       if (analyticsRes.status === 'fulfilled') {
         setAnalyticsData(analyticsRes.value.data || null)
@@ -565,6 +566,16 @@ const Dashboard = () => {
       toast.error('Failed to load dashboard data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchAgingData = async () => {
+    try {
+      const response = await cachedGet(`/api/reconciliation/analytics/aging?side=${dashboardSide}&period=current_month`)
+      setAgingData(response.data?.buckets || [])
+      setAgingYear(response.data?.current_year || new Date().getFullYear())
+    } catch {
+      toast.error('Failed to load asset aging data')
     }
   }
 
@@ -754,11 +765,27 @@ const Dashboard = () => {
         assignment_note: assignmentModal.assignment_note,
         ...(assignmentModal.assignment_scope === 'specific_user' ? { assignee_id: assignmentModal.assignee_id } : {})
       }
-      await axios.post(`/api/reconciliation/${assignmentModal.id}/assign`, payload)
+      const response = await axios.post(`/api/reconciliation/${assignmentModal.id}/assign`, payload)
+      const assignment = response.data.assignment
+      const assignee = assignment.assignment_scope === 'specific_user'
+        ? assignableUsers.find(option => Number(option.id) === Number(assignment.assigned_to))
+        : null
+      setReconciliations(current => current.map(reconciliation => (
+        reconciliation.id === assignmentModal.id
+          ? {
+              ...reconciliation,
+              assignment_scope: assignment.assignment_scope,
+              assigned_to: assignment.assigned_to,
+              assigned_to_username: assignment.assigned_to_username || assignee?.username || null,
+              assigned_by: assignment.assigned_by,
+              assignment_note: assignment.assignment_note,
+              assigned_at: assignment.assigned_at,
+            }
+          : reconciliation
+      )))
       toast.success('Review assignment updated successfully')
       clearCachedGets()
       setAssignmentModal(null)
-      fetchDashboardData()
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to update assignment')
     } finally {
@@ -1200,7 +1227,7 @@ const Dashboard = () => {
       {/* ── Side tabs and chart cards ────────────────────────────────────── */}
       <div className="mb-4 flex gap-2">
         {['erp', 'physical'].map(side => (
-          <button key={side} onClick={() => setDashboardSide(side)}
+          <button type="button" key={side} onClick={event => { event.preventDefault(); setDashboardSide(side) }}
             className={`border-b-2 px-5 py-3 text-sm font-semibold ${
               dashboardSide === side
                 ? 'border-[#8E288D] text-[#8E288D]'
@@ -1212,7 +1239,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="flex h-[440px] min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:col-span-2">
+        <div className="flex h-[462px] min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:col-span-2">
           <div className="border-b border-gray-100 p-4 dark:border-gray-800">
             <div className="flex flex-wrap gap-2">
               {[
@@ -1221,7 +1248,7 @@ const Dashboard = () => {
                 { key: 'divisionDistrict', label: 'Division / District' },
                 { key: 'location', label: 'Location' },
               ].map(tab => (
-                <button key={tab.key} onClick={() => setDashboardChartTab(tab.key)}
+                <button type="button" key={tab.key} onClick={event => { event.preventDefault(); setDashboardChartTab(tab.key) }}
                   className={`flex h-10 w-44 items-center justify-center px-4 text-sm font-medium transition-colors ${dashboardChartTab === tab.key
                       ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D]'
                       : 'text-gray-600'
@@ -1266,7 +1293,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="h-[440px] min-h-0 overflow-y-auto cursor-context-menu" title="Right-click for AI aging insights"
+        <div className="h-[462px] min-h-0 overflow-y-auto cursor-context-menu" title="Right-click for AI aging insights"
           onContextMenu={e => openAIContextMenu(e, {
             chartData: { source: 'asset_aging', agingData, year: agingYear, side: dashboardSide },
             chartType: 'pie',
@@ -1334,9 +1361,9 @@ const Dashboard = () => {
             {/* New Reconciliation Button */}
             <Link
               to="/upload"
-              className="inline-flex items-center px-4 py-1.5 text-xs font-semibold text-white bg-[#701460] hover:bg-[#5c104e] rounded-lg shadow-sm transition-all transform hover:scale-[1.02]"
+              className="inline-flex h-8 w-fit items-center gap-2 rounded-lg bg-[#701460] px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:scale-[1.02] hover:bg-[#5c104e]"
             >
-              <FiPlus className="mr-1.5 h-3.5 w-3.5" />
+              <FiPlus className="h-3.5 w-3.5" />
               New Upload
             </Link>
 
@@ -1344,13 +1371,13 @@ const Dashboard = () => {
               <button
                 type="button"
                 onClick={() => setShowTrash(value => !value)}
-                className={`inline-flex items-center px-4 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${showTrash
-                  ? 'border-[#701460] bg-[#701460] text-white'
-                  : 'border-gray-200 text-gray-600 hover:border-[#701460] hover:text-[#701460] dark:border-gray-700 dark:text-gray-300'
-                }`}
+                className={`inline-flex h-8 w-[120px] items-center justify-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold transition-colors ${showTrash
+                    ? 'border-[#701460] bg-[#701460] text-white'
+                    : 'border-gray-200 text-gray-600 hover:border-[#701460] hover:text-[#701460] dark:border-gray-700 dark:text-gray-300'
+                  }`}
               >
-                <FiTrash2 className="mr-1.5 h-3.5 w-3.5" />
-                {showTrash ? 'Back to Reports' : 'Trash'}
+                <FiTrash2 className="h-3.5 w-3.5" />
+                {showTrash ? 'Main' : 'Trash'}
               </button>
             )}
           </div>
@@ -1404,6 +1431,14 @@ const Dashboard = () => {
                           <div>
                             <p className="text-[12px] text-gray-700 dark:text-gray-500">
                               <span className='font-bold'>Requester:</span> <span className='text-[#8E288D]'> {recon.requester_username || `User #${recon.user_id || 'Unknown'}`} : {recon.requester_email || 'Email unavailable'}</span>
+                            </p>
+                            <p className="text-[12px] text-gray-700 dark:text-gray-500">
+                              <span className="font-bold">Checker:</span>{' '}
+                              <span className="text-[#8E288D]">
+                                {recon.assignment_scope === 'specific_user'
+                                  ? recon.assigned_to_username || `User #${recon.assigned_to}`
+                                  : 'All officers'}
+                              </span>
                             </p>
                             <p className="text-gray-800 dark:text-gray-100 capitalize">
                               <span className='font-bold'>File:</span>
@@ -1635,6 +1670,7 @@ const Dashboard = () => {
 
             <div className="flex justify-end gap-3 pt-4">
               <button
+                type="button"
                 onClick={() => setAssignmentModal(null)}
                 disabled={assignmentSubmitting}
                 className="w-32 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
@@ -1642,6 +1678,7 @@ const Dashboard = () => {
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleAssignReconciliation}
                 disabled={assignmentSubmitting || (assignmentModal.assignment_scope === 'specific_user' && !assignmentModal.assignee_id)}
                 className="w-32 h-10 rounded-lg bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7D207C] transition-colors disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center"

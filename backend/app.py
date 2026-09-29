@@ -5,7 +5,7 @@ from config import config
 from models import db
 from flask_migrate import Migrate
 from dotenv import load_dotenv
-from sqlalchemy import inspect, text
+from sqlalchemy import text
 import os
 import logging
 
@@ -108,80 +108,6 @@ def create_app(config_name='default'):
             logger.error('Database connection failed: %s', exc)
             print(f'Database connection failed: {exc}')
 
-        db.create_all()
-
-        inspector = inspect(db.engine)
-
-        # User auto-migration is intentionally disabled to avoid modifying user rows
-        # during app startup. Manual migrations remain the controlled path.
-
-        if 'reconciliations' in inspector.get_table_names():
-            reconciliation_columns = {
-                column['name'] for column in inspector.get_columns('reconciliations')
-            }
-            with db.engine.begin() as connection:
-                if 'is_deleted' not in reconciliation_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliations ADD COLUMN "
-                        "is_deleted BOOLEAN NOT NULL DEFAULT 0"
-                    ))
-                if 'deleted_at' not in reconciliation_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliations ADD COLUMN deleted_at DATETIME NULL"
-                    ))
-                if 'deleted_by' not in reconciliation_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliations ADD COLUMN deleted_by INTEGER NULL"
-                    ))
-                if 'assignment_scope' not in reconciliation_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliations ADD COLUMN assignment_scope VARCHAR(50) NOT NULL DEFAULT 'none'"
-                    ))
-                if 'assigned_to' not in reconciliation_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliations ADD COLUMN assigned_to INTEGER NULL"
-                    ))
-                if 'assigned_by' not in reconciliation_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliations ADD COLUMN assigned_by INTEGER NULL"
-                    ))
-                if 'assignment_note' not in reconciliation_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliations ADD COLUMN assignment_note TEXT NULL"
-                    ))
-                if 'assigned_at' not in reconciliation_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliations ADD COLUMN assigned_at DATETIME NULL"
-                    ))
-
-        if 'reconciliation_records' in inspector.get_table_names():
-            record_columns = {column['name'] for column in inspector.get_columns('reconciliation_records')}
-            with db.engine.begin() as connection:
-                if 'maker_user_id' not in record_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliation_records ADD COLUMN maker_user_id INTEGER NULL"
-                    ))
-                if 'check_status' not in record_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliation_records ADD COLUMN check_status VARCHAR(50) DEFAULT 'pending'"
-                    ))
-                if 'checked_by' not in record_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliation_records ADD COLUMN checked_by INTEGER NULL"
-                    ))
-                if 'checked_at' not in record_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliation_records ADD COLUMN checked_at DATETIME NULL"
-                    ))
-                if 'checker_status' not in record_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliation_records ADD COLUMN checker_status VARCHAR(50) DEFAULT 'pending'"
-                    ))
-                if 'approver_status' not in record_columns:
-                    connection.execute(text(
-                        "ALTER TABLE reconciliation_records ADD COLUMN approver_status VARCHAR(50) DEFAULT 'pending'"
-                    ))
-    
         # Health check endpoint
         @app.route('/api/health', methods=['GET'])
         def health_check():

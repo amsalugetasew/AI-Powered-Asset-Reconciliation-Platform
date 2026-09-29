@@ -163,9 +163,10 @@ const StatusDropdown = ({ recordId, category, current, onSelect, loading }) => {
 }
 
 // ── Bulk action dropdown ──────────────────────────────────────────────────────
-const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = [], stage = 'check', className = '', actionLabel = 'Bulk Approve' }) => {
+const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = [], selectedRecords = [], stage = 'check', className = '', actionLabel = 'Bulk Approve' }) => {
   const [open, setOpen] = useState(false)
   const [subCat, setSubCat] = useState(null) // for Unmatched sub-category step
+  const selectionMode = selectedRecords.length > 0
   const isDuplicate = category === 'Duplicate'
   const isUnmatched = category === 'Unmatched'
 
@@ -179,9 +180,19 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
     : subCat === 'ERP Unmatched'
       ? BULK_OPTIONS_ERP_UNMATCHED
       : BULK_OPTIONS_UNMATCHED
-  const optionsForCat = isDuplicate ? BULK_OPTIONS_DUPLICATE
-    : isUnmatched ? optionsForSubCat
-      : BULK_OPTIONS_MATCHED
+  const getAllowedBulkValues = targetCategory => {
+    if (targetCategory === 'Physical Unmatched') return new Set(['surplus_assets', 'reconciled', 'unreconciled'])
+    if (targetCategory === 'ERP Unmatched') return new Set(['exist_in_erp_not_physical', 'reconciled', 'unreconciled'])
+    if (targetCategory === 'Duplicate') return new Set(['duplicated', 'unique'])
+    return new Set(['reconciled', 'unreconciled'])
+  }
+  const selectedAllowedValues = selectionMode
+    ? STATUSES.filter(status => selectedRecords.every(record => getAllowedBulkValues(record.category).has(status.value)))
+    : []
+  const optionsForCat = selectionMode ? selectedAllowedValues
+    : isDuplicate ? BULK_OPTIONS_DUPLICATE
+      : isUnmatched ? optionsForSubCat
+        : BULK_OPTIONS_MATCHED
 
   const getStatusValue = (record) => {
     if (stage === 'approve') {
@@ -191,6 +202,25 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
   }
 
   const getTargetSummary = targetCategory => {
+    if (selectionMode) {
+      return selectedRecords.reduce((result, record) => {
+        const value = getStatusValue(record)
+        result.total += 1
+        if (value === 'pending' || value === 'checking' || !value) result.pending += 1
+        else result[value] = (result[value] || 0) + 1
+        return result
+      }, { total: 0, pending: 0 })
+    }
+
+    const stageCounts = approvalSummary[targetCategory]?.stage_counts?.[stage]
+    if (stageCounts && Object.keys(stageCounts).length) {
+      return {
+        ...stageCounts,
+        total: Object.values(stageCounts).reduce((sum, count) => sum + Number(count || 0), 0),
+        pending: Number(stageCounts.pending || 0) + Number(stageCounts.checking || 0),
+      }
+    }
+
     if (targetCategory === 'Unmatched') {
       const keys = ['Physical Unmatched', 'ERP Unmatched']
       const summary = { total: 0, pending: 0, reconciled: 0, unreconciled: 0, surplus_assets: 0, exist_in_erp_not_physical: 0, duplicated: 0, unique: 0 }
@@ -219,23 +249,16 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
     }, { total: 0, pending: 0, reconciled: 0, unreconciled: 0, surplus_assets: 0, exist_in_erp_not_physical: 0, duplicated: 0, unique: 0 })
   }
 
-  const getAllowedBulkValues = (targetCategory) => {
-    if (targetCategory === 'Physical Unmatched') return new Set(['surplus_assets', 'reconciled', 'unreconciled'])
-    if (targetCategory === 'ERP Unmatched') return new Set(['exist_in_erp_not_physical', 'reconciled', 'unreconciled'])
-    if (targetCategory === 'Duplicate') return new Set(['duplicated', 'unique'])
-    return new Set(['reconciled', 'unreconciled'])
-  }
-
   const isOptionDisabled = (targetCategory, option) => {
     const targetSummary = getTargetSummary(targetCategory)
-    const allowed = getAllowedBulkValues(targetCategory)
+    const allowed = selectionMode
+      ? new Set(selectedAllowedValues.map(status => status.value))
+      : getAllowedBulkValues(targetCategory)
     if (!allowed.has(option.value)) return true
     if (!targetSummary.total) return true
 
     const selectedCount = Number(targetSummary[option.value] || 0)
     const pendingCount = Number(targetSummary.pending || 0)
-
-    if (pendingCount > 0) return false
 
     const expectedValueForCategory = targetCategory === 'Physical Unmatched'
       ? 'surplus_assets'
@@ -244,14 +267,17 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
         : null
 
     if (expectedValueForCategory && option.value === expectedValueForCategory) {
-      return selectedCount >= targetSummary.total
+      return pendingCount === 0
     }
 
+    if (pendingCount > 0) return false
     return selectedCount >= targetSummary.total
   }
 
   const loadingKey = loading && Object.keys(loading).find(k => k.startsWith(category) && loading[k])
-  const categorySummary = category === 'Unmatched'
+  const categorySummary = selectionMode
+    ? { total: selectedRecords.length }
+    : category === 'Unmatched'
     ? getTargetSummary('Unmatched')
     : approvalSummary[category] || {}
   const noRecords = !categorySummary.total
@@ -266,6 +292,7 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
   return (
     <div className="relative inline-block">
       <button
+        type="button"
         onClick={() => { setOpen(o => !o); setSubCat(null) }}
         disabled={!!loadingKey || noRecords}
         className={`inline-flex items-center justify-center gap-1 rounded text-xs font-medium text-white bg-[#8E288D] hover:bg-[#7A1E79] disabled:cursor-not-allowed disabled:opacity-50 transition-colors ${className}`}
@@ -286,7 +313,7 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
                   Apply to…
                 </div>
                 {UNMATCHED_SUBCATS.map(sc => (
-                  <button key={sc.value}
+                  <button type="button" key={sc.value}
                     onClick={() => setSubCat(sc.value)}
                     className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-700 flex items-center justify-between">
                     {sc.label}
@@ -300,14 +327,14 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
             {isUnmatched && subCat && (
               <>
                 <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 border-b border-gray-100 flex items-center gap-2">
-                  <button onClick={() => setSubCat(null)}
+                  <button type="button" onClick={() => setSubCat(null)}
                     className="text-[#8E288D] hover:underline flex items-center gap-1">
                     <FiChevronDown className="w-3 h-3 rotate-90" /> Back
                   </button>
                   <span className="truncate">{UNMATCHED_SUBCATS.find(s => s.value === subCat)?.label}</span>
                 </div>
                 {optionsForCat.map(opt => (
-                  <button key={opt.value}
+                  <button type="button" key={opt.value}
                     disabled={isOptionDisabled(subCat, opt)}
                     onClick={() => handleSelect(subCat, opt.value)}
                     className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 ${isOptionDisabled(subCat, opt)
@@ -325,10 +352,14 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
             {!isUnmatched && (
               <>
                 <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
-                  Mark all as…
+                  {selectionMode ? 'Mark selected as…' : 'Mark all as…'}
                 </div>
-                {optionsForCat.map(opt => (
-                  <button key={opt.value}
+                {selectionMode && optionsForCat.length === 0 ? (
+                  <p className="max-w-60 px-3 py-2 text-xs text-gray-500">
+                    Select rows from compatible categories to apply one status to all.
+                  </p>
+                ) : optionsForCat.map(opt => (
+                  <button type="button" key={opt.value}
                     disabled={isOptionDisabled(category, opt)}
                     onClick={() => handleSelect(category, opt.value)}
                     className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 ${isOptionDisabled(category, opt)
@@ -357,6 +388,7 @@ const ApprovalPage = () => {
 
   const [records, setRecords] = useState([])
   const [allCategoryRecords, setAllCategoryRecords] = useState([])
+  const [selectedRecordMap, setSelectedRecordMap] = useState(() => new Map())
   const [summary, setSummary] = useState({})
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -368,8 +400,8 @@ const ApprovalPage = () => {
   const [tableCollapsed, setTableCollapsed] = useState(false)
 
   const isPrivilegedReviewer = hasRole('manager') || hasRole('admin')
-  const canCheck = user?.role === 'officer' && reconciliation && user.id !== reconciliation.user_id && (
-    reconciliation.assigned_to === user.id ||
+  const canCheck = user?.role === 'officer' && reconciliation && Number(user.id) !== Number(reconciliation.user_id) && (
+    Number(reconciliation.assigned_to) === Number(user.id) ||
     reconciliation.assignment_scope === 'all_officers'
   )
   const canApprove = isPrivilegedReviewer
@@ -389,6 +421,8 @@ const ApprovalPage = () => {
   }
 
   const categoryRecords = getRecordsForCategory(selectedCategory)
+  const selectedRecords = Array.from(selectedRecordMap.values())
+  const visibleRowsSelected = records.length > 0 && records.every(record => selectedRecordMap.has(record.id))
   const isRecordChecked = (record) => {
     const value = record?.checker_status || record?.check_status || 'pending'
     return value !== 'pending' && value !== 'checking' && value !== '' && value !== null
@@ -419,8 +453,54 @@ const ApprovalPage = () => {
     return { ...empty, ...(summary[cat] || {}) }
   }
 
+  const getStageSummary = (categoryKey, stage) => {
+    const categoryKeys = categoryKey === 'all'
+      ? Object.keys(summary).filter(key => !['Physical Unmatched', 'ERP Unmatched', 'Unmatched', 'Duplicate'].includes(key))
+          .concat(['Physical Unmatched', 'ERP Unmatched'])
+      : categoryKey === 'Unmatched'
+        ? ['Physical Unmatched', 'ERP Unmatched']
+        : [categoryKey]
+    const counts = {}
+    categoryKeys.forEach(key => {
+      const stageCounts = summary[key]?.stage_counts?.[stage] || {}
+      Object.entries(stageCounts).forEach(([status, count]) => {
+        counts[status] = (counts[status] || 0) + Number(count || 0)
+      })
+    })
+    let total = Object.values(counts).reduce((sum, count) => sum + count, 0)
+    const stageRecords = getRecordsForCategory(categoryKey).filter(record => (
+      categoryKey !== 'all' || record.category !== 'Duplicate'
+    ))
+    if (total === 0 || (stageRecords.length > 0 && stageRecords.length === total)) {
+      Object.keys(counts).forEach(status => { counts[status] = 0 })
+      stageRecords.forEach(record => {
+        const preferredStatus = stage === 'check'
+          ? record.checker_status
+          : record.approver_status
+        const fallbackStatus = stage === 'check'
+          ? record.check_status
+          : record.approval_status
+        const preferredIsPending = !preferredStatus || ['pending', 'checking'].includes(preferredStatus)
+        const fallbackIsDone = fallbackStatus && !['pending', 'checking'].includes(fallbackStatus)
+        const status = preferredIsPending && fallbackIsDone
+          ? fallbackStatus
+          : preferredStatus || fallbackStatus || 'pending'
+        counts[status] = (counts[status] || 0) + 1
+      })
+      total = stageRecords.length
+    }
+    const pending = Number(counts.pending || 0) + Number(counts.checking || 0)
+    return { total, pending, checked: Math.max(total - pending, 0) }
+  }
+
   const isCategoryFullyChecked = (categoryKey) => {
     if (!categoryKey || categoryKey === 'all') return false
+    const checkCounts = summary[categoryKey]?.stage_counts?.check
+    if (checkCounts && Object.keys(checkCounts).length) {
+      const total = Object.values(checkCounts).reduce((sum, count) => sum + Number(count || 0), 0)
+      const pending = Number(checkCounts.pending || 0) + Number(checkCounts.checking || 0)
+      return total > 0 && pending === 0
+    }
     const catRecords = getRecordsForCategory(categoryKey)
     return catRecords.length > 0 && catRecords.every(isRecordChecked)
   }
@@ -568,6 +648,11 @@ const ApprovalPage = () => {
         decision_stage: decisionStage,
       })
       clearCachedGets()
+      setSelectedRecordMap(current => {
+        const next = new Map(current)
+        next.delete(recordId)
+        return next
+      })
       logActivity(`/approval/${id}`, `APPROVE_RECORD_${recordId}_AS_${decision.toUpperCase()}_${decisionStage.toUpperCase()}`)
       toast.success(`Marked as "${STATUS_MAP[decision]?.label || decision}" (${decisionStage})`)
       await fetchRecords()
@@ -585,7 +670,8 @@ const ApprovalPage = () => {
     try {
       setBulkLoading(p => ({ ...p, [key]: true }))
       const isPrivilegedReviewer = hasRole('manager') || hasRole('admin')
-      const allRecordsForCategory = getRecordsForCategory(category)
+      const usingSelection = selectedRecords.length > 0
+      const allRecordsForCategory = usingSelection ? selectedRecords : getRecordsForCategory(category)
       const allChecked = allRecordsForCategory.length > 0 && allRecordsForCategory.every(isRecordChecked)
       if (isPrivilegedReviewer && !allChecked) {
         toast.error('All records in this category must be checked before bulk approval can be done.')
@@ -598,10 +684,14 @@ const ApprovalPage = () => {
         category,
         approval_decision: decision,
         decision_stage: decisionStage,
+        ...(usingSelection ? { record_ids: allRecordsForCategory.map(record => record.id) } : {}),
       })
       clearCachedGets()
       logActivity(`/approval/${id}`, `BULK_${decisionStage.toUpperCase()}_${category.toUpperCase()}_AS_${decision.toUpperCase()}`)
-      toast.success(`All "${category}" → "${STATUS_MAP[decision]?.label || decision}" (${decisionStage})`)
+      toast.success(usingSelection
+        ? `${allRecordsForCategory.length} selected records → "${STATUS_MAP[decision]?.label || decision}" (${decisionStage})`
+        : `All "${category}" → "${STATUS_MAP[decision]?.label || decision}" (${decisionStage})`)
+      if (usingSelection) setSelectedRecordMap(new Map())
       await fetchRecords()
       await fetchSummary()
     } catch (e) {
@@ -653,8 +743,18 @@ const ApprovalPage = () => {
   )
 
   const overall = getSummary('all')
-  const overallDone = nonPendingCount(overall)
-  const pct = overall.total > 0 ? ((overallDone / overall.total) * 100).toFixed(0) : 0
+  const isCheckerView = canCheck && !canApprove
+  const checkerProgress = getStageSummary('all', 'check')
+  const progressTotal = isCheckerView ? checkerProgress.total : overall.total
+  const progressPending = isCheckerView ? checkerProgress.pending : overall.pending
+  const progressDone = isCheckerView ? checkerProgress.checked : nonPendingCount(overall)
+  const progressPct = progressTotal > 0 ? ((progressDone / progressTotal) * 100).toFixed(0) : 0
+  const matchedCheckerProgress = ['Exact Match', 'AI Match', 'Manual Review'].reduce((checked, category) => {
+    const progress = getStageSummary(category, 'check')
+    return checked + progress.checked
+  }, 0)
+  const physicalCheckerProgress = matchedCheckerProgress + getStageSummary('Physical Unmatched', 'check').checked
+  const erpCheckerProgress = matchedCheckerProgress + getStageSummary('ERP Unmatched', 'check').checked
 
   return (
     <div className="min-w-0 bg-[#f7f9fc] px-4 pb-12 sm:px-6 lg:px-8">
@@ -680,24 +780,33 @@ const ApprovalPage = () => {
           </p>
         </div>
         <div className="min-w-[300px] rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          {/* Overall approval progress — excludes Duplicate category */}
+          {/* Checker progress and approver progress use their own workflow stage. */}
           <p className="text-xs text-gray-500 mb-1 font-medium">
-            Approval Progress (excluding Duplicates)
+            {isCheckerView ? 'Checking Progress (excluding Duplicates)' : 'Approval Progress (excluding Duplicates)'}
           </p>
           <div className="flex items-center gap-2 mb-1">
             <div className="flex-1 bg-gray-200 rounded-full h-2">
-              <div className="bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+              <div className="bg-gradient-to-r from-[#8E288D] to-[#CFB53B] text-white rounded-lg hover:from-[#CFB53B] hover:to-[#8E288D] h-2 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
             </div>
-            <span className="text-sm font-bold text-gray-700">{pct}% reviewed</span>
+            <span className="text-sm font-bold text-gray-700">{progressPct}% {isCheckerView ? 'checked' : 'reviewed'}</span>
           </div>
           <p className="text-xs text-gray-400 mb-2">
-            {overall.total - overall.pending} of {overall.total} records reviewed
+            {progressDone} of {progressTotal} records {isCheckerView ? 'checked' : 'reviewed'}
           </p>
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs mb-3">
-            <span className="text-[#CFB53B] font-medium">⏳ {overall.pending} pending</span>
-            <span className="text-[#8E288D] font-medium">✓ {overall.reconciled} reconciled</span>
-            <span className="text-red-600 font-medium">✗ {overall.unreconciled} unreconciled</span>
-            <span className="text-orange-600 font-medium">◈ {overall.surplus_assets} surplus</span>
+            {isCheckerView ? (
+              <>
+                <span className="text-[#CFB53B] font-medium">⏳ {progressPending} pending</span>
+                <span className="text-[#8E288D] font-medium">✓ {checkerProgress.checked} checked</span>
+              </>
+            ) : (
+              <>
+                <span className="text-[#CFB53B] font-medium">⏳ {overall.pending} pending</span>
+                <span className="text-[#8E288D] font-medium">✓ {overall.reconciled} reconciled</span>
+                <span className="text-red-600 font-medium">✗ {overall.unreconciled} unreconciled</span>
+                <span className="text-orange-600 font-medium">◈ {overall.surplus_assets} surplus</span>
+              </>
+            )}
           </div>
           {/* Per-side reconciliation rates based on APPROVAL decisions */}
           {reconciliation && (() => {
@@ -706,15 +815,21 @@ const ApprovalPage = () => {
             const finTotal = stats.total_internal_records || 1
             const custUnmatch = stats.customer_unmatched || 0
             const finUnmatch = stats.internal_unmatched || 0
+            const physicalUniqueTotal = Math.max(custTotal - Number(stats.customer_duplicates || 0), 0)
+            const erpUniqueTotal = Math.max(finTotal - Number(stats.internal_duplicates || 0), 0)
             // Reconciliation rate = approved-reconciled / total (from approval decisions)
-            const custRecRate = ((overall.reconciled / custTotal) * 100).toFixed(1)
-            const finRecRate = ((overall.reconciled / finTotal) * 100).toFixed(1)
+            const custRecRate = isCheckerView
+              ? (physicalUniqueTotal > 0 ? (physicalCheckerProgress / physicalUniqueTotal) * 100 : 0).toFixed(1)
+              : ((overall.reconciled / custTotal) * 100).toFixed(1)
+            const finRecRate = isCheckerView
+              ? (erpUniqueTotal > 0 ? (erpCheckerProgress / erpUniqueTotal) * 100 : 0).toFixed(1)
+              : ((overall.reconciled / finTotal) * 100).toFixed(1)
             return (
               <div className="border-t border-gray-100 pt-2 grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-purple-50 dark:bg-gray-800 rounded p-2">
                   <p className="text-gray-700 font-bold text-center">Physical</p>
                   <p className="text-xl font-bold text-gray-700 text-center">{custRecRate}%</p>
-                  <p className="text-gray-600 font-bold text-center">Reconciled</p>
+                  <p className="text-gray-600 font-bold text-center">{isCheckerView ? 'Checked' : 'Reconciled'}</p>
                   <div className="mt-1 space-y-0.5 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Total</span>
@@ -733,7 +848,7 @@ const ApprovalPage = () => {
                 <div className="bg-teal-50 dark:bg-gray-800 rounded p-2">
                   <p className="text-gray-700 font-bold text-center">ERP</p>
                   <p className="text-xl font-bold text-gray-700 text-center">{finRecRate}%</p>
-                  <p className="text-gray-600 font-bold text-center">Reconciled</p>
+                  <p className="text-gray-600 font-bold text-center">{isCheckerView ? 'Checked' : 'Reconciled'}</p>
                   <div className="mt-1 space-y-0.5 text-xs">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Total</span>
@@ -762,7 +877,7 @@ const ApprovalPage = () => {
           <FiFilter className="text-gray-400 flex-shrink-0" />
           {['all', ...STATUSES.map(s => s.value)].map(sf => (
             <button key={sf}
-              onClick={() => { setStatusFilter(sf); setPage(1) }}
+              onClick={() => { setStatusFilter(sf); setPage(1); setSelectedRecordMap(new Map()) }}
               className={`flex h-10 w-36 items-center justify-center px-4 text-sm font-medium transition-colors ${statusFilter === sf
                   ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D]'
                   : 'text-gray-600'
@@ -772,18 +887,29 @@ const ApprovalPage = () => {
           ))}
         </div>
 
-        {/* Bulk action stays available for the selected category: Bulk Check first, then Bulk Approve after the checker step is complete */}
-        {showBulkAction && (
+        {/* Selected rows take precedence; category-wide bulk remains available with no selection. */}
+        {canReview && (selectedRecords.length > 0 || showBulkAction) && (
           <BulkDropdown
-            category={selectedCategory}
+            category={selectedRecords.length > 0 ? 'Selected' : selectedCategory}
             onSelect={handleBulkDecision}
             loading={bulkLoading}
             approvalSummary={summary}
             records={getRecordsForCategory(selectedCategory)}
-            stage={isPrivilegedReviewer && allCategoryChecked ? 'approve' : 'check'}
+            selectedRecords={selectedRecords}
+            stage={isPrivilegedReviewer && (selectedRecords.length > 0
+              ? selectedRecords.every(isRecordChecked)
+              : allCategoryChecked) ? 'approve' : 'check'}
             className="h-10 w-44"
-            actionLabel={bulkActionLabel}
+            actionLabel={selectedRecords.length > 0
+              ? `${isPrivilegedReviewer && selectedRecords.every(isRecordChecked) ? 'Bulk Approve' : 'Bulk Check'} Selected (${selectedRecords.length})`
+              : bulkActionLabel}
           />
+        )}
+        {selectedRecords.length > 0 && (
+          <button type="button" onClick={() => setSelectedRecordMap(new Map())}
+            className="text-xs font-semibold text-gray-500 hover:text-gray-800">
+            Clear selection
+          </button>
         )}
       </div>
 
@@ -823,6 +949,9 @@ const ApprovalPage = () => {
         <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-white px-4 py-3">
           {CATEGORIES.map(cat => {
             const s = getSummary(cat.key)
+            const stageSummary = isCheckerView ? getStageSummary(cat.key, 'check') : null
+            const pendingCount = isCheckerView ? stageSummary.pending : s.pending
+            const doneCount = isCheckerView ? stageSummary.checked : nonPendingCount(s)
             const isActive = selectedCategory === cat.key
             const activeCls = {
               all:            'bg-[#8E288D] text-white border-[#8E288D]',
@@ -842,12 +971,12 @@ const ApprovalPage = () => {
             }
             return (
               <button key={cat.key}
-                onClick={() => { setSelectedCategory(cat.key); setPage(1) }}
+                onClick={() => { setSelectedCategory(cat.key); setPage(1); setSelectedRecordMap(new Map()) }}
                 className={`rounded-lg h-10 w-44 border px-4 py-1.5 text-xs font-semibold transition-colors ${isActive ? activeCls[cat.key] : inactiveCls[cat.key]}`}>
                 {cat.label}
                 {cat.key !== 'all' && (
                   <span className="ml-1 opacity-80">
-                    ({s.pending}p · {nonPendingCount(s)}d)
+                    ({pendingCount}p · {doneCount}{isCheckerView ? 'c' : 'd'})
                   </span>
                 )}
               </button>
@@ -869,10 +998,26 @@ const ApprovalPage = () => {
             <thead>
               {/* Row 1 — dark navy group headers */}
               <tr style={{ background: "#e7e7e7"}}>
-                <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-white uppercase 
-                whitespace-nowrap sticky left-0 z-10"
+                <th rowSpan={2} className="sticky left-0 z-30 w-10 bg-[#cfcdcd] px-1 py-3 text-center"
+                  style={{ width: '40px', minWidth: '40px', maxWidth: '40px', left: 0, zIndex: 31 }}>
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible records"
+                    checked={visibleRowsSelected}
+                    disabled={!canReview || records.length === 0 || recordsLoading}
+                    onChange={event => setSelectedRecordMap(current => {
+                      const next = new Map(current)
+                      records.forEach(record => {
+                        if (event.target.checked) next.set(record.id, record)
+                        else next.delete(record.id)
+                      })
+                      return next
+                    })}
+                  />
+                </th>
+                <th rowSpan={2} className="sticky left-10 z-20 bg-[#cfcdcd] px-4 py-3 text-left text-xs font-bold text-white uppercase whitespace-nowrap"
                   style={{color:'#1a3a5c', background: "#cfcdcd", letterSpacing: '0.07em', 
-                  borderRight: '1px solid rgba(255,255,255,0.2)' }}>
+                  borderRight: '1px solid rgba(255,255,255,0.2)', left: '40px', zIndex: 30 }}>
                   Category
                 </th>
                 {COLUMN_PAIRS.map(p => (
@@ -948,7 +1093,7 @@ const ApprovalPage = () => {
             <tbody>
               {recordsLoading ? (
                 <tr>
-                  <td colSpan={3 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
+                  <td colSpan={4 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
                     className="px-4 py-12 text-center" style={{ color: '#94a3b8' }}>
                     <div className="flex flex-col items-center">
                       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#8E288D] mb-3" />
@@ -958,7 +1103,7 @@ const ApprovalPage = () => {
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={3 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
+                  <td colSpan={4 + COLUMN_PAIRS.length * 2 + (canApprove ? 1 : 0)}
                     className="px-4 py-10 text-center" style={{ color: '#94a3b8' }}>
                     <FiAlertCircle className="mx-auto h-10 w-10 mb-2 opacity-30" />
                     <p className="text-sm">No records found for this filter</p>
@@ -970,9 +1115,26 @@ const ApprovalPage = () => {
                   onMouseEnter={e => e.currentTarget.style.background = '#eef4ff'}
                   onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? '#ffffff' : '#f4f7fa'}>
 
+                  <td className="sticky left-0 z-20 bg-white px-1 py-2.5 text-center"
+                    style={{ width: '40px', minWidth: '40px', maxWidth: '40px', left: 0 }}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select record ${rec.id}`}
+                      checked={selectedRecordMap.has(rec.id)}
+                      disabled={!canReview}
+                      onClick={event => event.stopPropagation()}
+                      onChange={event => setSelectedRecordMap(current => {
+                        const next = new Map(current)
+                        if (event.target.checked) next.set(rec.id, rec)
+                        else next.delete(rec.id)
+                        return next
+                      })}
+                    />
+                  </td>
+
                   {/* Category */}
-                  <td className="px-4 py-2.5 whitespace-nowrap sticky left-0 z-10"
-                    style={{ background: 'inherit', borderRight: '1px solid #e2e8f0' }}>
+                  <td className="px-4 py-2.5 whitespace-nowrap sticky left-10 z-10"
+                    style={{ background: 'inherit', borderRight: '1px solid #e2e8f0', left: '40px' }}>
                     <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
                       // style={{
                       //   color: rec.category === 'Exact Match' ? '#1a3a5c' :

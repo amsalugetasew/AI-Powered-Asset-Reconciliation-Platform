@@ -30,8 +30,8 @@ const duration = (seconds) => {
 const APPROVAL_COLORS = {
   reconciled: '#8E288D',
   unmatched: '#BE123C',
-  surplus_assets: '#BE123C',
-  exist_in_erp_not_physical: '#BE123C',
+  surplus_assets: '#B45309',
+  exist_in_erp_not_physical: '#F33838',
   pending: '#6B7280',
 }
 
@@ -354,12 +354,12 @@ const ReconciliationReport = () => {
   const STATUS_COLORS = {
     reconciled:                  '#8E288D',
     unmatched:                '#BE123C',
-    duplicated:                  '#000000',
+    duplicated:                  '#8c8c8c',
     unique:                      '#14b8a6',
     pending:                     '#6B7280',
     ...(reportSide === 'erp'
-      ? { exist_in_erp_not_physical: '#BE123C' }
-      : { surplus_assets: '#BE123C' }),
+      ? { exist_in_erp_not_physical: '#F33838' }
+      : { surplus_assets: '#B45309' }),
   }
   
   const STATUS_LABELS = {
@@ -408,8 +408,8 @@ const DONUT_CATEGORY_STATUS_MAP = {
     { label: 'Unmatched', value: Number(selectedSide.unmatched || 0), color: '#BE123C' },
     { label: reportSide === 'erp' ? 'Shortage' : 'Surplus',
       value: Number(reportSide === 'erp' ? selectedSide.shortage : selectedSide.surplus) || 0,
-      color: '#BE123C' },
-    { label: 'Duplicate', value: Number(selectedSide.duplicate || 0), color: '#000000' },
+      color: '#B45309' },
+    { label: 'Duplicate', value: Number(selectedSide.duplicate || 0), color: '#8c8c8c' },
   ].filter(item => item.value > 0)
 
   return (
@@ -499,7 +499,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
       <div className="mb-6 flex gap-2 border-b border-gray-200">
         {['erp', 'physical'].map(side => (
-          <button key={side} onClick={() => setReportSide(side)}
+          <button type="button" key={side} onClick={event => { event.preventDefault(); setReportSide(side) }}
             className={`border-b-2 px-5 py-3 text-sm font-semibold capitalize ${
               reportSide === side ? 'border-[#8E288D] text-[#8E288D]' : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}>
@@ -548,11 +548,11 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
         return (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <div className="flex h-[440px] min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-2">
+            <div className="flex h-[462px] min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-2">
               <div className="border-b border-gray-100 p-4">
                 <div className="mb-4 flex flex-wrap gap-2">
                   {tabs.map(t => (
-                    <button key={t.key} onClick={() => { setActiveTab(t.key); logActivity(`/report/${id}`, `TAB_SWITCH_${t.key.toUpperCase()}`) }}
+                    <button type="button" key={t.key} onClick={event => { event.preventDefault(); setActiveTab(t.key); logActivity(`/report/${id}`, `TAB_SWITCH_${t.key.toUpperCase()}`) }}
                       className={`flex h-10 w-44 items-center justify-center px-4 text-sm font-medium transition-colors ${activeTab === t.key
                         ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D]'
                         : 'text-gray-600'
@@ -630,9 +630,9 @@ const DONUT_CATEGORY_STATUS_MAP = {
               </div>
             </div>
 
-            <div className="h-[440px] min-h-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-6">
-              <h3 className="mb-1 text-lg font-semibold text-gray-800">Reconciliation Status</h3>
-              <p className="mb-4 text-xs text-gray-400">
+            <div className="w-full max-w-[616px] min-h-[462px] bg-white dark:bg-gray-900 rounded-[8px] border border-[#E2E8F0] dark:border-gray-800 p-6 flex flex-col gap-2">
+              <h3 className="mb-0 text-lg font-semibold text-gray-800">Reconciliation Status</h3>
+              <p className="mb-0 text-xs text-gray-400">
                 {reportSide === 'erp' ? 'ERP' : 'Physical'} status for reconciliation #{id}
               </p>
               <div className="mb-6">
@@ -699,7 +699,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           {/* Approval Status Donut */}
-          <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 text-purple-600 cursor-context-menu" title="Right-click for AI insights"
+          <div className="h-[462px] overflow-y-auto bg-white rounded-xl shadow p-6 text-purple-600 cursor-context-menu" title="Right-click for AI insights"
             onContextMenu={e => openAIContextMenu(e, {
               chartData: {
                 source: 'report_approval_status_donut',
@@ -764,7 +764,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
           </div>
 
           {/* Match type progress */}
-          <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+          <div className="h-[462px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
             onContextMenu={e => openAIContextMenu(e, {
               chartData: {
                 source: 'report_match_type_breakdown',
@@ -794,8 +794,8 @@ const DONUT_CATEGORY_STATUS_MAP = {
                 { label: 'AI Match', value: kpis.ai_matched, color: '#CFB53B' },
                 { label: 'Near Match', value: kpis.near_match, color: '#CFB53B' },
                 { label: 'Unmatched', value: kpis.customer_unmatched, color: '#BE123C' },
-                { label: 'Physical Duplicates', value: kpis.customer_duplicates || 0, color: '#000000' },
-                { label: 'ERP Duplicates', value: kpis.internal_duplicates || 0, color: '#000000' },
+                { label: 'Physical Duplicates', value: kpis.customer_duplicates || 0, color: '#8c8c8c' },
+                { label: 'ERP Duplicates', value: kpis.internal_duplicates || 0, color: '#8c8c8c' },
               ].map(item => {
                 const total = kpis.physical_count || 1
                 const r = ((item.value / total) * 100).toFixed(1)
@@ -832,7 +832,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
       {/* ── By Category ──────────────────────────────────────────────────── */}
       {activeTab === 'category' && (
-        <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+        <div className="h-[462px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
           onContextMenu={e => openAIContextMenu(e, {
             chartData: {
               source: 'report_category_breakdown',
@@ -880,7 +880,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
       {/* ── By Division/Department ────────────────────────────────────────── */}
       {activeTab === 'department' && (
-        <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+        <div className="h-[462px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
           onContextMenu={e => openAIContextMenu(e, {
             chartData: {
               source: 'report_division_department_breakdown',
@@ -926,7 +926,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
       {/* ── By District/Branch ───────────────────────────────────────────── */}
       {activeTab === 'district' && (
-        <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+        <div className="h-[462px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
           onContextMenu={e => openAIContextMenu(e, {
             chartData: {
               source: 'report_branch_district_breakdown',
@@ -998,7 +998,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
           <div className="space-y-6">
             <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-2 gap-4">
               {/* Aging Bar Chart */}
-              <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+              <div className="h-[462px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
                 onContextMenu={e => openAIContextMenu(e, {
                   chartData: {
                     source: 'report_aging_analysis',
@@ -1046,7 +1046,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
               </div>
 
               {/* Department stacked bar */}
-              <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+              <div className="h-[462px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
                 onContextMenu={e => openAIContextMenu(e, {
                   chartData: {
                     source: 'report_aging_department_breakdown',
@@ -1091,7 +1091,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
               </div>
 
               {/* District/Branch stacked bar */}
-              <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+              <div className="h-[462px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
                 onContextMenu={e => openAIContextMenu(e, {
                   chartData: {
                     source: 'report_aging_branch_breakdown',

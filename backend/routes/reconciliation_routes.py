@@ -184,6 +184,18 @@ def _collapse_category_breakdown(rows, limit=15):
     return visible + [other] + ([pending_row] if pending_row else [])
 
 
+def _variance_status_error(match_category, approval_decision):
+    if match_category == 'Physical Unmatched' and approval_decision == 'exist_in_erp_not_physical':
+        return 'Physical-only records can be marked as Surplus, not Shortage.'
+    if match_category == 'ERP Unmatched' and approval_decision == 'surplus_assets':
+        return 'ERP-only records can be marked as Shortage, not Surplus.'
+    if match_category == 'Unmatched' and approval_decision in {
+        'surplus_assets', 'exist_in_erp_not_physical'
+    }:
+        return 'Choose Physical Unmatched for Surplus or ERP Unmatched for Shortage.'
+    return None
+
+
 def _auto_save_records(reconciliation_id, report_path):
     """
     Parse the Excel report and save all records to DB with approval_status='pending'.
@@ -504,6 +516,7 @@ def assign_reconciliation(reconciliation_id):
             return jsonify({'error': 'Invalid assignment_scope. Must be all_officers or specific_user'}), 400
 
         assignee_id = data.get('assignee_id')
+        assignee = None
         if assignment_scope == 'specific_user':
             if assignee_id in [None, '', 'null']:
                 return jsonify({'error': 'assignee_id is required for specific_user assignments'}), 400
@@ -546,6 +559,7 @@ def assign_reconciliation(reconciliation_id):
                 'reconciliation_id': reconciliation.id,
                 'assignment_scope': reconciliation.assignment_scope,
                 'assigned_to': reconciliation.assigned_to,
+                'assigned_to_username': assignee.username if assignee else None,
                 'assigned_by': reconciliation.assigned_by,
                 'assignment_note': reconciliation.assignment_note,
                 'assigned_at': reconciliation.assigned_at.isoformat() if reconciliation.assigned_at else None,
@@ -586,8 +600,20 @@ def list_reconciliations():
                 .order_by(Reconciliation.created_at.desc()).all()
             scope = 'assigned_or_own'
 
+        assignee_ids = {r.assigned_to for r in reconciliations if r.assigned_to}
+        assignee_names = {}
+        if assignee_ids:
+            assignee_names = dict(db.session.query(User.id, User.username).filter(
+                User.id.in_(assignee_ids)
+            ).all())
+        reconciliation_data = []
+        for reconciliation in reconciliations:
+            item = reconciliation.to_dict()
+            item['assigned_to_username'] = assignee_names.get(reconciliation.assigned_to)
+            reconciliation_data.append(item)
+
         return jsonify({
-            'reconciliations': [r.to_dict() for r in reconciliations],
+            'reconciliations': reconciliation_data,
             'scope': scope,
             'role': user_role
         }), 200
@@ -1427,6 +1453,10 @@ def approve_record():
         if not _user_can_approve_reconciliation(reconciliation, current_user.id, current_user.role):
             return jsonify({'error': 'Access denied', 'message': 'Only managers/admins or the assigned officer can review these records.'}), 403
 
+        variance_error = _variance_status_error(record.match_category, approval_decision)
+        if variance_error:
+            return jsonify({'error': variance_error}), 400
+
         if current_user.role not in ['manager', 'admin'] and current_user.id == record.maker_user_id:
             return jsonify({'error': 'The maker cannot check or approve their own record.'}), 403
 
@@ -1520,6 +1550,10 @@ def approve_group():
                 'allowed': VALID_DECISIONS
             }), 400
 
+        variance_error = _variance_status_error(category, approval_decision)
+        if variance_error:
+            return jsonify({'error': variance_error}), 400
+
         if decision_stage not in ['', 'check', 'checker', 'approve', 'approver']:
             return jsonify({'error': 'Invalid decision_stage. Use check or approve'}), 400
 
@@ -1537,33 +1571,64 @@ def approve_group():
         if current_user.role not in ['manager', 'admin'] and current_user.id == reconciliation.user_id:
             return jsonify({'error': 'The maker cannot check or approve records they created.'}), 403
 
+        requested_record_ids = data.get('record_ids')
+        selected_records = None
+        if requested_record_ids is not None:
+            if not isinstance(requested_record_ids, list) or not requested_record_ids:
+                return jsonify({'error': 'record_ids must be a non-empty list.'}), 400
+            try:
+                selected_ids = [int(record_id) for record_id in requested_record_ids]
+            except (TypeError, ValueError):
+                return jsonify({'error': 'record_ids must contain valid record IDs.'}), 400
+            if len(set(selected_ids)) != len(selected_ids):
+                return jsonify({'error': 'record_ids must not contain duplicates.'}), 400
+            selected_records = ReconciliationRecord.query.filter(
+                ReconciliationRecord.reconciliation_id == reconciliation_id,
+                ReconciliationRecord.id.in_(selected_ids),
+            ).all()
+            if len(selected_records) != len(selected_ids):
+                return jsonify({'error': 'One or more selected records do not belong to this reconciliation.'}), 400
+            for record in selected_records:
+                variance_error = _variance_status_error(record.match_category, approval_decision)
+                if variance_error:
+                    return jsonify({'error': variance_error}), 400
+
         stage = 'approver' if current_user.role in ['manager', 'admin'] and (decision_stage or '').lower() in ['approve', 'approver'] else 'checker'
         if current_user.role not in ['manager', 'admin']:
             stage = 'checker'
 
         if stage == 'approver':
-            if category == 'Unmatched':
-                category_filter = db.or_(
-                    ReconciliationRecord.match_category == 'Physical Unmatched',
-                    ReconciliationRecord.match_category == 'ERP Unmatched'
+            if selected_records is not None:
+                pending_checked = sum(
+                    (record.check_status or record.checker_status or 'pending') in [None, '', 'pending', 'checking']
+                    for record in selected_records
                 )
             else:
-                category_filter = ReconciliationRecord.match_category == category
+                if category == 'Unmatched':
+                    category_filter = db.or_(
+                        ReconciliationRecord.match_category == 'Physical Unmatched',
+                        ReconciliationRecord.match_category == 'ERP Unmatched'
+                    )
+                else:
+                    category_filter = ReconciliationRecord.match_category == category
 
-            pending_checked = ReconciliationRecord.query.filter(
-                ReconciliationRecord.reconciliation_id == reconciliation_id,
-                category_filter,
-                db.or_(
-                    ReconciliationRecord.check_status.in_([None, '', 'pending', 'checking']),
-                    ReconciliationRecord.checker_status.in_([None, '', 'pending', 'checking'])
-                )
-            ).count()
+                pending_checked = ReconciliationRecord.query.filter(
+                    ReconciliationRecord.reconciliation_id == reconciliation_id,
+                    category_filter,
+                    db.or_(
+                        ReconciliationRecord.check_status.in_([None, '', 'pending', 'checking']),
+                        ReconciliationRecord.checker_status.in_([None, '', 'pending', 'checking'])
+                    )
+                ).count()
             if pending_checked > 0:
-                return jsonify({'error': 'This category still contains unchecked records. Complete the checker stage before approving.'}), 400
+                return jsonify({'error': 'Every selected record must be checked before approval.' if selected_records is not None else 'This category still contains unchecked records. Complete the checker stage before approving.'}), 400
 
         existing_count = ReconciliationRecord.query.filter_by(
             reconciliation_id=reconciliation_id
         ).count()
+
+        if selected_records is not None and existing_count == 0:
+            return jsonify({'error': 'Selected records are not available in the database.'}), 404
         
         records_created = 0
         
@@ -1610,7 +1675,9 @@ def approve_group():
             db.session.flush()
             print(f"Created {records_created} records in database")
         
-        if category == 'Unmatched':
+        if selected_records is not None:
+            records = selected_records
+        elif category == 'Unmatched':
             records = ReconciliationRecord.query.filter(
                 ReconciliationRecord.reconciliation_id == reconciliation_id,
                 db.or_(
@@ -1629,6 +1696,12 @@ def approve_group():
                 'error': 'No records found',
                 'message': f'No records found for category: {category}'
             }), 404
+
+        if stage == 'approver' and any(
+            (record.checker_status or record.check_status or 'pending') in [None, '', 'pending', 'checking']
+            for record in records
+        ):
+            return jsonify({'error': 'Every selected record must be checked before approval.'}), 400
         
         updated_count = 0
         for record in records:
@@ -1737,6 +1810,32 @@ def get_approval_summary(reconciliation_id):
                 summary[match_category][key] += count
             else:
                 summary[match_category][key] = count
+
+        stage_results = db.session.query(
+            ReconciliationRecord.match_category,
+            func.coalesce(ReconciliationRecord.checker_status, ReconciliationRecord.check_status),
+            func.coalesce(ReconciliationRecord.approver_status, ReconciliationRecord.approval_status),
+            func.count(ReconciliationRecord.id)
+        ).filter(
+            ReconciliationRecord.reconciliation_id == reconciliation_id
+        ).group_by(
+            ReconciliationRecord.match_category,
+            func.coalesce(ReconciliationRecord.checker_status, ReconciliationRecord.check_status),
+            func.coalesce(ReconciliationRecord.approver_status, ReconciliationRecord.approval_status)
+        ).all()
+        for match_category, checker_status, approver_status, count in stage_results:
+            category_summary = summary.setdefault(match_category, {
+                'total': 0, 'pending': 0, 'reconciled': 0, 'unreconciled': 0,
+                'not_reconciled': 0, 'surplus_assets': 0,
+                'exist_in_erp_not_physical': 0,
+            })
+            stage_counts = category_summary.setdefault('stage_counts', {
+                'check': {}, 'approve': {},
+            })
+            checker_key = checker_status or 'pending'
+            approver_key = approver_status or 'pending'
+            stage_counts['check'][checker_key] = stage_counts['check'].get(checker_key, 0) + count
+            stage_counts['approve'][approver_key] = stage_counts['approve'].get(approver_key, 0) + count
         
         # Group unmatched categories
         if 'Physical Unmatched' in summary or 'ERP Unmatched' in summary:
@@ -1746,11 +1845,18 @@ def get_approval_summary(reconciliation_id):
                 'surplus_assets': 0,
                 'exist_in_erp_not_physical': 0,
                 'duplicated': 0, 'unique': 0,
+                'stage_counts': {'check': {}, 'approve': {}},
             }
             for key in ['Physical Unmatched', 'ERP Unmatched']:
                 if key in summary:
                     for field in unmatched_summary:
+                        if field == 'stage_counts':
+                            continue
                         unmatched_summary[field] += summary[key].get(field, 0)
+                    for stage_name in ('check', 'approve'):
+                        for status, count in summary[key].get('stage_counts', {}).get(stage_name, {}).items():
+                            stage_counts = unmatched_summary['stage_counts'][stage_name]
+                            stage_counts[status] = stage_counts.get(status, 0) + count
             summary['Unmatched'] = unmatched_summary
         
         return jsonify({

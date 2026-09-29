@@ -205,7 +205,7 @@ const Layout = () => {
     const baseItems = [
       { path: '/', icon: FiHome, label: 'Dashboard', roles: ['officer', 'manager', 'admin'] },
       { path: '/upload', icon: FiUpload, label: 'Upload & Reconcile', roles: ['officer', 'manager', 'admin'] },
-      { path: '/analytics', icon: FiBarChart2, label: 'Reports & Analytics', roles: ['officer', 'manager', 'admin'] },
+      // { path: '/analytics', icon: FiBarChart2, label: 'Reports & Analytics', roles: ['officer', 'manager', 'admin'] },
     ]
 
     // Only Admin sees audit trail and user management

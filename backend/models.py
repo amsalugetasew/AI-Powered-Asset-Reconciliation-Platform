@@ -66,6 +66,12 @@ class User(db.Model):
 class Reconciliation(db.Model):
     """Reconciliation job model"""
     __tablename__ = 'reconciliations'
+    __table_args__ = (
+        db.Index('ix_reconciliations_deleted_created', 'is_deleted', 'created_at'),
+        db.Index('ix_reconciliations_user_deleted_created', 'user_id', 'is_deleted', 'created_at'),
+        db.Index('ix_reconciliations_assignee_deleted_created', 'assigned_to', 'is_deleted', 'created_at'),
+        db.Index('ix_reconciliations_scope_deleted_created', 'assignment_scope', 'is_deleted', 'created_at'),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
@@ -160,6 +166,16 @@ class ActivityLog(db.Model):
 class ReconciliationRecord(db.Model):
     """Row-by-row reconciliation results from the report"""
     __tablename__ = 'reconciliation_records'
+    __table_args__ = (
+        db.Index(
+            'ix_records_recon_category_approval_id',
+            'reconciliation_id', 'match_category', 'approval_status', 'id',
+        ),
+        db.Index(
+            'ix_records_recon_category_checker',
+            'reconciliation_id', 'match_category', 'check_status', 'checker_status',
+        ),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     reconciliation_id = db.Column(db.Integer, db.ForeignKey('reconciliations.id', ondelete='CASCADE'), nullable=False)

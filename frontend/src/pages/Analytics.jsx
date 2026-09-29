@@ -287,16 +287,18 @@ const Analytics = () => {
 
   useEffect(() => {
     logActivity('/analytics', 'PAGE_VISIT_ANALYTICS')
-    Promise.all([
-      cachedGet('/api/reconciliation/analytics?period=latest'),
-      cachedGet(`/api/reconciliation/analytics/aging?side=${reportSide}&period=latest`),
-    ])
-      .then(([r1, r2]) => {
-        setData(r1.data)
-        setAgingData(r2.data)
+    cachedGet('/api/reconciliation/analytics?period=latest')
+      .then(response => {
+        setData(response.data)
       })
       .catch(() => toast.error('Failed to fetch analytics'))
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    cachedGet(`/api/reconciliation/analytics/aging?side=${reportSide}&period=latest`)
+      .then(response => setAgingData(response.data))
+      .catch(() => toast.error('Failed to fetch aging data'))
   }, [reportSide])
 
   if (loading) return (
@@ -451,7 +453,7 @@ const Analytics = () => {
 
       <div className="mb-2 flex gap-2 border-b border-gray-200">
         {['erp', 'physical'].map(side => (
-          <button key={side} onClick={() => setReportSide(side)}
+          <button type="button" key={side} onClick={event => { event.preventDefault(); setReportSide(side) }}
             className={`border-b-2 px-5 py-1 text-sm font-semibold capitalize ${
               reportSide === side ? 'border-[#8E288D] text-[#8E288D]' : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}>
@@ -465,7 +467,7 @@ const Analytics = () => {
           <div className="border-b border-gray-100 p-4">
             <div className="flex flex-wrap gap-2">
               {tabs.map(t => (
-                <button key={t.key} onClick={() => { setActiveTab(t.key); logActivity('/analytics', `TAB_SWITCH_${t.key.toUpperCase()}`) }}
+                <button type="button" key={t.key} onClick={event => { event.preventDefault(); setActiveTab(t.key); logActivity('/analytics', `TAB_SWITCH_${t.key.toUpperCase()}`) }}
                   className={`flex h-10 w-44 items-center justify-center px-4 text-sm font-medium transition-colors ${activeTab === t.key
                         ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D]'
                         : 'text-gray-600'
