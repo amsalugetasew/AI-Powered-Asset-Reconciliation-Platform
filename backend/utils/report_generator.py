@@ -151,18 +151,19 @@ class ReportGenerator:
                 if not df.empty:
                     reordered_df = _reorder_matched_columns(df) if 'match_type' in df.columns else df
                     
-                    # For very large dataframes, write in chunks
                     if len(reordered_df) > chunk_size:
                         print(f"    Writing {sheet_name} in chunks ({len(reordered_df)} rows)...")
-                        # Write first chunk with header
-                        reordered_df.iloc[:chunk_size].to_excel(writer, sheet_name=sheet_name, index=False)
-                        
-                        # Append remaining chunks
-                        for i in range(chunk_size, len(reordered_df), chunk_size):
-                            chunk_end = min(i + chunk_size, len(reordered_df))
-                            print(f"      Writing rows {i+1}-{chunk_end}...")
-                    else:
-                        reordered_df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    for start in range(0, len(reordered_df), chunk_size):
+                        chunk = reordered_df.iloc[start:start + chunk_size]
+                        chunk.to_excel(
+                            writer,
+                            sheet_name=sheet_name,
+                            index=False,
+                            header=start == 0,
+                            startrow=0 if start == 0 else start + 1,
+                        )
+                        if start:
+                            print(f"      Wrote rows {start+1}-{start + len(chunk)}...")
                     
                     print(f"    ✓ {sheet_name} sheet created ({len(df)} rows)")
                 else:

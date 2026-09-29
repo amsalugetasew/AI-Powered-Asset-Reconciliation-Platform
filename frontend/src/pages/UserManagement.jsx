@@ -3,7 +3,7 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 import {
   FiPlus, FiTrash2, FiX, FiShield, FiLock, FiEdit2,
-  FiSearch, FiChevronLeft, FiChevronRight, FiUsers, FiUserCheck, FiUserX,
+  FiSearch, FiChevronLeft, FiChevronRight, FiUsers, FiUserCheck, FiUserX,FiUserPlus,FiClock,
   FiMoreVertical,
 } from 'react-icons/fi'
 import { Hash, Mail, Building2, Eye, EyeOff, Lock } from 'lucide-react'
@@ -287,221 +287,382 @@ const UserManagement = () => {
     <div className="space-y-5 pb-8">
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-2xl font-extrabold text-gray-900">User &amp; Permission Directory</h2>
-        <p className="text-sm text-gray-500 mt-0.5">Manage system access, user roles, and permissions for the reconciliation platform.</p>
+      <div className="flex h-[48px] w-full flex-col gap-1">
+        <h2 className="text-[22px] font-extrabold text-[#1E293B] leading-[100%]"
+          style={{
+            height: '27px',
+            fontFamily: 'inter sans-serif',
+            fontWeight: 800,
+            fontStyle: 'extra-bold',
+          }}>User &amp; Permission Directory</h2>
+        <p className="text-[14px] text-[#64748B]"
+          style={{
+            height: '17px',
+            fontFamily: 'inter sans-serif',
+            fontWeight: 400,
+            fontStyle: 'normal',
+          }}>Manage system access, user roles, and permissions for the reconciliation platform.</p>
       </div>
 
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
       <div className="grid w-full grid-cols-1 gap-4 p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
-
         {/* Total Users */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
+          style={{
+            background: 'linear-gradient(to right, #FFFFFF 0%, #E1C3DF 100%)',
+          }}>
 
           {/* KPI Label + Icon */}
-          <div
-            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+          <div className="relative h-[32px] flex items-left justify-left rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider"
             style={{
-              color: '#8E288D',
-              backgroundColor: '#8E288D10',
+              color: '#000000',
+              backgroundColor: '#E1C3DF',
             }}>
-            <span className="text-center">
-              Total Users
-            </span>
-
-            <span className="absolute right-2 text-sm">
+            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#8E288D]">
               <FiUsers />
+            </span>
+            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              style={{
+                height: '14px',
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 700,
+                fontStyle: 'normal',}}> Total Users
             </span>
           </div>
 
           {/* KPI Value */}
-          <div className="mt-4 flex w-full items-baseline justify-between">
-            <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-extrabold text-gray-900">
+          <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
+            <div className="flex h-[36px] w-full flex-row items-center gap-2">
+              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 800,
+                }}>
                 {totalUsers}
               </p>
 
-              <p className="text-xl font-semibold text-gray-500">
+              <p
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 600,
+                }}>
                 Users
               </p>
             </div>
-
-            <span className="mt-1 inline-block rounded-full bg-purple-100 px-2 py-0.5 text-[14px] font-extrabold text-[#8E288D]">
-              Validated
-            </span>
+            <div className="flex h-[17px] w-full flex-row items-center gap-3 justify-between">
+              <p
+                className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 400,
+                }}>
+                Total Registered Users
+              </p>
+              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-purple-purple-100 px-2 text-[14px] font-extrabold text-[#8E288D]">
+                Validated
+              </span>
+            </div>
           </div>
         </div>
 
 
         {/* Active Users */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
-
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
+          style={{
+            background: 'linear-gradient(to right, #FFFFFF 0%, #ECFDF5 100%)',
+          }}>
           {/* KPI Label + Icon */}
-          <div
-            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
-            style={{
-              color: '#059669',
-              backgroundColor: '#10B98110',
-            }}
-          >
-            <span className="text-center">
-              Active Users
-            </span>
-
-            <span className="absolute right-2 text-sm">
+          <div className="relative text-[#059669] bg-[#ECFDF5] h-[32px] flex items-left justify-left rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider">
+            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#059669]">
               <FiUserCheck />
             </span>
+            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              style={{
+                height: '14px',
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 700,
+                fontStyle: 'normal',}}>Active Users
+            </span>
+            
           </div>
 
           {/* KPI Value */}
-          <div className="mt-4 flex w-full items-baseline justify-between">
-            <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-extrabold text-gray-900">
+          <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
+            <div className="flex h-[36px] w-full flex-row items-center gap-2">
+              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]">
                 {activeUsers}
               </p>
 
-              <p className="text-xl font-semibold text-gray-500">
+              <p className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 600,
+                }}>
                 Users
               </p>
             </div>
 
-            <span className="mt-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-[14px] font-extrabold text-emerald-700">
+            <div className="flex h-[17px] w-full flex-row items-center gap-3 justify-between">
+              <p
+                className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 400,
+                }}>
+                Total Active Users
+              </p>
+              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-purple-green-100 px-2 text-[14px] font-extrabold text-[#8E288D]">
+                Validated
+              </span>
+            </div>
+            {/* <span className="mt-1 inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-green-100 px-2 text-[14px] font-extrabold text-emerald-700">
               Validated
-            </span>
+            </span> */}
           </div>
         </div>
 
 
         {/* Suspended Users */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
+          style={{
+            background: 'linear-gradient(to right, #FFFFFF 0%, #FEE2E2 100%)',
+          }}>
 
           {/* KPI Label + Icon */}
-          <div
-            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+          <div className="relative h-[32px] flex items-left justify-left rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider"
             style={{
               color: '#DC2626',
               backgroundColor: '#DC262610',
-            }}
-          >
-            <span className="text-center">
-              Suspended Users
+            }}>
+            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              style={{
+                height: '14px',
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 700,
+                fontStyle: 'normal',}}>Suspended Users
             </span>
 
-            <span className="absolute right-2 text-sm">
+            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#DC2626]">
               <FiUserX />
             </span>
           </div>
 
           {/* KPI Value */}
-          <div className="mt-4 flex w-full items-baseline justify-between">
-            <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-extrabold text-gray-900">
+          <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
+            <div className="flex h-[36px] w-full flex-row items-center gap-2">
+              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]">
                 {suspendedUsers}
               </p>
 
-              <p className="text-xl font-semibold text-gray-500">
+              <p className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 600,
+                }}>
                 Users
               </p>
             </div>
-
-            <span className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-[14px] font-extrabold text-red-700">
-              Suspended
-            </span>
+              
+            
+            <div className="flex h-[17px] w-full flex-row items-center gap-3 justify-between">
+              <p className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 400,
+                }}>
+                Total Suspended Users
+              </p>
+              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-purple-green-100 px-2 text-[14px] font-extrabold text-[#8E288D]">
+                Validated
+              </span>
+            </div>
           </div>
         </div>
 
 
         {/* Pending Approval */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
+          style={{
+            background: 'linear-gradient(to right, #FFFFFF 0%, #FEF3C7 100%)',
+          }}>
 
           {/* KPI Label + Icon */}
           <div
-            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            className="relative h-[32px] flex items-left justify-left rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider"
             style={{
               color: '#D97706',
               backgroundColor: '#D9770610',
             }}
           >
-            <span className="text-center">
-              Pending Approval
+            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              style={{
+                height: '14px',
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 700,
+                fontStyle: 'normal',}}> Pending Approval
             </span>
 
-            <span className="absolute right-2 text-sm">
-              <FiUserCheck />
+            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#D97706]">
+              <FiClock />
             </span>
           </div>
 
           {/* KPI Value */}
-          <div className="mt-4 flex w-full items-baseline justify-between">
-            <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-extrabold text-gray-900">
+          <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
+            <div className="flex h-[36px] w-full flex-row items-center gap-2">
+              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]">
                 {pendingUsers}
               </p>
 
-              <p className="text-xl font-semibold text-gray-500">
+              <p className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 600,
+                }}>
                 Users
               </p>
             </div>
 
-            <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[14px] font-extrabold text-amber-700">
-              Pending
-            </span>
+            <div className="flex h-[17px] w-full flex-row items-center gap-3 justify-between">
+              <p
+                className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 400,
+                }}>
+                Total Pending Users
+              </p>
+              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-purple-green-100 px-2 text-[14px] font-extrabold text-[#8E288D]">
+                Validated
+              </span>
+            </div>
           </div>
         </div>
 
       </div>
 
       {/* ── Filter bar ───────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3 bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
+      <div className="flex min-h-[76px] w-full flex-wrap items-center gap-4 rounded-[14px] border border-[#E2E8F0] bg-[#FFFFFF] p-5 shadow-sm">
+
         {/* Role */}
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-gray-500 font-medium">Role</span>
-          <select value={filterRole} onChange={e => { setFilterRole(e.target.value); setPage(1) }}
-            className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 bg-white min-w-[120px]">
+        <div className="flex h-[34px] min-w-[220px] flex-1 items-center gap-2 text-sm xl:max-w-[321.5px]">
+          <span
+            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B]"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+            }}
+          >
+            Role
+          </span>
+
+          <select
+            value={filterRole}
+            onChange={e => {
+              setFilterRole(e.target.value);
+              setPage(1);
+            }}
+            className="h-[40px] min-w-0 flex-1 rounded-[8px] border border-[#E2E8F0] bg-white px-3 text-sm text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
+          >
             <option value="all">All Roles</option>
             <option value="officer">Officer</option>
             <option value="manager">Manager</option>
             <option value="admin">Admin</option>
           </select>
         </div>
+
         {/* Status */}
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-gray-500 font-medium">Status</span>
-          <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1) }}
-            className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 bg-white min-w-[130px]">
+        <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 text-sm xl:max-w-[321.5px]">
+          <span
+            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B]"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+            }}
+          >
+            Status
+          </span>
+
+          <select
+            value={filterStatus}
+            onChange={e => {
+              setFilterStatus(e.target.value);
+              setPage(1);
+            }}
+            className="h-[40px] min-w-0 flex-1 rounded-[8px] border border-[#E2E8F0] bg-white px-3 text-sm text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
+          >
             <option value="all">All Statuses</option>
             <option value="active">Active</option>
             <option value="pending">Pending</option>
             <option value="suspended">Suspended</option>
           </select>
         </div>
+
         {/* Department */}
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-gray-500 font-medium">Department</span>
-          <select value={filterDept} onChange={e => { setFilterDept(e.target.value); setPage(1) }}
-            className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 bg-white min-w-[160px]">
+        <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 text-sm xl:max-w-[321.5px]">
+          <span
+            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B]"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+            }}
+          >
+            Department
+          </span>
+
+          <select
+            value={filterDept}
+            onChange={e => {
+              setFilterDept(e.target.value);
+              setPage(1);
+            }}
+            className="h-[40px] min-w-0 flex-1 rounded-[8px] border border-[#E2E8F0] bg-white px-3 text-sm text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
+          >
             <option value="all">All Departments</option>
-            {allDepts.map(d => <option key={d} value={d}>{d}</option>)}
+            {allDepts.map(d => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
           </select>
         </div>
+
         {/* Search */}
-        <div className="flex items-center gap-2 text-sm ml-auto">
-          <span className="text-gray-500 font-medium">Search</span>
-          <div className="relative">
-            <FiSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 h-3.5 w-3.5" />
+        <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 text-sm xl:max-w-[321.5px]">
+          <span
+            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B]"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+            }}
+          >
+            Search
+          </span>
+
+          <div className="relative min-w-0 flex-1">
+            <FiSearch className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94A3B8]" />
+
             <input
               type="text"
               placeholder="Search directory..."
               value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1) }}
-              className="pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 w-48 bg-white"
+              onChange={e => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="h-[40px] w-full rounded-[8px] border border-[#E2E8F0] bg-white pl-9 pr-3 text-sm text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
             />
           </div>
         </div>
+
         {/* Add User */}
         <button
-          onClick={() => { setFormData(EMPTY_FORM); setShowCreateModal(true) }}
-          className="flex items-center gap-1.5 bg-[#8E288D] hover:bg-[#7A1E79] text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors whitespace-nowrap"
+          onClick={() => {
+            setFormData(EMPTY_FORM);
+            setShowCreateModal(true);
+          }}
+          className="flex h-[40px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[8px] bg-[#8E288D] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#7A1E79]"
         >
           <FiPlus className="h-4 w-4" />
           Add New User
@@ -509,36 +670,37 @@ const UserManagement = () => {
       </div>
 
       {/* ── Table ────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100">
+            <thead className="h-[43px] w-full bg-[#F8FAFC]">
+              <tr className="border-b border-[#E2E8F0]">
                 {['User', 'Role', 'Department', 'Last Active', 'Status', 'Actions'].map(h => (
-                  <th key={h} className={`px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-gray-400 ${h === 'Actions' ? 'text-right' : ''}`}>
+                  <th key={h} className={`px-5 py-3.5 text-left text-[12px] font-bold uppercase leading-[100%] text-[#64748B] ${h === 'Actions' ? 'text-right' : ''}`}
+                  style={{height: '15px', fontWeight: 700, fontStyle: 'bold'}}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-[#E2E8F0]">
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-400">
+                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-[#94A3B8]">
                     No users match the current filters.
                   </td>
                 </tr>
               ) : paginated.map((user, userIndex) => (
-                <tr key={user.id} className="hover:bg-gray-50/70 transition-colors group">
+                <tr key={user.id} className="hover:bg-[#F8FAFC]/70 transition-colors group">
                   {/* User cell */}
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <Avatar name={user.full_name || user.username} picture={user.profile_picture} />
                       <div>
-                        <p className="text-sm font-semibold text-gray-900 leading-tight">
+                        <p className="text-sm font-semibold text-[#334155] leading-tight">
                           {user.full_name || user.username}
                           {user.id === currentUser?.id && (
-                            <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(You)</span>
+                            <span className="ml-1.5 text-[10px] text-[#94A3B8] font-normal">(You)</span>
                           )}
                         </p>
                         <p className="text-xs text-gray-400">{user.email}</p>

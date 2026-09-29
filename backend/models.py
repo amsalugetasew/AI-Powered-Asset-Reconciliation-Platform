@@ -60,7 +60,7 @@ class User(db.Model):
             'role': self.role,
             'is_active': self.is_active,
             'status': self.status or ('active' if self.is_active else 'suspended'),
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 class Reconciliation(db.Model):
@@ -122,7 +122,7 @@ class Reconciliation(db.Model):
             'assigned_by': self.assigned_by,
             'assignment_note': self.assignment_note,
             'assigned_at': self.assigned_at.isoformat() if self.assigned_at else None,
-            'created_at': self.created_at.isoformat(),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'statistics': {
                 'total_customer_records': self.total_customer_records,
@@ -249,7 +249,7 @@ class ReconciliationRecord(db.Model):
             'customer_new_tag': self.customer_new_tag,
             'match_type': self.match_type,
             'confidence_score': self.confidence_score,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 

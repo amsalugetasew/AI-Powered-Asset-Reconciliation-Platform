@@ -61,7 +61,7 @@ const UploadedFileCard = ({ file, preview, error, label, accent, onRemove }) => 
   const accentText = isPurple ? 'text-[#8E288D]' : 'text-emerald-600'
   const accentBorder = isPurple ? 'border-[#ead5eb]' : 'border-[#ccefe4]'
   const accentBackground = isPurple ? 'bg-[#fcf8fd]' : 'bg-[#f7fffc]'
-  return <div className={`rounded-xl border ${accentBorder} ${accentBackground} px-4 py-3.5`}><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><div className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white ${accentText} shadow-sm`}><FiFileText className="h-4 w-4" /></div><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-700">{file?.name || `${label} file`}</p>{preview && !error && <p className="mt-1 text-xs text-slate-400">{preview.fileSize} · {preview.totalRecords.toLocaleString()} records · Uploaded just now</p>}<span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${error ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{error ? 'Needs attention' : 'Validated'}</span>{error && <p className="mt-2 text-xs leading-relaxed text-red-600">{error}</p>}</div></div><button type="button" onClick={onRemove} aria-label={`Remove ${label} file`} className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-white ${accentText} shadow-sm transition-colors hover:bg-red-50 hover:text-red-500`}><FiX className="h-4 w-4" /></button></div></div>
+  return <div className={`h-fit self-start rounded-xl border ${accentBorder} ${accentBackground} px-4 py-3.5`}><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><div className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white ${accentText} shadow-sm`}><FiFileText className="h-4 w-4" /></div><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-700">{file?.name || `${label} file`}</p>{preview && !error && <p className="mt-1 text-xs text-slate-400">{preview.fileSize} · {preview.totalRecords.toLocaleString()} records · Uploaded just now</p>}<span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${error ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>{error ? 'Needs attention' : 'Validated'}</span>{error && <p className="mt-2 text-xs leading-relaxed text-red-600">{error}</p>}</div></div><button type="button" onClick={onRemove} aria-label={`Remove ${label} file`} className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-white ${accentText} shadow-sm transition-colors hover:bg-red-50 hover:text-red-500`}><FiX className="h-4 w-4" /></button></div></div>
 }
 
 const SummaryCard = ({ label, value, caption, icon, accent, ready }) => {
@@ -201,7 +201,7 @@ const Upload = () => {
         <thead>
           <tr className="border-b border-gray-50">
             {['Job ID', 'Date & Time', 'ERP File', 'Physical Count File', 'Records', 'Status', 'Actions'].map(header => 
-            <th key={header} className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-[#8E288D]">
+            <th key={header} className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-[#64748B]">
               {header}
             </th>)}
           </tr>

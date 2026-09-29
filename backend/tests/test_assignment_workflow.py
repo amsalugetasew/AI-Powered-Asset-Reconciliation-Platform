@@ -24,6 +24,23 @@ def _make_user(username, email, role='officer'):
     return user
 
 
+def test_user_to_dict_handles_missing_created_at():
+    user = User(
+        username='legacy_user',
+        email='legacy@example.com',
+        full_name='Legacy User',
+        password_hash='hashed-password',
+        role='officer',
+        is_active=True,
+        status='active',
+        created_at=None,
+    )
+
+    payload = user.to_dict()
+    assert payload['created_at'] is None
+    assert payload['status'] == 'active'
+
+
 def test_auto_save_records_persists_report_rows(tmp_path):
     os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
     app = create_app('development')

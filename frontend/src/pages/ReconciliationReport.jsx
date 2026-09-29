@@ -6,12 +6,13 @@ import { logActivity } from '../services/activityService'
 import { cachedGet } from '../services/cachedGet'
 import AIAnalysisModal from '../components/AIAnalysisModal'
 import AIContextMenu from '../components/AIContextMenu'
+import { DonutCenterLabel, DonutChartLegend } from '../components/DonutChartPresentation'
 import {
   FiArrowLeft, FiDatabase, FiCheckCircle, FiXCircle, FiAlertTriangle, FiClock, FiTarget, FiCpu, FiCopy, FiRepeat,
   FiAlertCircle, FiLoader, FiPercent, FiLayers, FiMapPin, FiBarChart2
 } from 'react-icons/fi'
 import {
-  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts'
 
@@ -28,7 +29,7 @@ const duration = (seconds) => {
 
 const APPROVAL_COLORS = {
   reconciled: '#8E288D',
-  unreconciled: '#BE123C',
+  unmatched: '#BE123C',
   surplus_assets: '#BE123C',
   exist_in_erp_not_physical: '#BE123C',
   pending: '#6B7280',
@@ -41,43 +42,102 @@ const KpiCard = ({
   sub,
   icon: Icon,
   color = '#8E288D',
+  lightColor = '#E1C3DF',
+  unit,
+  description,
 }) => (
-  <div className="w-full min-h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
-
+  <div
+    className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+    style={{
+      background: `linear-gradient(to right, #FFFFFF 0%, ${lightColor} 100%)`,
+    }}
+  >
     {/* KPI Label + Icon */}
     <div
-      className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+      className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
       style={{
-        color: color,
-        backgroundColor: `${color}10`,
+        color: '#000000',
+        backgroundColor: lightColor,
       }}
     >
-      {/* Centered Label */}
-      <span className="text-center">
-        {label}
-      </span>
-
-      {/* Right Corner Icon */}
+      {/* Left Icon */}
       {Icon && (
-        <span className="absolute right-2 text-base">
+        <span
+          className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
+          style={{ color }}
+        >
           <Icon />
         </span>
       )}
+
+      {/* Label */}
+      <span
+        className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+        style={{
+          height: '14px',
+          fontFamily: 'Geist, sans-serif',
+          fontWeight: 700,
+        }}
+      >
+        {label}
+      </span>
     </div>
 
     {/* KPI Value */}
-    <p
-      className="mt-4 text-center text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white"
-    >
-      {value}
-    </p>
+    <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
 
-    {/* Optional Subtitle */}
-    {sub && (
-      <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-400">
-        {sub}
-      </p>
-    )}
+      {/* Value + Unit */}
+      <div className="flex h-[36px] w-full flex-row items-center gap-2">
+        <p
+          className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+          style={{
+            fontFamily: 'Geist, sans-serif',
+            fontWeight: 800,
+          }}
+        >
+          {value}
+        </p>
+
+        {unit && (
+          <p
+            className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+            style={{
+              fontFamily: 'Geist, sans-serif',
+              fontWeight: 600,
+            }}
+          >
+            {unit}
+          </p>
+        )}
+      </div>
+
+      {/* Description + Status */}
+      {(description || sub) && (
+        <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
+
+          <p
+            className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+            style={{
+              fontFamily: 'Geist, sans-serif',
+              fontWeight: 400,
+            }}
+          >
+            {description || sub}
+          </p>
+
+          <span
+            className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
+            style={{
+              color,
+              backgroundColor: lightColor,
+            }}
+          >
+            Validated
+          </span>
+
+        </div>
+      )}
+    </div>
   </div>
 );
 
@@ -217,6 +277,7 @@ const ReconciliationReport = () => {
   const [loading, setLoading] = useState(true)
   const [reportSide, setReportSide] = useState('erp')
   const [activeTab, setActiveTab] = useState('report_category')
+  const [activeDonutName, setActiveDonutName] = useState(null)
   const [barSize, setBarSize] = useState(40)
   const [showAIModal, setShowAIModal] = useState(false)
   const [showAIContextMenu, setShowAIContextMenu] = useState(false)
@@ -292,7 +353,7 @@ const ReconciliationReport = () => {
   // ── Shared status palette for ALL breakdown tabs ──────────────────────────
   const STATUS_COLORS = {
     reconciled:                  '#8E288D',
-    unreconciled:                '#BE123C',
+    unmatched:                '#BE123C',
     duplicated:                  '#000000',
     unique:                      '#14b8a6',
     pending:                     '#6B7280',
@@ -303,7 +364,7 @@ const ReconciliationReport = () => {
   
   const STATUS_LABELS = {
     reconciled:                  'Reconciled',
-    unreconciled:                'Unmatched',
+    unmatched:                'Unmatched',
     duplicated:                  'Duplicated',
     unique:                      'Unique',
     pending:                     'Pending',
@@ -316,8 +377,7 @@ const ReconciliationReport = () => {
   // ── Donut category colors — uses the same palette as horizontal stacked charts ──
 const DONUT_CATEGORY_STATUS_MAP = {
   Reconciled: 'reconciled',
-  Unreconciled: 'unreconciled',
-  Unmatched: 'unreconciled',
+  unmatched: 'unreconciled',
   Duplicated: 'duplicated',
   Duplicate: 'duplicated',
   Unique: 'unique',
@@ -331,7 +391,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
     name: c.name.length > 18 ? c.name.slice(0, 18) + '…' : c.name,
     fullName: c.name,
     reconciled:                 c.reconciled   || 0,
-    unreconciled:               c.unreconciled || 0,
+    unmatched:               c.unreconciled || 0,
     ...(reportSide === 'erp'
       ? { exist_in_erp_not_physical: c.exist_in_erp_not_physical || 0 }
       : { surplus_assets: c.surplus_assets || 0 }),
@@ -391,32 +451,48 @@ const DONUT_CATEGORY_STATUS_MAP = {
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
 
+        {/* ERP Assets */}
         <KpiCard
           label="ERP Assets"
           value={fmt(kpis.total_erp_assets)}
+          unit="Assets"
+          description="Total assets recorded in ERP"
           icon={FiDatabase}
           color="#8E288D"
+          lightColor="#E1C3DF"
         />
 
+        {/* Physical Records */}
         <KpiCard
           label="Physical Records"
           value={fmt(kpis.physical_count)}
+          unit="Records"
+          description="Total physical asset records"
           icon={FiLayers}
           color="#CFB53B"
+          lightColor="#F5EFCF"
         />
 
+        {/* Match Rate */}
         <KpiCard
           label="Match Rate (ERP)"
           value={pct(kpis.erp_match_rate)}
+          unit="Match"
+          description="ERP reconciliation match rate"
           icon={FiPercent}
           color="#059669"
+          lightColor="#D1FAE5"
         />
 
+        {/* Processing Time */}
         <KpiCard
           label="Processing Time"
           value={duration(processingSeconds)}
+          unit="Duration"
+          description="Reconciliation processing time"
           icon={FiClock}
           color="#2563EB"
+          lightColor="#DBEAFE"
         />
 
       </div>
@@ -472,7 +548,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
         return (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-2">
+            <div className="flex h-[440px] min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-2">
               <div className="border-b border-gray-100 p-4">
                 <div className="mb-4 flex flex-wrap gap-2">
                   {tabs.map(t => (
@@ -489,7 +565,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
                   <FiLayers className="text-[#8E288D]" /> {activeTab === 'report_aging' ? 'Asset Aging' : breakdownTitle}
                 </h3>
               </div>
-              <div className="p-6">
+              <div className="min-h-0 flex-1 overflow-y-auto p-6">
                 <div className="mb-4 flex items-center justify-between text-xs text-gray-400">
                   <span>{reportSide === 'erp' ? 'ERP' : 'Physical'} records for reconciliation #{id}</span>
                   <span>{activeTab === 'report_aging'
@@ -554,35 +630,46 @@ const DONUT_CATEGORY_STATUS_MAP = {
               </div>
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="h-[440px] min-h-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-6">
               <h3 className="mb-1 text-lg font-semibold text-gray-800">Reconciliation Status</h3>
               <p className="mb-4 text-xs text-gray-400">
                 {reportSide === 'erp' ? 'ERP' : 'Physical'} status for reconciliation #{id}
               </p>
               <div className="mb-6">
                 {donut.length ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie data={donut} cx="50%" cy="50%" innerRadius={55} outerRadius={82} paddingAngle={3} dataKey="value">
-                        {/* {donut.map((entry, index) => <Cell key={index} fill={entry.color} />)} */}
-                        {donut.map((entry, index) => {
-                          const statusKey = DONUT_CATEGORY_STATUS_MAP[entry.name]
-
-                          return (
-                            <Cell
-                              key={index}
-                              fill={STATUS_COLORS[statusKey] || entry.color}
-                            />
-                          )
-                        })}
-                      </Pie>
-                      <Tooltip formatter={value => Number(value).toLocaleString()} />
-                      <Legend wrapperStyle={{ fontSize: '11px' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  (() => {
+                    const donutTotal = donut.reduce((sum, entry) => sum + Number(entry.value || 0), 0)
+                    const getStatusColor = entry => {
+                      const statusKey = DONUT_CATEGORY_STATUS_MAP[entry.name]
+                      return STATUS_COLORS[statusKey] || entry.color
+                    }
+                    const activeDonutVisible = donut.some(entry => entry.name === activeDonutName)
+                    return (
+                      <>
+                        <div className="relative">
+                          <ResponsiveContainer width="100%" height={260}>
+                            <PieChart>
+                              <Pie data={donut} cx="50%" cy="50%" innerRadius={98} outerRadius={120}
+                                paddingAngle={5} cornerRadius={6} dataKey="value">
+                                {donut.map((entry, index) => (
+                                  <Cell key={index} fill={getStatusColor(entry)}
+                                    opacity={activeDonutVisible && activeDonutName !== entry.name ? 0.25 : 1} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={value => Number(value).toLocaleString()} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <DonutCenterLabel total={donutTotal} />
+                        </div>
+                        <DonutChartLegend data={donut} getColor={getStatusColor}
+                          activeName={activeDonutName} onSelect={setActiveDonutName}
+                          singleRow />
+                      </>
+                    )
+                  })()
                 ) : <p className="py-10 text-center text-gray-400">No status data available</p>}
               </div>
-              <div className="border-t border-gray-100 pt-4">
+              {/* <div className="border-t border-gray-100 pt-4">
                 <h4 className="mb-3 text-sm font-semibold text-gray-700">Match Type Breakdown</h4>
                 <div className="space-y-3">
                   {matchTypeData.map(item => {
@@ -601,7 +688,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
                     )
                   })}
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
         )
@@ -612,7 +699,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           {/* Approval Status Donut */}
-          <div className="bg-white rounded-xl shadow p-6 text-purple-600 cursor-context-menu" title="Right-click for AI insights"
+          <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 text-purple-600 cursor-context-menu" title="Right-click for AI insights"
             onContextMenu={e => openAIContextMenu(e, {
               chartData: {
                 source: 'report_approval_status_donut',
@@ -630,45 +717,45 @@ const DONUT_CATEGORY_STATUS_MAP = {
             </div>
             {donut.length > 0 ? (() => {
               const donutTotal = donut.reduce((s, d) => s + d.value, 0) || 1
+              const activeDonutVisible = donut.some(entry => entry.name === activeDonutName)
               return (
                 <>
-                  <p className="text-xs text-gray-400 mb-3">
-                    Total: {donutTotal.toLocaleString()} records
-                  </p>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie data={donut} cx="50%" cy="50%"
-                        innerRadius={65} outerRadius={110}
-                        paddingAngle={3} dataKey="value"
-                        label={({ value, percent }) =>
-                          percent > 0.04
-                            ? `${name.split(' ')[0]}: ${((value / donutTotal) * 100).toFixed(1)}%`
-                            : ''
-                        }
-                        labelLine={false}>
-                        {donut.map((e, i) => <Cell key={i} fill={e.color} />)}
-                      </Pie>
-                      <Tooltip content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null
-                        const p = payload[0]
-                        const sharePct = ((p.value / donutTotal) * 100).toFixed(1)
-                        return (
-                          <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
-                            <p className="font-bold border-b border-gray-600 pb-1 mb-1">{p.name}</p>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-gray-300">Count</span>
-                              <span className="font-semibold">{p.value.toLocaleString()}</span>
+                  <div className="relative">
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie data={donut} cx="50%" cy="50%"
+                          innerRadius={98} outerRadius={120}
+                          paddingAngle={5} cornerRadius={6} dataKey="value">
+                          {donut.map((e, i) => (
+                            <Cell key={i} fill={e.color}
+                              opacity={activeDonutVisible && activeDonutName !== e.name ? 0.25 : 1} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null
+                          const p = payload[0]
+                          const sharePct = ((p.value / donutTotal) * 100).toFixed(1)
+                          return (
+                            <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                              <p className="font-bold border-b border-gray-600 pb-1 mb-1">{p.name}</p>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-gray-300">Count</span>
+                                <span className="font-semibold">{p.value.toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span className="text-gray-300">Share</span>
+                                <span className="font-semibold">{sharePct}%</span>
+                              </div>
                             </div>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-gray-300">Share</span>
-                              <span className="font-semibold">{sharePct}%</span>
-                            </div>
-                          </div>
-                        )
-                      }} />
-                      <Legend wrapperStyle={{ fontSize: '12px' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                          )
+                        }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <DonutCenterLabel total={donutTotal} />
+                  </div>
+                  <DonutChartLegend data={donut} getColor={entry => entry.color}
+                    activeName={activeDonutName} onSelect={setActiveDonutName}
+                    singleRow />
                 </>
               )
             })() : (
@@ -677,7 +764,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
           </div>
 
           {/* Match type progress */}
-          <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+          <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
             onContextMenu={e => openAIContextMenu(e, {
               chartData: {
                 source: 'report_match_type_breakdown',
@@ -745,7 +832,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
       {/* ── By Category ──────────────────────────────────────────────────── */}
       {activeTab === 'category' && (
-        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+        <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
           onContextMenu={e => openAIContextMenu(e, {
             chartData: {
               source: 'report_category_breakdown',
@@ -793,7 +880,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
       {/* ── By Division/Department ────────────────────────────────────────── */}
       {activeTab === 'department' && (
-        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+        <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
           onContextMenu={e => openAIContextMenu(e, {
             chartData: {
               source: 'report_division_department_breakdown',
@@ -839,7 +926,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
       {/* ── By District/Branch ───────────────────────────────────────────── */}
       {activeTab === 'district' && (
-        <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+        <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
           onContextMenu={e => openAIContextMenu(e, {
             chartData: {
               source: 'report_branch_district_breakdown',
@@ -911,7 +998,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
           <div className="space-y-6">
             <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-2 gap-4">
               {/* Aging Bar Chart */}
-              <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+              <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
                 onContextMenu={e => openAIContextMenu(e, {
                   chartData: {
                     source: 'report_aging_analysis',
@@ -959,7 +1046,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
               </div>
 
               {/* Department stacked bar */}
-              <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+              <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
                 onContextMenu={e => openAIContextMenu(e, {
                   chartData: {
                     source: 'report_aging_department_breakdown',
@@ -1004,7 +1091,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
               </div>
 
               {/* District/Branch stacked bar */}
-              <div className="bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
+              <div className="h-[440px] overflow-y-auto bg-white rounded-xl shadow p-6 cursor-context-menu" title="Right-click for AI insights"
                 onContextMenu={e => openAIContextMenu(e, {
                   chartData: {
                     source: 'report_aging_branch_breakdown',

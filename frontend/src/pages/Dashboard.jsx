@@ -27,10 +27,10 @@ const AGING_BUCKET_CONFIG = [
 
 // ── Category Distribution Bar Component ─────────────────────────────────────
 // Horizontal stacked rows match the reporting page breakdown layout.
-const CategoryDistributionChart = ({ categoryData, monthLabel }) => {
-  const hasData = categoryData && categoryData.length > 0
+const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => {
+  const hasData = (categoryData && categoryData.length > 0) || Number(totalCount || 0) > 0
 
-  const items = (categoryData || []).slice(0, 10).map(cat => {
+  const allItems = (categoryData || []).map(cat => {
         const resolved = (cat.reconciled || 0)
           + (cat.surplus_assets || 0)
           + (cat.exist_in_erp_not_physical || 0)
@@ -47,6 +47,22 @@ const CategoryDistributionChart = ({ categoryData, monthLabel }) => {
           total,
         }
       })
+  const items = allItems.slice(0, 10)
+  const remainingItems = allItems.slice(10)
+  if (remainingItems.length) {
+    items.push(remainingItems.reduce((other, item) => ({
+      name: 'Other categories',
+      resolved: other.resolved + item.resolved,
+      unmatched: other.unmatched + item.unmatched,
+      pending: other.pending + item.pending,
+      total: other.total + item.total,
+    }), { name: 'Other categories', resolved: 0, unmatched: 0, pending: 0, total: 0 }))
+  }
+  const categoryTotal = allItems.reduce((sum, item) => sum + item.total, 0)
+  const unclassifiedTotal = Math.max(Number(totalCount || 0) - categoryTotal, 0)
+  if (unclassifiedTotal) {
+    items.push({ name: 'Unclassified', resolved: 0, unmatched: 0, pending: unclassifiedTotal, total: unclassifiedTotal, unclassified: true })
+  }
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 h-full flex flex-col gap-4">
@@ -62,6 +78,9 @@ const CategoryDistributionChart = ({ categoryData, monthLabel }) => {
             Reconciled, Unmatched, and Pending per asset category
           </p>
         </div>
+        <span className="flex-shrink-0 text-xs font-semibold text-gray-500">
+          Total: {Number(totalCount || 0).toLocaleString()}
+        </span>
       </div>
 
       {/* Horizontal stacked rows */}
@@ -74,14 +93,18 @@ const CategoryDistributionChart = ({ categoryData, monthLabel }) => {
             </div>
             <div className="flex h-9 w-full overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800" title={`${item.name}: ${item.total.toLocaleString()} records`}>
               {[
-                { key: 'resolved', value: item.resolved, color: '#8E288D', label: 'Reconciled' },
-                { key: 'unmatched', value: item.unmatched, color: '#BE123C', label: 'Unmatched' },
-                { key: 'pending', value: item.pending, color: '#6B7280', label: 'Pending' },
+                ...(item.unclassified
+                  ? [{ key: 'unclassified', value: item.total, color: '#9CA3AF', label: 'No detail data' }]
+                  : [
+                      { key: 'resolved', value: item.resolved, color: '#8E288D', label: 'Reconciled' },
+                      { key: 'unmatched', value: item.unmatched, color: '#BE123C', label: 'Unmatched' },
+                      { key: 'pending', value: item.pending, color: '#6B7280', label: 'Pending' },
+                    ]),
               ].map(segment => segment.value > 0 && (
                 <div key={segment.key} className="flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
                   style={{ width: `${(segment.value / item.total) * 100}%`, backgroundColor: segment.color }}
                   title={`${segment.label}: ${segment.value.toLocaleString()}`}>
-                  {segment.value / item.total > 0.12 && <span className={`truncate px-1 text-[10px] font-semibold ${segment.key === 'pending' ? 'text-slate-700' : 'text-white'}`}>{segment.label}</span>}
+                  {segment.value / item.total > 0.12 && <span className={`truncate px-1 text-[10px] font-semibold ${segment.key === 'pending' ? 'text-white' : 'text-[#6B7280]'}`}>{segment.label}</span>}
                 </div>
               ))}
             </div>
@@ -276,35 +299,38 @@ const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount, side
     })
     .filter(d => d.count > 0)  // hide zero buckets
 
-  const hasData = orderedData.length > 0
+  const bucketTotal = orderedData.reduce((sum, item) => sum + item.count, 0)
+  const totalAssets = Number(totalERPCount) || bucketTotal
+  const unclassifiedCount = Math.max(totalAssets - bucketTotal, 0)
+  const chartData = unclassifiedCount
+    ? [...orderedData, { key: 'Unclassified', label: 'Unclassified', color: '#9CA3AF', count: unclassifiedCount }]
+    : orderedData
+  const hasData = chartData.length > 0
 
   // Fall back placeholder when no data
-  const displayData = hasData ? orderedData : [
+  const displayData = hasData ? chartData : [
     { key: 'No data', label: 'No data yet', color: '#e5e7eb', count: 1 }
   ]
 
-  const totalAssets = hasData
-    ? orderedData.reduce((s, d) => s + d.count, 0)
-    : (totalERPCount || 0)
-
   // SVG donut parameters
-  const size        = 200
-  const sw          = 28           // stroke width
+  const size        = 260
+  const sw          = 22           // stroke width
   const radius      = (size - sw) / 2
   const cx          = size / 2
   const cy          = size / 2
   const circ        = 2 * Math.PI * radius
-  const gapAngle    = hasData ? 0.03 : 0  // small gap between segments (radians)
+  const gapAngle    = hasData ? 0.27 : 0  // leave visible spacing between rounded segment ends
   const gapArc      = hasData ? (gapAngle * radius) : 0
+  const availableArc = circ - gapArc * displayData.length
 
   // Build segments
   let offsetAcc = 0
   const segments = displayData.map(item => {
     const pct       = totalAssets > 0 ? item.count / totalAssets : 1
-    const arcLen    = Math.max(0, pct * circ - gapArc)
+    const arcLen    = Math.max(0, pct * availableArc)
     const dash      = `${arcLen} ${circ}`
     const offset    = -offsetAcc
-    offsetAcc      += pct * circ
+    offsetAcc      += arcLen + gapArc
     return { ...item, pct, dash, offset }
   })
 
@@ -324,7 +350,7 @@ const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount, side
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-5 h-full flex flex-col gap-4">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-4 h-full flex flex-col gap-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -362,7 +388,7 @@ const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount, side
               strokeWidth={hovered === seg.key ? sw + 5 : sw}
               strokeDasharray={seg.dash}
               strokeDashoffset={seg.offset}
-              strokeLinecap="butt"
+              strokeLinecap="round"
               className="transition-all duration-200 cursor-pointer"
               style={{ opacity: hovered && hovered !== seg.key ? 0.45 : 1 }}
               onMouseMove={e => handleMouseMove(e, seg)}
@@ -390,8 +416,8 @@ const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount, side
               <span className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">
                 {totalAssets.toLocaleString()}
               </span>
-              <span className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mt-0.5">
-                Total {side === 'erp' ? 'ERP' : 'Physical'} Assets
+              <span className="text-[10px] font-medium uppercase text-gray-500 mt-1">
+                Total Assets
               </span>
             </>
           )}
@@ -421,20 +447,24 @@ const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount, side
       </div>
 
       {/* Legend — single row, titles only */}
-      <div className="border-t border-gray-100 dark:border-gray-800 pt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 border-t border-gray-100 dark:border-gray-800 pt-3 gap-x-2 gap-y-3">
         {displayData.map(item => {
           const isHov = hovered === item.key
           return (
             <div
               key={item.key}
-              className={`flex items-center gap-1.5 cursor-pointer rounded-md px-1.5 py-0.5 transition-colors ${isHov ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
+              className={`flex min-w-0 flex-col items-center justify-center gap-1 cursor-pointer rounded-md px-1 py-1 transition-colors ${isHov ? 'bg-gray-50 dark:bg-gray-800' : ''}`}
               onMouseEnter={() => setHovered(item.key)}
               onMouseLeave={() => setHovered(null)}
             >
-              <span className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: item.color }} />
-              <span className="text-[11px] font-semibold whitespace-nowrap"
-                style={{ color: item.color }}>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: item.color }} />
+                <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
+                  {item.count.toLocaleString()}
+                </span>
+              </span>
+              <span className="text-[10px] font-medium uppercase text-gray-500 text-center leading-tight">
                 {item.label}
               </span>
             </div>
@@ -820,172 +850,348 @@ const Dashboard = () => {
       </div>
 
       {/* ── Top 4 KPI Metric Cards ─────────────────────────────────────────── */}
-      <div className="grid w-full grid-cols-1 gap-4 p-2 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid w-full grid-cols-1 gap-4 p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
 
         {/* Card 1: Reconciled */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
-
+        <div
+          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+          style={{
+            background: 'linear-gradient(to right, #FFFFFF 0%, #E1C3DF 100%)',
+          }}
+        >
           {/* KPI Label + Icon */}
           <div
-            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
             style={{
-              color: '#8E288D',
-              backgroundColor: '#8E288D10',
+              color: '#000000',
+              backgroundColor: '#E1C3DF',
             }}
           >
-            {/* Centered Title */}
-            <span className="text-center">
-              Reconciled ({activeMonthLabel})
+            {/* Icon */}
+            <span
+              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
+              style={{ color: '#8E288D' }}
+            >
+              <FiCheckCircle />
             </span>
 
-            {/* Right Corner Icon */}
-            <span className="absolute right-2 text-base">
-              <FiCheckCircle />
+            {/* Label */}
+            <span
+              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              style={{
+                height: '14px',
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 700,
+              }}
+            >
+              Reconciled ({activeMonthLabel})
             </span>
           </div>
 
           {/* KPI Value */}
-          <p className="mt-4 text-center text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-            {reconciledCount.toLocaleString()}
-          </p>
+          <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
+            <div className="flex h-[36px] w-full flex-row items-center gap-2">
+              <p
+                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 800,
+                }}
+              >
+                {reconciledCount.toLocaleString()}
+              </p>
 
-          {/* KPI Note + Percentage */}
-          <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
-            <span className="truncate text-gray-600 dark:text-gray-400">
-              {reconciledCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
-            </span>
+              <p
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 600,
+                }}
+              >
+                Records
+              </p>
+            </div>
 
-            <span className="ml-1 inline-flex flex-shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold text-[#8E288D]">
-              {reconciledRate}%
-            </span>
+            {/* Description + Percentage */}
+            <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
+              <p
+                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 400,
+                }}
+              >
+                {reconciledCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
+              </p>
+
+              <span
+                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
+                style={{
+                  color: '#8E288D',
+                  backgroundColor: '#E1C3DF',
+                }}
+              >
+                {reconciledRate}%
+              </span>
+            </div>
           </div>
         </div>
 
 
         {/* Card 2: Unmatched ERP Records */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
-
+        <div
+          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+          style={{
+            background: 'linear-gradient(to right, #FFFFFF 0%, #FCE4EA 100%)',
+          }}
+        >
           {/* KPI Label + Icon */}
           <div
-            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
             style={{
-              color: '#BE123C',
-              backgroundColor: '#BE123C10',
+              color: '#000000',
+              backgroundColor: '#FCE4EA',
             }}
           >
-            {/* Centered Title */}
-            <span className="text-center">
-              Unmatched ({activeMonthLabel})
+            {/* Icon */}
+            <span
+              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
+              style={{ color: '#BE123C' }}
+            >
+              <FiHelpCircle />
             </span>
 
-            {/* Right Corner Icon */}
-            <span className="absolute right-2 text-base">
-              <FiHelpCircle />
+            {/* Label */}
+            <span
+              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              style={{
+                height: '14px',
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 700,
+              }}
+            >
+              Unmatched ({activeMonthLabel})
             </span>
           </div>
 
           {/* KPI Value */}
-          <p className="mt-4 text-center text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-            {unmatchedERPCount.toLocaleString()}
-          </p>
+          <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
+            <div className="flex h-[36px] w-full flex-row items-center gap-2">
+              <p
+                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 800,
+                }}
+              >
+                {unmatchedERPCount.toLocaleString()}
+              </p>
 
-          {/* KPI Note + Percentage */}
-          <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
-            <span className="truncate text-gray-600 dark:text-gray-400">
-              {unmatchedERPCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
-            </span>
+              <p
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 600,
+                }}
+              >
+                Records
+              </p>
+            </div>
 
-            <span className="ml-1 inline-flex flex-shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold text-rose-700">
-              {unmatchedRate}%
-            </span>
+            {/* Description + Percentage */}
+            <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
+              <p
+                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 400,
+                }}
+              >
+                {unmatchedERPCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
+              </p>
+
+              <span
+                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
+                style={{
+                  color: '#BE123C',
+                  backgroundColor: '#FCE4EA',
+                }}
+              >
+                {unmatchedRate}%
+              </span>
+            </div>
           </div>
         </div>
 
-
-        {/* Card 3: Surplus Assets */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
-
+         {/* Card 3: Shortage Assets */}
+        <div
+          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+          style={{
+            background: 'linear-gradient(to right, #FFFFFF 0%, #FEE2E2 100%)',
+          }}>
           {/* KPI Label + Icon */}
           <div
-            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
             style={{
-              color: '#B45309',
-              backgroundColor: '#B4530910',
+              color: '#000000',
+              backgroundColor: '#FEE2E2',
+            }}
+            title="ERP records not found in the physical count">
+            {/* Icon */}
+            <span
+              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
+              style={{ color: '#F33838' }}
+            >
+              <FiMinusCircle />
+            </span>
+
+            {/* Label */}
+            <span
+              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              style={{
+                height: '14px',
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 700,
+              }}
+            >
+              Shortage Assets ({activeMonthLabel})
+            </span>
+          </div>
+
+          {/* KPI Value */}
+          <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
+            <div className="flex h-[36px] w-full flex-row items-center gap-2">
+              <p
+                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 800,
+                }}
+              >
+                {shortageCount.toLocaleString()}
+              </p>
+
+              <p
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 600,
+                }}
+              >
+                Records
+              </p>
+            </div>
+
+            {/* Description + Percentage */}
+            <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
+              <p
+                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 400,
+                }}
+                title="ERP records not found in physical count"
+              >
+                {shortageCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
+              </p>
+
+              <span
+                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
+                style={{
+                  color: '#F33838',
+                  backgroundColor: '#FEE2E2',
+                }}
+              >
+                {shortageRate}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Surplus Assets */}
+        <div
+          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+          style={{
+            background: 'linear-gradient(to right, #FFFFFF 0%, #FEF3C7 100%)',
+          }}
+        >
+          {/* KPI Label + Icon */}
+          <div
+            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
+            style={{
+              color: '#000000',
+              backgroundColor: '#FEF3C7',
             }}
             title="Assets found in Physical/Customer records but not in ERP"
           >
-            {/* Centered Title */}
-            <span className="text-center">
-              Surplus Assets ({activeMonthLabel})
-            </span>
-
-            {/* Right Corner Icon */}
-            <span className="absolute right-2 text-base">
+            {/* Icon */}
+            <span
+              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
+              style={{ color: '#B45309' }}
+            >
               <FiPackage />
             </span>
-          </div>
 
-          {/* KPI Value */}
-          <p className="mt-4 text-center text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-            {surplusCount.toLocaleString()}
-          </p>
-
-          {/* KPI Note + Percentage */}
-          <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
+            {/* Label */}
             <span
-              className="truncate text-gray-600 dark:text-gray-400"
-              title="Physical/Customer records not found in ERP"
+              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              style={{
+                height: '14px',
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 700,
+              }}
             >
-              {surplusCount.toLocaleString()} / {physicalTotal.toLocaleString()} Physical Records
-            </span>
-
-            <span className="ml-1 inline-flex flex-shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold text-amber-700">
-              {surplusRate}%
-            </span>
-          </div>
-        </div>
-
-
-        {/* Card 4: Shortage Assets */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
-
-          {/* KPI Label + Icon */}
-          <div
-            className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
-            style={{
-              color: '#F33838',
-              backgroundColor: '#F3383810',
-            }}
-            title="ERP records not found in the physical count"
-          >
-            {/* Centered Title */}
-            <span className="text-center">
-              Shortage Assets ({activeMonthLabel})
-            </span>
-
-            {/* Right Corner Icon */}
-            <span className="absolute right-2 text-base">
-              <FiMinusCircle />
+              Surplus Assets ({activeMonthLabel})
             </span>
           </div>
 
           {/* KPI Value */}
-          <p className="mt-4 text-center text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-            {shortageCount.toLocaleString()}
-          </p>
+          <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
+            <div className="flex h-[36px] w-full flex-row items-center gap-2">
+              <p
+                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 800,
+                }}
+              >
+                {surplusCount.toLocaleString()}
+              </p>
 
-          {/* KPI Note + Percentage */}
-          <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-3 text-xs dark:border-gray-800">
-            <span
-              className="truncate text-gray-600 dark:text-gray-400"
-              title="ERP records not found in physical count"
-            >
-              {shortageCount.toLocaleString()} / {erpTotal.toLocaleString()} ERP Records
-            </span>
+              <p
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 600,
+                }}
+              >
+                Records
+              </p>
+            </div>
 
-            <span className="ml-1 inline-flex flex-shrink-0 items-center rounded-lg px-2 py-0.5 text-[11px] font-bold text-red-700">
-              {shortageRate}%
-            </span>
+            {/* Description + Percentage */}
+            <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
+              <p
+                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+                style={{
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 400,
+                }}
+                title="Physical/Customer records not found in ERP"
+              >
+                {surplusCount.toLocaleString()} / {physicalTotal.toLocaleString()} Physical Records
+              </p>
+
+              <span
+                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
+                style={{
+                  color: '#B45309',
+                  backgroundColor: '#FEF3C7',
+                }}
+              >
+                {surplusRate}%
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1006,7 +1212,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:col-span-2">
+        <div className="flex h-[440px] min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 lg:col-span-2">
           <div className="border-b border-gray-100 p-4 dark:border-gray-800">
             <div className="flex flex-wrap gap-2">
               {[
@@ -1026,9 +1232,13 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {dashboardChartTab === 'category' && (
-              <CategoryDistributionChart categoryData={selectedBreakdowns.category} monthLabel={`${selectedSideLabel} · ${activeMonthLabel}`} />
+              <CategoryDistributionChart
+                categoryData={selectedBreakdowns.category}
+                monthLabel={`${selectedSideLabel} · ${activeMonthLabel}`}
+                totalCount={dashboardSide === 'erp' ? erpTotal : physicalTotal}
+              />
             )}
             {dashboardChartTab === 'departmentBranch' && (
               <ReportingBreakdownChart
@@ -1056,7 +1266,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="cursor-context-menu" title="Right-click for AI aging insights"
+        <div className="h-[440px] min-h-0 overflow-y-auto cursor-context-menu" title="Right-click for AI aging insights"
           onContextMenu={e => openAIContextMenu(e, {
             chartData: { source: 'asset_aging', agingData, year: agingYear, side: dashboardSide },
             chartType: 'pie',
@@ -1161,7 +1371,7 @@ const Dashboard = () => {
           <div className="overflow-x-auto mt-2">
             <table className="reconciliation-table w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-gray-800 text-[12px] font-bold uppercase tracking-wider text-[#8E288D] dark:text-gray-200 text-center">
+                <tr className="border-b border-gray-100 dark:border-gray-800 text-[12px] font-bold uppercase tracking-wider text-[#64748B] dark:text-gray-200 text-center">
                   <th className="py-3 px-3">Requested By</th>
                   <th className="py-3 px-3">RECONCILIATION DATE</th>
                   <th className="py-3 px-3">RECORDS ANALYZED</th>
@@ -1252,7 +1462,7 @@ const Dashboard = () => {
                               logActivity('/', `VIEW_REPORT_DASHBOARD_ID_${recon.id}`)
                               navigate(`/report/${recon.id}`)
                             }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-[#701460] hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors"
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-[#701460] hover:bg-purple-300 dark:hover:bg-purple-950/50 transition-colors"
                             title="View Visual Dashboard"
                           >
                             <FiBarChart2 className="h-4 w-4" />
@@ -1274,7 +1484,7 @@ const Dashboard = () => {
                           {recon.status === 'completed' && (
                             <button
                               onClick={() => handleDownload(recon.id)}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors"
                               title="Download Enriched Excel Report"
                             >
                               <FiDownload className="h-4 w-4" />
@@ -1290,7 +1500,7 @@ const Dashboard = () => {
                                 assignee_id: recon.assigned_to || (assignableUsers[0]?.id || ''),
                                 assignment_note: recon.assignment_note || '',
                               })}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors"
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors"
                               title="Assign review to another officer"
                             >
                               <FiUser className="h-4 w-4" />
@@ -1371,8 +1581,8 @@ const Dashboard = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-lg border border-gray-100 dark:border-gray-800">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="p-2.5 bg-indigo-100 dark:bg-indigo-950/60 rounded-xl">
-                <FiUser className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              <div className="p-2.5 bg-purple-100 dark:bg-purple-950/60 rounded-xl">
+                <FiUser className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-gray-900 dark:text-white">Assign Review</h3>
@@ -1427,14 +1637,14 @@ const Dashboard = () => {
               <button
                 onClick={() => setAssignmentModal(null)}
                 disabled={assignmentSubmitting}
-                className="w-28 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                className="w-32 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAssignReconciliation}
                 disabled={assignmentSubmitting || (assignmentModal.assignment_scope === 'specific_user' && !assignmentModal.assignee_id)}
-                className="w-32 h-10 rounded-lg bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center"
+                className="w-32 h-10 rounded-lg bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7D207C] transition-colors disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center"
               >
                 {assignmentSubmitting ? <FiLoader className="animate-spin h-3.5 w-3.5" /> : 'Save assignment'}
               </button>
@@ -1463,14 +1673,14 @@ const Dashboard = () => {
               <button
                 onClick={() => setDeleteConfirmId(null)}
                 disabled={deleting}
-                className="w-28 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                className="w-32 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirmId)}
                 disabled={deleting}
-                className="w-28 h-10 rounded-lg bg-rose-600 text-sm font-semibold text-white hover:bg-rose-700 transition-colors flex items-center justify-center space-x-1.5"
+                className="w-32 h-10 rounded-lg bg-rose-600 text-sm font-semibold text-white hover:bg-rose-700 transition-colors flex items-center justify-center space-x-1.5"
               >
                 {deleting ? <FiLoader className="animate-spin h-3.5 w-3.5" /> : <FiTrash2 className="h-3.5 w-3.5" />}
                 <span>{deleting ? 'Deleting...' : 'Delete Job'}</span>

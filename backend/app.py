@@ -98,8 +98,16 @@ def create_app(config_name='default'):
     app.register_blueprint(admin_bp)
     app.register_blueprint(analysis_bp)
     
-    # Create database tables is handled by Flask-Migrate/Alembic now, but keeping for safety if tables don't exist
+    # Startup DB connectivity check for debugging the test server.
     with app.app_context():
+        try:
+            db.session.execute(text('SELECT 1'))
+            logger.info('Database connection successful: SQLAlchemy can reach the configured database.')
+            print('Database connection successful: SQLAlchemy can reach the configured database.')
+        except Exception as exc:
+            logger.error('Database connection failed: %s', exc)
+            print(f'Database connection failed: {exc}')
+
         db.create_all()
 
         inspector = inspect(db.engine)

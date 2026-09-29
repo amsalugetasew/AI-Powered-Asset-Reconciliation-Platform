@@ -139,82 +139,176 @@ const AuditTrail = () => {
           {
             label: 'Total Events',
             value: totalEvents.toLocaleString(),
-            note: `${todayEvents.toLocaleString()} events today`,
+            valueUnit: 'events Recorded',
+            note: `${todayEvents.toLocaleString()} events Recorded`,
+            // description: 'Total Registered Events',
+            status: `${todayEvents.toLocaleString()} + events`,
             icon: <FiActivity />,
             color: '#8E288D',
+            lightColor: '#E1C3DF',
+            statusBg: '#E1C3DF',
           },
           {
             label: 'User Actions',
-            value: `${userActions.toLocaleString()} Logged`,
+            value: userActions.toLocaleString(),
+            valueUnit: 'Login Attempts Recorded',
             note: `${new Set(logs.map(log => log.user_id)).size} unique users`,
+            // description: 'Total User Actions',
+            status: `${new Set(logs.map(log => log.user_id)).size} unique users`,
             icon: <FiUser />,
             color: '#CFB53B',
+            lightColor: '#F5EFCF',
+            statusBg: '#F5EFCF',
           },
           {
             label: 'System Events',
-            value: `${systemEvents.toLocaleString()} Automated`,
+            value: systemEvents.toLocaleString(),
+            valueUnit: 'Automated Events',
             note: 'No failure alerts',
+            // description: 'Total Automated Events',
+            status: 'Healthy',
             icon: <FiSettings />,
             color: '#10B981',
+            lightColor: '#D1FAE5',
+            statusBg: '#D1FAE5',
           },
           {
             label: 'Flagged Items',
-            value: `${flaggedItems.toLocaleString()} critical`,
+            value: flaggedItems.toLocaleString(),
+            valueUnit: 'Critical Events',
             note: flaggedItems
               ? 'Requires security review'
               : 'No security alerts',
+            // description: 'Security Flagged Items',
+            status: flaggedItems ? 'Review' : 'Requires Security Review',
             icon: <FiAlertTriangle />,
             color: '#DC2626',
+            lightColor: '#FEE2E2',
+            statusBg: '#FEE2E2',
           },
         ].map(card => (
           <div
             key={card.label}
-            className="h-[140px] w-full rounded-2xl border border-slate-100 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md"
+            className="h-[140px] w-full rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
+            style={{
+              background: `linear-gradient(to right, #FFFFFF 0%, ${card.lightColor} 100%)`,
+            }}
           >
             {/* KPI Label + Icon */}
             <div
-              className="relative flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wider"
+              className="relative flex h-[32px] items-center justify-left gap-3 rounded-[8px] px-3 py-1.5 text-xs font-bold uppercase tracking-wider"
               style={{
-                color: card.color,
-                backgroundColor: `${card.color}10`,
+                color: '#000000',
+                backgroundColor: card.lightColor,
               }}
             >
-              {/* Centered Label */}
-              <span className="text-center">
-                {card.label}
-              </span>
-
-              {/* Right Corner Icon */}
-              <span className="absolute right-2 text-sm">
+              {/* Icon */}
+              <span
+                className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px]"
+                style={{
+                  color: card.color,
+                  fontSize: '16px',
+                }}
+              >
                 {card.icon}
               </span>
+              {/* <span
+                className="absolute left-0 flex h-[20px] w-[20px] items-center justify-center rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold"
+                style={{
+                  color: card.color,
+                }}
+              >
+                {card.icon}
+              </span> */}
+
+              {/* Label */}
+              <span
+                className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+                style={{
+                  height: '14px',
+                  fontFamily: 'Geist, sans-serif',
+                  fontWeight: 700,
+                  fontStyle: 'normal',
+                }}
+              >
+                {card.label}
+              </span>
             </div>
 
-            {/* KPI Value */}
-            <div
-              className="mt-4 text-center text-2xl font-extrabold tracking-tight"
-              style={{ color: card.color }}
-            >
-              {card.value}
-            </div>
+            {/* KPI Value + Description */}
+            <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
 
-            {/* KPI Note */}
-            <div
-              className="mt-3 text-center text-xs font-bold"
-              style={{ color: card.color }}
-            >
-              {card.note}
+              {/* Value */}
+              <div className="flex h-[36px] w-full flex-row items-center gap-2">
+                <p
+                  className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                  style={{
+                    fontFamily: 'Geist, sans-serif',
+                    fontWeight: 800,
+                  }}
+                >
+                  {card.value}
+                </p>
+
+                <p
+                  className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                  style={{
+                    fontFamily: 'Geist, sans-serif',
+                    fontWeight: 600,
+                  }}
+                >
+                  {card.valueUnit}
+                </p>
+              </div>
+
+              {/* Description + Status */}
+              <div className="flex h-[24px] w-full items-center justify-end pr-2">
+                <span
+                  className="flex items-center justify-center px-2 text-[12px] font-bold"
+                  style={{
+                    color: card.color,
+                    fontFamily: 'Geist, sans-serif',
+                    fontWeight: 700,
+                  }}
+                >
+                  {card.status}
+                </span>
+              </div>
+              {/* <div className="flex h-[24px] w-full flex-row items-center justify-between gap-3">
+                <p
+                  className="text-[12px] font-normal leading-[100%] tracking-[0%] text-[#94A3B8]"
+                  style={{
+                    fontFamily: 'Geist, sans-serif',
+                    fontWeight: 400,
+                  }}
+                >
+                  {card.description}
+                </p>
+
+                <span
+                  className="flex h-[16px] w-[146px] items-center justify-center text-[12px] font-bold"
+                  style={{
+                    color: card.color,
+                    backgroundColor: card.statusBg,
+                    fontFamily: 'Geist, sans-serif',
+                    fontWeight: 700,
+                  }}
+                >
+                  {card.status}
+                </span>
+              </div> */}
             </div>
           </div>
         ))}
       </div>
 
       <div className="grid w-full grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-2 lg:grid-cols-5">
+      {/* <div className="flex min-h-[76px] w-full flex-wrap items-center gap-4 rounded-[14px] border border-[#E2E8F0] bg-[#FFFFFF] p-5 shadow-sm"> */}
 
         {/* Search */}
-        <div className="relative min-w-0 lg:col-span-2">
-          <FiSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
+        {/* <div className="relative min-w-0 lg:col-span-2"> */}
+        <div className="relative lg:col-span-2 h-[36px] min-w-0 flex-1 items-center gap-2 text-sm xl:max-w-[643px]">
+          <FiSearch className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94A3B8]" />
           <input
             value={search}
             onChange={event => setSearch(event.target.value)}
@@ -266,14 +360,16 @@ const AuditTrail = () => {
         </label>
 
         {/* Export */}
-        <button
-          type="button"
-          onClick={exportLogs}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#972b91] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#7d2278]"
-        >
-          <FiDownload />
-          Export Logs
-        </button>
+        <div className="flex w-full justify-end">
+          <button
+            type="button"
+            onClick={exportLogs}
+            className="flex h-[40px] w-[160px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] bg-[#8E288D] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#7A1E79]"
+          >
+            <FiDownload />
+            Export Logs
+          </button>
+        </div>
 
       </div>
 
@@ -286,7 +382,7 @@ const AuditTrail = () => {
           </div> :
           <div className="overflow-x-auto">
             <table className="min-w-[1050px] w-full text-center dark:bg-gray-900">
-              <thead className="bg-slate-50 text-[12px] uppercase tracking-wide text-[#8E288D] text-center dark:bg-gray-800">
+              <thead className="bg-slate-50 text-[12px] uppercase tracking-wide text-[#64748B] text-center dark:bg-gray-800">
                 <tr>
                   {['Timestamp', 'User', 'Action', 'Module', 'Details', 'IP Address', 'Status'].map(header => 
                   <th key={header} className="border-b border-slate-200 px-4 py-3 font-bold">{header}</th>

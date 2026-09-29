@@ -3,11 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { FiDownload, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiGrid, FiBarChart2, FiXCircle, FiDatabase, FiUsers, FiChevronLeft, FiChevronRight, FiCheck, FiZap } from 'react-icons/fi'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { logActivity } from '../services/activityService'
 import { useAuth } from '../context/AuthContext'
 import AIAnalysisModal from '../components/AIAnalysisModal'
 import AIContextMenu from '../components/AIContextMenu'
+import { DonutCenterLabel, DonutChartLegend } from '../components/DonutChartPresentation'
 
 // ── Paired column definitions (mirrored from ApprovalPage) ────────────────────
 const RESULT_COLUMN_PAIRS = [
@@ -61,6 +62,8 @@ const Results = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [recordsPerPage] = useState(10)
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [activePhysicalDonutName, setActivePhysicalDonutName] = useState(null)
+  const [activeErpDonutName, setActiveErpDonutName] = useState(null)
   const [totalRecords, setTotalRecords] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [recordsStored, setRecordsStored] = useState(false)
@@ -228,7 +231,7 @@ const Results = () => {
   }
 
   const stats = reconciliation.statistics
-  const totalMatched = stats.rule_matched + stats.ai_matched
+  const totalMatched = stats.rule_matched + stats.ai_matched + stats.manual_review
   const totalCustomerRecords = stats.total_customer_records
   const customerDuplicates = stats.customer_duplicates || 0
   const uniqueRecords = totalCustomerRecords - customerDuplicates
@@ -243,12 +246,13 @@ const Results = () => {
   ]
 
   // Physical records breakdown
-  const customerReconciled = stats.rule_matched + stats.ai_matched
+  const customerReconciled = stats.rule_matched + stats.ai_matched + stats.manual_review
   const customerData = [
     { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
     { name: 'Manual Review', value: stats.manual_review, color: '#CFB53B' },
-    { name: 'Not Reconciled', value: stats.customer_unmatched, color: '#BE123C' }
+    { name: 'Unmatched', value: stats.customer_unmatched, color: '#BE123C' },
+    { name: 'Duplicate', value: stats.customer_duplicates || 0, color: '#000000' }
   ]
 
   // ERP records breakdown (assuming similar distribution)
@@ -257,7 +261,8 @@ const Results = () => {
     { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
     { name: 'Manual Review', value: stats.manual_review, color: '#CFB53B' },
-    { name: 'Not Reconciled', value: stats.internal_unmatched, color: '#BE123C' }
+    { name: 'Unmatched', value: stats.internal_unmatched, color: '#BE123C' },
+    { name: 'Duplicate', value: stats.internal_duplicates || 0, color: '#000000' }
   ]
 
   // Comparison bar chart data
@@ -273,7 +278,7 @@ const Results = () => {
       ERP: internalReconciled
     },
     {
-      category: 'Not Reconciled',
+      category: 'Unmatched',
       Customer: stats.customer_unmatched,
       ERP: stats.internal_unmatched
     }
@@ -691,13 +696,13 @@ const Results = () => {
       </div>
 
       {/* Section Divider */}
-      <div className="mt-12 mb-8">
+      {/* <div className="mt-12 mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Detailed Breakdown</h2>
         <div className="h-1 w-32 bg-gradient-to-r from-[#8E288D] to-[#CFB53C] rounded"></div>
-      </div>
+      </div> */}
 
       {/* KPI Cards */}
-      <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {/* <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
             <div className="flex items-center">
@@ -768,12 +773,81 @@ const Results = () => {
 
       {/* Overall Statistics Summary */}
       <div className="mt-8 mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Statistics Summary</h2>
-        <div className="h-1 w-32 bg-gradient-to-r from-[#8E288D] to-[#CFB53C] rounded"></div>
+        <h2 className="text-xl font-bold text-[#6C5B7B] mb-2">Statistics Summary Before Human Review</h2>
+        <div className="h-1 w-90 bg-gradient-to-r from-[#8E288D] to-[#CFB53C] rounded"></div>
+      </div>
+
+      {/* <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Total Matched', value: totalMatched, detail: `${matchRate}% match rate`, icon: FiCheckCircle, color: '#8E288D' },
+          { label: 'Exact Matched', value: stats.rule_matched, detail: 'Rule-based matches', icon: FiCheckCircle, color: '#008080' },
+          { label: 'AI Matched', value: stats.ai_matched, detail: 'AI-assisted matches', icon: FiZap, color: '#CFB53B' },
+          { label: 'Unmatched', value: stats.customer_unmatched, detail: 'Physical records', icon: FiXCircle, color: '#BE123C' },
+        ].map(card => {
+          const Icon = card.icon
+          return (
+            <div key={card.label} className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                <Icon className="h-4 w-4" style={{ color: card.color }} />
+                {card.label}
+              </div>
+              <p className="mt-3 truncate text-2xl font-extrabold text-slate-800" title={Number(card.value || 0).toLocaleString()}>
+                {Number(card.value || 0).toLocaleString()}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">{card.detail}</p>
+            </div>
+          )
+        })}
+      </div> */}
+
+      <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {[
+          {
+            side: 'Physical', data: customerData, total: stats.total_customer_records,
+            activeName: activePhysicalDonutName, setActiveName: setActivePhysicalDonutName,
+            source: 'results_physical_distribution',
+          },
+          {
+            side: 'ERP', data: internalData, total: stats.total_internal_records,
+            activeName: activeErpDonutName, setActiveName: setActiveErpDonutName,
+            source: 'results_erp_distribution',
+          },
+        ].map(panel => (
+          <section key={panel.side} className="min-w-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm cursor-context-menu"
+            title="Right-click for AI insights"
+            onContextMenu={event => openAIContextMenu(event, {
+              chartData: panel.data,
+              chartType: 'donut',
+              title: `AI Analysis - ${panel.side} Record Distribution`,
+              targetLabel: `${panel.side} Record Distribution`,
+              analysisContext: { source: panel.source, reconciliationId: Number(id) },
+            })}>
+            <h3 className="mb-2 border-b border-gray-100 pb-2 text-base font-semibold text-slate-800">
+              {panel.side} Record Distribution
+            </h3>
+            <div className="relative">
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={panel.data} cx="50%" cy="50%" innerRadius={98} outerRadius={120}
+                    paddingAngle={5} cornerRadius={6} dataKey="value">
+                    {panel.data.map((entry, index) => (
+                      <Cell key={`${panel.side}-${index}`} fill={entry.color}
+                        opacity={panel.activeName && panel.activeName !== entry.name ? 0.25 : 1} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ fontSize: '12px', fontWeight: '500' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <DonutCenterLabel total={panel.total} />
+            </div>
+            <DonutChartLegend data={panel.data} getColor={entry => entry.color}
+              activeName={panel.activeName} onSelect={panel.setActiveName} singleRow />
+          </section>
+        ))}
       </div>
 
       {/* Detailed Statistics Table */}
-      <div className="mt-8 bg-white shadow rounded-lg p-6">
+      <div className="hidden mt-8 bg-white shadow rounded-lg p-6">
         {/* <h3 className="text-xl font-semibold text-gray-900 mb-6">Detailed Statistics</h3> */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div
@@ -788,26 +862,31 @@ const Results = () => {
             })}
           >
             <h3 className="text-md font-semibold text-center text-gray-900 border-gray-500 mb-0 pb-2 border-b-2">Asset Matching Distribution</h3>
-            <ResponsiveContainer width="100%" height={350}>
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={true}
-                  // label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
-                  outerRadius={110}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ fontSize: '12px', fontWeight: '500' }} />
-                <Legend wrapperStyle={{ fontSize: '12px', fontWeight: '500' }} />
-              </PieChart>
-            </ResponsiveContainer>
+              {(() => {
+                const chartTotal = chartData.reduce((sum, entry) => sum + Number(entry.value || 0), 0)
+                return (
+                  <>
+                    <div className="relative">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie data={chartData} cx="50%" cy="50%" innerRadius={98} outerRadius={120}
+                            paddingAngle={5} cornerRadius={6} dataKey="value">
+                            {chartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color}
+                                opacity={activePhysicalDonutName && activePhysicalDonutName !== entry.name ? 0.25 : 1} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ fontSize: '12px', fontWeight: '500' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <DonutCenterLabel total={chartTotal} />
+                    </div>
+                    <DonutChartLegend data={chartData} getColor={entry => entry.color}
+                      activeName={activePhysicalDonutName} onSelect={setActivePhysicalDonutName}
+                      singleRow />
+                  </>
+                )
+              })()}
           </div>
           <div>
             <h4 className="text-md font-semibold text-gray-700 mb-3 pb-2 border-b-2 border-[#8E288D]">

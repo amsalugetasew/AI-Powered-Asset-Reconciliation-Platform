@@ -69,6 +69,121 @@ def _missing_required_columns(file_storage):
     return DataCleaner.validate_columns(columns)
 
 
+def _records_for_side(records, side, reconciliations):
+    """Select duplicate rows for one asset side, including legacy report rows."""
+    side_categories = {'Exact Match', 'AI Match', 'Manual Review'}
+    side_categories.add('Physical Unmatched' if side == 'physical' else 'ERP Unmatched')
+    selected = [record for record in records if record.match_category in side_categories]
+    by_reconciliation = {}
+    reconciliation_by_id = {item.id: item for item in reconciliations}
+    for record in records:
+        if record.match_category == 'Duplicate':
+            by_reconciliation.setdefault(record.reconciliation_id, []).append(record)
+
+    for reconciliation_id, duplicates in by_reconciliation.items():
+        reconciliation = reconciliation_by_id.get(reconciliation_id)
+        if not reconciliation:
+            continue
+        expected = {
+            'physical': int(reconciliation.customer_duplicates or 0),
+            'erp': int(reconciliation.internal_duplicates or 0),
+        }
+        assigned = {'physical': [], 'erp': []}
+        legacy = []
+        for record in duplicates:
+            record_side = (record.full_record_json or {}).get('_record_side')
+            if record_side in assigned:
+                assigned[record_side].append(record)
+            else:
+                legacy.append(record)
+
+        needed = {
+            record_side: max(expected[record_side] - len(assigned[record_side]), 0)
+            for record_side in assigned
+        }
+        legacy.sort(key=lambda record: record.id or 0)
+        if len(legacy) >= sum(needed.values()):
+            assigned['physical'].extend(legacy[:needed['physical']])
+            assigned['erp'].extend(
+                legacy[needed['physical']:needed['physical'] + needed['erp']]
+            )
+        elif needed['physical'] and not needed['erp']:
+            assigned['physical'].extend(legacy[:needed['physical']])
+        elif needed['erp'] and not needed['physical']:
+            assigned['erp'].extend(legacy[:needed['erp']])
+
+        selected.extend(assigned[side])
+
+    return selected
+
+
+def _missing_side_detail_count(records, reconciliations, side):
+    total_attribute = 'total_customer_records' if side == 'physical' else 'total_internal_records'
+    expected_total = sum(int(getattr(item, total_attribute) or 0) for item in reconciliations)
+    return max(expected_total - len(records), 0)
+
+
+def _missing_record_detail_count(reconciliation_ids, reconciliations):
+    expected_total = sum(
+        int(item.rule_matched or 0)
+        + int(item.ai_matched or 0)
+        + int(item.manual_review or 0)
+        + int(item.customer_unmatched or 0)
+        + int(item.internal_unmatched or 0)
+        + int(item.customer_duplicates or 0)
+        + int(item.internal_duplicates or 0)
+        for item in reconciliations
+    )
+    stored_total = ReconciliationRecord.query.filter(
+        ReconciliationRecord.reconciliation_id.in_(reconciliation_ids)
+    ).count()
+    return max(expected_total - stored_total, 0)
+
+
+def _append_pending_detail_row(rows, missing_count):
+    if not missing_count:
+        return
+    rows.append({
+        'name': 'Pending records (details unavailable)',
+        'total': missing_count,
+        'reconciled': 0,
+        'unreconciled': 0,
+        'surplus_assets': 0,
+        'exist_in_erp_not_physical': 0,
+        'duplicated': 0,
+        'unique': 0,
+        'pending': missing_count,
+        'rate': 0,
+    })
+
+
+def _collapse_category_breakdown(rows, limit=15):
+    pending_row = next(
+        (row for row in rows if row['name'] == 'Pending records (details unavailable)'),
+        None,
+    )
+    categories = [row for row in rows if row is not pending_row]
+    if len(categories) <= limit:
+        return rows
+
+    visible = categories[:limit - 1]
+    remainder = categories[limit - 1:]
+    status_keys = (
+        'reconciled', 'unreconciled', 'surplus_assets',
+        'exist_in_erp_not_physical', 'duplicated', 'unique', 'pending',
+    )
+    other = {
+        'name': 'Other categories',
+        'total': sum(row.get('total', 0) for row in remainder),
+        **{
+            status: sum(row.get(status, 0) for row in remainder)
+            for status in status_keys
+        },
+    }
+    other['rate'] = round(other['reconciled'] / other['total'] * 100, 1) if other['total'] else 0
+    return visible + [other] + ([pending_row] if pending_row else [])
+
+
 def _auto_save_records(reconciliation_id, report_path):
     """
     Parse the Excel report and save all records to DB with approval_status='pending'.
@@ -110,6 +225,8 @@ def _auto_save_records(reconciliation_id, report_path):
         for _, row in df.iterrows():
             row_dict = row.to_dict()
             cleaned = {k: (None if pd.isna(v) else v) for k, v in row_dict.items()}
+            if match_type == 'Duplicate':
+                cleaned['_record_side'] = 'physical' if sheet_name == 'Physical_Duplicates' else 'erp'
             default_approval = 'duplicated' if match_type == 'Duplicate' else 'pending'
 
             record = ReconciliationRecord(
@@ -314,15 +431,24 @@ def process_reconciliation(reconciliation_id):
         }), 200
         
     except Exception as e:
-        # Log the full error
-        import traceback
-        print("ERROR in process_reconciliation:")
-        print(traceback.format_exc())
-        
-        # Update status to failed
+        # Keep the original processing error visible and avoid masking it with
+        # a second failure while marking the reconciliation as failed.
+        current_app.logger.exception(
+            'Reconciliation processing failed for job %s',
+            reconciliation_id,
+        )
+
         if reconciliation:
-            reconciliation.status = 'failed'
-            db.session.commit()
+            try:
+                db.session.rollback()
+                reconciliation.status = 'failed'
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                current_app.logger.exception(
+                    'Failed to mark reconciliation %s as failed',
+                    reconciliation_id,
+                )
         
         return jsonify({'error': str(e)}), 500
 
@@ -839,6 +965,7 @@ def get_analytics():
             for side in sides:
                 if status == 'pending':
                     side_counts[side]['approval_pending'] += count
+                    continue
                 if status in {'reconciled', 'unique'}:
                     side_counts[side]['resolved'] += count
                 elif status == 'surplus_assets' and side == 'physical':
@@ -902,26 +1029,35 @@ def get_analytics():
             ReconciliationRecord.reconciliation_id.in_(recon_ids),
             ReconciliationRecord.match_category.in_(ERP_ANALYTICS_CATEGORIES)
         ).all()
-        all_records = [
-            rec for rec in all_records
-            if rec.match_category != 'Duplicate' or any(
-                str(key).startswith('internal_')
-                for key in (rec.full_record_json or {})
-            )
-        ]
+        all_records = _records_for_side(all_records, 'erp', reconciliations)
         physical_records = ReconciliationRecord.query.filter(
             ReconciliationRecord.reconciliation_id.in_(recon_ids),
             ReconciliationRecord.match_category.in_(
                 {'Exact Match', 'AI Match', 'Manual Review', 'Physical Unmatched', 'Duplicate'}
             )
         ).all()
-        physical_records = [
-            rec for rec in physical_records
-            if rec.match_category != 'Duplicate' or any(
-                str(key).startswith('customer_')
-                for key in (rec.full_record_json or {})
-            )
-        ]
+        physical_records = _records_for_side(physical_records, 'physical', reconciliations)
+        missing_erp_details = _missing_side_detail_count(all_records, reconciliations, 'erp')
+        missing_physical_details = _missing_side_detail_count(physical_records, reconciliations, 'physical')
+        missing_record_details = _missing_record_detail_count(recon_ids, reconciliations)
+        if missing_record_details:
+            approval_counts['pending'] += missing_record_details
+            total_records_in_db = sum(approval_counts.values())
+            recon_rate = round(
+                approval_counts['reconciled'] / total_records_in_db * 100, 2
+            ) if total_records_in_db else 0
+            approval_kpis['pending'] = approval_counts['pending']
+            approval_kpis['reconciliation_rate'] = recon_rate
+        for side, missing in (
+            ('erp', missing_erp_details),
+            ('physical', missing_physical_details),
+        ):
+            side_counts[side]['approval_pending'] += missing
+            side_counts[side]['pending'] = max(side_counts[side]['pending'] - missing, 0)
+        approval_kpis['pending_erp'] = (
+            side_counts['erp']['approval_pending'] + side_counts['erp']['pending']
+        )
+        approval_kpis['unresolved_erp'] = approval_kpis['pending_erp']
 
         # ── category breakdown ─────────────────────────────────────────────────
         STATUS_LIST_GLOBAL = ['pending','reconciled','unreconciled','surplus_assets',
@@ -956,6 +1092,7 @@ def get_analytics():
             }
             for k, v in cat_stats.items()
         ], key=lambda x: -x['rate'])
+        _append_pending_detail_row(category_breakdown, missing_erp_details)
 
         # ── department breakdown ───────────────────────────────────────────────
         dept_stats = {}
@@ -986,6 +1123,7 @@ def get_analytics():
             }
             for k, v in dept_stats.items()
         ], key=lambda x: -x['rate'])
+        _append_pending_detail_row(department_breakdown, missing_erp_details)
 
         # ── district/branch breakdown ──────────────────────────────────────────
         dist_stats = {}
@@ -1016,6 +1154,7 @@ def get_analytics():
             }
             for k, v in dist_stats.items()
         ], key=lambda x: -x['rate'])
+        _append_pending_detail_row(district_breakdown, missing_erp_details)
 
         # ── location reconciliation summary ──────────────────────────────────
         def _norm_location(value):
@@ -1113,6 +1252,24 @@ def get_analytics():
             return result
 
         physical_breakdowns = build_side_breakdowns(physical_records, 'physical')
+        _append_pending_detail_row(physical_breakdowns['category'], missing_physical_details)
+        _append_pending_detail_row(physical_breakdowns['department'], missing_physical_details)
+        _append_pending_detail_row(physical_breakdowns['district'], missing_physical_details)
+        if missing_erp_details:
+            na_location = next(
+                (row for row in location_reconciliation_chart if row['name'] == 'N/A'),
+                None,
+            )
+            if na_location:
+                na_location['total'] += missing_erp_details
+                na_location['value'] += missing_erp_details
+                na_location['pending'] += missing_erp_details
+            else:
+                location_reconciliation_chart.append({
+                    'name': 'N/A', 'value': missing_erp_details,
+                    'total': missing_erp_details, 'pending': missing_erp_details,
+                    'color': '#9ca3af',
+                })
 
         # ── monthly trend (by reconciliation completion date) ──────────────────
         monthly = {}
@@ -2323,6 +2480,7 @@ def get_reconciliation_analytics(reconciliation_id):
             for side in sides:
                 if status == 'pending':
                     side_counts[side]['approval_pending'] += count
+                    continue
                 if status in {'reconciled', 'unique'}:
                     side_counts[side]['resolved'] += count
                 elif status == 'surplus_assets' and side == 'physical':
@@ -2353,22 +2511,37 @@ def get_reconciliation_analytics(reconciliation_id):
                     return str(v).strip()
             return None
 
-        all_records = ReconciliationRecord.query.filter_by(
+        all_reconciliation_records = ReconciliationRecord.query.filter_by(
             reconciliation_id=reconciliation_id
         ).all()
+        erp_records = _records_for_side(all_reconciliation_records, 'erp', [recon])
+        physical_records = _records_for_side(all_reconciliation_records, 'physical', [recon])
+        missing_erp_details = _missing_side_detail_count(erp_records, [recon], 'erp')
+        missing_physical_details = _missing_side_detail_count(physical_records, [recon], 'physical')
+        missing_record_details = _missing_record_detail_count([reconciliation_id], [recon])
+        if missing_record_details:
+            approval_counts['pending'] += missing_record_details
+            total_db = sum(approval_counts.values())
+            recon_rate = round(
+                approval_counts['reconciled'] / total_db * 100, 2
+            ) if total_db else 0
+            kpis['pending'] = approval_counts['pending']
+            kpis['reconciliation_rate'] = recon_rate
+        for side, missing in (
+            ('erp', missing_erp_details),
+            ('physical', missing_physical_details),
+        ):
+            side_counts[side]['approval_pending'] += missing
+            side_counts[side]['pending'] = max(side_counts[side]['pending'] - missing, 0)
+        kpis['pending_erp'] = (
+            side_counts['erp']['approval_pending'] + side_counts['erp']['pending']
+        )
+
         report_categories = {'Exact Match', 'AI Match', 'Manual Review',
                              'ERP Unmatched' if report_side == 'erp' else 'Physical Unmatched',
                              'Duplicate'}
-        duplicate_prefix = 'internal_' if report_side == 'erp' else 'customer_'
-        all_records = [
-            rec for rec in all_records
-            if rec.match_category in report_categories and (
-                rec.match_category != 'Duplicate' or any(
-                    str(key).startswith(duplicate_prefix)
-                    for key in (rec.full_record_json or {})
-                )
-            )
-        ]
+        side_records = erp_records if report_side == 'erp' else physical_records
+        all_records = [rec for rec in side_records if rec.match_category in report_categories]
 
         # ── category breakdown ─────────────────────────────────────────────
         cat_stats = {}
@@ -2398,8 +2571,13 @@ def get_reconciliation_analytics(reconciliation_id):
                 'pending':                  v.get('pending', 0),
                 'rate': round(v.get('reconciled', 0) / v['total'] * 100, 1) if v['total'] else 0
             }
-            for k, v in cat_stats.items() if k != 'Unknown'
-        ], key=lambda x: -x['rate'])[:15]
+            for k, v in cat_stats.items()
+        ], key=lambda x: -x['rate'])
+        _append_pending_detail_row(
+            category_breakdown,
+            missing_erp_details if report_side == 'erp' else missing_physical_details,
+        )
+        category_breakdown = _collapse_category_breakdown(category_breakdown)
 
         # ── department breakdown ───────────────────────────────────────────
         dept_stats = {}
@@ -2429,6 +2607,10 @@ def get_reconciliation_analytics(reconciliation_id):
             }
             for k, v in dept_stats.items()
         ], key=lambda x: -x['rate'])[:15]
+        _append_pending_detail_row(
+            department_breakdown,
+            missing_erp_details if report_side == 'erp' else missing_physical_details,
+        )
 
         # ── district breakdown ─────────────────────────────────────────────
         dist_stats = {}
@@ -2458,6 +2640,10 @@ def get_reconciliation_analytics(reconciliation_id):
             }
             for k, v in dist_stats.items()
         ], key=lambda x: -x['rate'])[:15]
+        _append_pending_detail_row(
+            district_breakdown,
+            missing_erp_details if report_side == 'erp' else missing_physical_details,
+        )
 
         # ── dept_reconcile summary ─────────────────────────────────────────
         def _norm_dept(v):
@@ -2512,6 +2698,22 @@ def get_reconciliation_analytics(reconciliation_id):
             }
             for key, values in dept_rec_counts.items() if values['total'] > 0
         ]
+        missing_side_details = missing_erp_details if report_side == 'erp' else missing_physical_details
+        if missing_side_details:
+            na_location = next(
+                (row for row in dept_rec_chart if row['name'] == 'N/A'),
+                None,
+            )
+            if na_location:
+                na_location['total'] += missing_side_details
+                na_location['value'] += missing_side_details
+                na_location['pending'] += missing_side_details
+            else:
+                dept_rec_chart.append({
+                    'name': 'N/A', 'value': missing_side_details,
+                    'total': missing_side_details, 'pending': missing_side_details,
+                    'color': '#9ca3af',
+                })
 
         chart_side = side_counts[report_side]
         donut = [
@@ -2601,13 +2803,8 @@ def get_aging_analysis():
             ReconciliationRecord.reconciliation_id.in_(recon_ids),
             ReconciliationRecord.match_category.in_(FINANCE_CATEGORIES)
         ).all()
-        records = [
-            rec for rec in records
-            if rec.match_category != 'Duplicate' or any(
-                str(key).startswith('internal_' if report_side == 'erp' else 'customer_')
-                for key in (rec.full_record_json or {})
-            )
-        ]
+        records = _records_for_side(records, report_side, reconciliations)
+        missing_details = _missing_side_detail_count(records, reconciliations, report_side)
 
         ERP_STATUS_KEYS = ['reconciled','unreconciled','pending',
                    'exist_erp_not_physical' if report_side == 'erp' else 'surplus_assets',
@@ -2617,12 +2814,14 @@ def get_aging_analysis():
             for bucket in ['< 1 yr', '1 – 3 yr', '3 – 5 yr', '5 – 10 yr',
                            '10 – 20 yr', '> 20 yr', 'Unknown']
         }
+        buckets_map['Unknown']['pending'] += missing_details
 
         for rec in records:
             j = rec.full_record_json or {}
             year_prefix = 'internal_' if report_side == 'erp' else 'customer_'
             raw_year = j.get(f'{year_prefix}year') or j.get(f'{year_prefix}Year')
-            # DO NOT fall back to j.get('year') — that could be customer data
+            if rec.match_category == 'Duplicate':
+                raw_year = raw_year or j.get('year')
             try:
                 asset_year = int(float(str(raw_year).strip()))
                 age = current_year - asset_year
@@ -2654,7 +2853,7 @@ def get_aging_analysis():
             'buckets': simple_buckets,       # backward-compat for Dashboard aging chart
             'stacked_buckets': result,        # new: stacked by approval status
             'current_year': current_year,
-            'total_records': len(records)
+            'total_records': len(records) + missing_details
             , 'side': report_side
         }), 200
 
@@ -2695,13 +2894,8 @@ def get_reconciliation_aging(reconciliation_id):
             ReconciliationRecord.reconciliation_id == reconciliation_id,
             ReconciliationRecord.match_category.in_(FINANCE_CATEGORIES)
         ).all()
-        all_records = [
-            rec for rec in all_records
-            if rec.match_category != 'Duplicate' or any(
-                str(key).startswith('internal_' if report_side == 'erp' else 'customer_')
-                for key in (rec.full_record_json or {})
-            )
-        ]
+        all_records = _records_for_side(all_records, report_side, [recon])
+        missing_details = _missing_side_detail_count(all_records, [recon], report_side)
 
         STATUSES = ['reconciled', 'unreconciled', 'pending',
                     'exist_in_erp_not_physical' if report_side == 'erp' else 'surplus_assets',
@@ -2733,10 +2927,13 @@ def get_reconciliation_aging(reconciliation_id):
 
         # ── aging by approval status ───────────────────────────────────────────
         aging = {b: _empty_status() for b in BUCKET_ORDER}
+        aging['Unknown']['pending'] += missing_details
         for rec in all_records:
             j = rec.full_record_json or {}
             year_prefix = 'internal_' if report_side == 'erp' else 'customer_'
             raw_yr = _pick(j, f'{year_prefix}year', f'{year_prefix}Year')
+            if rec.match_category == 'Duplicate':
+                raw_yr = raw_yr or j.get('year')
             bucket = _bucket(raw_yr)
             status = rec.approval_status or 'pending'
             aging[bucket][status] = aging[bucket].get(status, 0) + 1
@@ -2764,6 +2961,14 @@ def get_reconciliation_aging(reconciliation_id):
                  total=sum(v.values()))
             for k, v in dept_map.items()
         ], key=lambda x: -x['total'])[:15]
+        if missing_details:
+            dept_chart.append({
+                'name': 'Pending details unavailable',
+                'full_name': 'Pending details unavailable',
+                **_empty_status(),
+                'pending': missing_details,
+                'total': missing_details,
+            })
 
         # ── district/branch breakdown with approval stacks ─────────────────────
         dist_map = {}
@@ -2780,10 +2985,18 @@ def get_reconciliation_aging(reconciliation_id):
                  total=sum(v.values()))
             for k, v in dist_map.items()
         ], key=lambda x: -x['total'])[:15]
+        if missing_details:
+            dist_chart.append({
+                'name': 'Pending details unavailable',
+                'full_name': 'Pending details unavailable',
+                **_empty_status(),
+                'pending': missing_details,
+                'total': missing_details,
+            })
 
         return jsonify({
             'current_year':      current_year,
-            'total_records':     len(all_records),
+            'total_records':     len(all_records) + missing_details,
             'aging_chart':       aging_chart,
             'department_chart':  dept_chart,
             'district_chart':    dist_chart,

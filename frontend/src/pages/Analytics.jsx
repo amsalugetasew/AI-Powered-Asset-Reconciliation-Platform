@@ -5,12 +5,13 @@ import { logActivity } from '../services/activityService'
 import { cachedGet } from '../services/cachedGet'
 import AIAnalysisModal from '../components/AIAnalysisModal'
 import AIContextMenu from '../components/AIContextMenu'
+import { DonutCenterLabel, DonutChartLegend } from '../components/DonutChartPresentation'
 import {
   FiDatabase, FiCheckCircle, FiXCircle, FiAlertCircle,FiAlertTriangle,FiClock,
   FiTrendingUp, FiBarChart2, FiLoader, FiPercent, FiLayers, FiMapPin,FiCopy
 } from 'react-icons/fi'
 import {
-  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   CartesianGrid, XAxis, YAxis
 } from 'recharts'
 
@@ -253,6 +254,7 @@ const Analytics = () => {
   const [loading, setLoading]     = useState(true)
   const [reportSide, setReportSide] = useState('erp')
   const [activeTab, setActiveTab] = useState('category')
+  const [activeDonutName, setActiveDonutName] = useState(null)
   const [showAIModal, setShowAIModal] = useState(false)
   const [aiModalConfig, setAiModalConfig] = useState({
     chartData: null,
@@ -459,7 +461,7 @@ const Analytics = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-2">
+        <div className="flex h-[510px] min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-2">
           <div className="border-b border-gray-100 p-4">
             <div className="flex flex-wrap gap-2">
               {tabs.map(t => (
@@ -474,7 +476,7 @@ const Analytics = () => {
             </div>
           </div>
 
-          <div className="p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {activeTab === 'category' && (
               <div className="bg-white rounded-xl cursor-context-menu" title="Right-click for AI insights"
                 onContextMenu={e => openAIContextMenu(e, {
@@ -756,7 +758,7 @@ const Analytics = () => {
           </div>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm" title="Right-click for AI insights"
+        <div className="flex h-[510px] min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm" title="Right-click for AI insights"
           onContextMenu={e => openAIContextMenu(e, {
               chartData: {
                 source: 'analytics_overall_status_donut',
@@ -769,49 +771,52 @@ const Analytics = () => {
               analysisContext: { page: 'Analytics', section: 'Overview' }
             })}>
           <h3 className="text-lg font-semibold text-gray-800 mb-1">Overview</h3>
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           {(() => {
             const donutTotal = donutData.reduce((s, d) => s + d.value, 0) || 1
             const chartTotal = donutTotal
             return (
               <>
-                <p className="text-xs text-gray-400 mb-3">
-                  Total: {chartTotal.toLocaleString()} records
-                </p>
-                <ResponsiveContainer width="100%" height={260}>
-                  <PieChart>
-                    <Pie data={donutData} cx="50%" cy="50%"
-                      innerRadius={62} outerRadius={96}
-                      paddingAngle={3} dataKey="value"
-                      labelLine={true}>
-                      {donutData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null
-                      const p = payload[0]
-                      const sharePct = ((p.value / chartTotal) * 100).toFixed(1)
-                      return (
-                        <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
-                          <p className="font-bold border-b border-gray-600 pb-1 mb-1">{p.name}</p>
-                          <div className="flex justify-between gap-4">
-                            <span className="text-gray-300">Count</span>
-                            <span className="font-semibold">{p.value.toLocaleString()}</span>
+                <div className="relative">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie data={donutData} cx="50%" cy="50%"
+                        innerRadius={98} outerRadius={120}
+                        paddingAngle={5} cornerRadius={6} dataKey="value">
+                        {donutData.map((entry, i) => (
+                          <Cell key={i} fill={entry.color}
+                            opacity={activeDonutName && activeDonutName !== entry.name ? 0.25 : 1} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null
+                        const p = payload[0]
+                        const sharePct = ((p.value / chartTotal) * 100).toFixed(1)
+                        return (
+                          <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                            <p className="font-bold border-b border-gray-600 pb-1 mb-1">{p.name}</p>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-300">Count</span>
+                              <span className="font-semibold">{p.value.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-gray-300">Share</span>
+                              <span className="font-semibold">{sharePct}%</span>
+                            </div>
+                            <div className="flex justify-between gap-4 border-t border-gray-600 mt-1 pt-1">
+                              <span className="text-gray-300">Total</span>
+                              <span className="font-semibold">{chartTotal.toLocaleString()}</span>
+                            </div>
                           </div>
-                          <div className="flex justify-between gap-4">
-                            <span className="text-gray-300">Share</span>
-                            <span className="font-semibold">{sharePct}%</span>
-                          </div>
-                          <div className="flex justify-between gap-4 border-t border-gray-600 mt-1 pt-1">
-                            <span className="text-gray-300">Total</span>
-                            <span className="font-semibold">{chartTotal.toLocaleString()}</span>
-                          </div>
-                        </div>
-                      )
-                    }} />
-                    <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
+                        )
+                      }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <DonutCenterLabel total={chartTotal} />
+                </div>
+                <DonutChartLegend data={donutData} getColor={entry => entry.color}
+                  activeName={activeDonutName} onSelect={setActiveDonutName}
+                  singleRow />
 
                 <div className="mt-6 border-t border-gray-100 pt-5">
                   <h4 className="mb-3 text-sm font-semibold text-gray-700">Match Type Breakdown</h4>
@@ -835,6 +840,7 @@ const Analytics = () => {
               </>
             )
           })()}
+          </div>
         </div>
       </div>
 
