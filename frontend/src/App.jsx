@@ -66,9 +66,9 @@ const RoleProtectedRoute = ({ children, requiredRole }) => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ActivityLogger />
-        <ToastContainer position="top-right" autoClose={3000} />
+        <ToastContainer position="top-right" autoClose={3000}  toastClassName="!bg-white !text-[#8E288D]" progressClassName="!bg-[#8E288D]"/>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />

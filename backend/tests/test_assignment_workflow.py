@@ -85,9 +85,9 @@ def test_checker_and_approver_status_columns_are_persisted():
         db.drop_all()
         db.create_all()
 
-        officer_one = _make_user('officer_one', 'officer1@example.com', 'officer')
-        officer_two = _make_user('officer_two', 'officer2@example.com', 'officer')
-        manager = _make_user('manager_user', 'manager@example.com', 'manager')
+        officer_one = _make_user('officer', 'officer@cbe.com.et', 'officer')
+        officer_two = _make_user('officer1', 'officer1@cbe.com.et', 'officer')
+        manager = _make_user('manger', 'manager@cbe.com.et', 'manager')
 
         recon = Reconciliation(
             user_id=officer_one.id,
@@ -157,8 +157,8 @@ def test_bulk_approve_is_scoped_to_selected_category(tmp_path):
         db.drop_all()
         db.create_all()
 
-        officer = _make_user('officer_one', 'officer1@example.com', 'officer')
-        manager = _make_user('manager_user', 'manager@example.com', 'manager')
+        officer = _make_user('officer', 'officer@cbe.com.et', 'officer')
+        manager = _make_user('manager', 'manager@cbe.com.et', 'manager')
         officer.set_password('Password123!')
         manager.set_password('Password123!')
         db.session.commit()
@@ -217,6 +217,127 @@ def test_bulk_approve_is_scoped_to_selected_category(tmp_path):
         payload = response.get_json()
         assert payload['decision_stage'] == 'approver'
         assert payload['records_updated'] == 1
+
+
+def test_shortage_with_legacy_checked_status_can_be_approved():
+    os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+    app = create_app('development')
+    app.config['TESTING'] = True
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+
+    with app.app_context():
+        db.drop_all()
+        db.create_all()
+
+        maker = _make_user('shortage_maker', 'shortage-maker@example.com', 'officer')
+        checker = _make_user('shortage_checker', 'shortage-checker@example.com', 'officer')
+        manager = _make_user('shortage_manager', 'shortage-manager@example.com', 'manager')
+        for user in (maker, checker, manager):
+            user.set_password('Password123!')
+        db.session.commit()
+
+        reconciliation = Reconciliation(
+            user_id=maker.id,
+            customer_file='customer.xlsx',
+            internal_file='internal.xlsx',
+            status='completed',
+            report_path='available.xlsx',
+        )
+        db.session.add(reconciliation)
+        db.session.commit()
+
+        record = ReconciliationRecord(
+            reconciliation_id=reconciliation.id,
+            match_category='ERP Unmatched',
+            check_status='exist_in_erp_not_physical',
+            checker_status='pending',
+            checked_by=checker.id,
+            approval_status='pending',
+            approver_status='pending',
+        )
+        db.session.add(record)
+        db.session.commit()
+
+        client = app.test_client()
+        login = client.post('/api/auth/login', json={
+            'username': manager.username,
+            'password': 'Password123!',
+        })
+        token = login.get_json()['access_token']
+        summary_response = client.get(
+            f'/api/reconciliation/records/approval-summary/{reconciliation.id}',
+            headers={'Authorization': f'Bearer {token}'},
+        )
+        assert summary_response.status_code == 200, summary_response.get_data(as_text=True)
+        assert summary_response.get_json()['summary']['ERP Unmatched']['stage_counts']['check'] == {
+            'exist_in_erp_not_physical': 1,
+        }
+        response = client.post(
+            '/api/reconciliation/records/approve-record',
+            json={
+                'record_id': record.id,
+                'approval_decision': 'exist_in_erp_not_physical',
+                'decision_stage': 'approve',
+            },
+            headers={'Authorization': f'Bearer {token}'},
+        )
+
+        assert response.status_code == 200, response.get_data(as_text=True)
+        db.session.refresh(record)
+        assert record.approval_status == 'exist_in_erp_not_physical'
+
+
+def test_assignment_marks_records_as_waiting_without_claiming_checker():
+    os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+    app = create_app('development')
+    app.config['TESTING'] = True
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+
+    with app.app_context():
+        db.drop_all()
+        db.create_all()
+
+        maker = _make_user('assignment_maker', 'assignment-maker@example.com', 'officer')
+        checker = _make_user('assignment_checker', 'assignment-checker@example.com', 'officer')
+        maker.set_password('Password123!')
+        db.session.commit()
+
+        reconciliation = Reconciliation(
+            user_id=maker.id,
+            customer_file='customer.xlsx',
+            internal_file='internal.xlsx',
+            status='completed',
+        )
+        db.session.add(reconciliation)
+        db.session.commit()
+        record = ReconciliationRecord(
+            reconciliation_id=reconciliation.id,
+            match_category='ERP Unmatched',
+            check_status='reconciled',
+            checker_status='reconciled',
+            checked_by=checker.id,
+        )
+        db.session.add(record)
+        db.session.commit()
+
+        client = app.test_client()
+        login = client.post('/api/auth/login', json={
+            'username': maker.username,
+            'password': 'Password123!',
+        })
+        token = login.get_json()['access_token']
+        response = client.post(
+            f'/api/reconciliation/{reconciliation.id}/assign',
+            json={'assignment_scope': 'specific_user', 'assignee_id': checker.id},
+            headers={'Authorization': f'Bearer {token}'},
+        )
+
+        assert response.status_code == 200, response.get_data(as_text=True)
+        db.session.refresh(record)
+        assert record.check_status == 'checking'
+        assert record.checker_status == 'checking'
+        assert record.checked_by is None
+        assert record.checked_at is None
 
 
 def test_download_enriched_report_keeps_missing_checker_approver_blank(tmp_path):

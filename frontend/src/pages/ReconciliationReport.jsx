@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -35,7 +35,37 @@ const APPROVAL_COLORS = {
   pending: '#6B7280',
 }
 
-// ── KPI Card ──────────────────────────────────────────────────────────────────
+const KPI_THEMES = {
+  '#8E288D': {
+    gradient: 'bg-gradient-to-r from-white to-[#E1C3DF] dark:from-gray-900 dark:to-purple-950/40',
+    header: 'bg-[#E1C3DF] dark:bg-purple-900/60',
+    iconText: 'text-[#8E288D] dark:text-purple-300',
+    headerText: 'text-[#6B7280] dark:text-purple-200',
+    badge: 'text-[#8E288D] bg-[#E1C3DF] dark:text-purple-200 dark:bg-purple-900/60',
+  },
+  '#CFB53B': {
+    gradient: 'bg-gradient-to-r from-white to-[#F5EFCF] dark:from-gray-900 dark:to-amber-950/40',
+    header: 'bg-[#F5EFCF] dark:bg-amber-900/60',
+    iconText: 'text-[#CFB53B] dark:text-amber-300',
+    headerText: 'text-[#6B7280] dark:text-amber-200',
+    badge: 'text-[#CFB53B] bg-[#F5EFCF] dark:text-amber-200 dark:bg-amber-900/60',
+  },
+  '#059669': {
+    gradient: 'bg-gradient-to-r from-white to-[#D1FAE5] dark:from-gray-900 dark:to-emerald-950/40',
+    header: 'bg-[#D1FAE5] dark:bg-emerald-900/60',
+    iconText: 'text-[#059669] dark:text-emerald-300',
+    headerText: 'text-[#6B7280] dark:text-emerald-200',
+    badge: 'text-[#059669] bg-[#D1FAE5] dark:text-emerald-200 dark:bg-emerald-900/60',
+  },
+  '#2563EB': {
+    gradient: 'bg-gradient-to-r from-white to-[#DBEAFE] dark:from-gray-900 dark:to-blue-950/40',
+    header: 'bg-[#DBEAFE] dark:bg-blue-900/60',
+    iconText: 'text-[#2563EB] dark:text-blue-300',
+    headerText: 'text-[#6B7280] dark:text-blue-200',
+    badge: 'text-[#2563EB] bg-[#DBEAFE] dark:text-blue-200 dark:bg-blue-900/60',
+  }
+}
+
 const KpiCard = ({
   label,
   value,
@@ -45,101 +75,92 @@ const KpiCard = ({
   lightColor = '#E1C3DF',
   unit,
   description,
-}) => (
-  <div
-    className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
-    style={{
-      background: `linear-gradient(to right, #FFFFFF 0%, ${lightColor} 100%)`,
-    }}
-  >
-    {/* KPI Label + Icon */}
+}) => {
+  const theme = KPI_THEMES[color] || KPI_THEMES['#8E288D']
+  return (
     <div
-      className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
-      style={{
-        color: '#000000',
-        backgroundColor: lightColor,
-      }}
+      className={`w-full h-[140px] rounded-2xl border border-slate-100 dark:border-gray-800 ${theme.gradient} p-0 shadow-sm transition-shadow hover:shadow-md dark:bg-gray-900`}
     >
-      {/* Left Icon */}
-      {Icon && (
-        <span
-          className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
-          style={{ color }}
-        >
-          <Icon />
-        </span>
-      )}
-
-      {/* Label */}
-      <span
-        className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
-        style={{
-          height: '14px',
-          fontFamily: 'Geist, sans-serif',
-          fontWeight: 700,
-        }}
+      {/* KPI Label + Icon */}
+      <div
+        className={`relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5 ${theme.header}`}
       >
-        {label}
-      </span>
-    </div>
+        {/* Left Icon */}
+        {Icon && (
+          <span
+            className={`absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px] ${theme.iconText}`}
+          >
+            <Icon />
+          </span>
+        )}
 
-    {/* KPI Value */}
-    <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
-
-      {/* Value + Unit */}
-      <div className="flex h-[36px] w-full flex-row items-center gap-2">
-        <p
-          className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+        {/* Label */}
+        <span
+          className={`ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] ${theme.headerText}`}
           style={{
+            height: '14px',
             fontFamily: 'Geist, sans-serif',
-            fontWeight: 800,
+            fontWeight: 700,
           }}
         >
-          {value}
-        </p>
-
-        {unit && (
-          <p
-            className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
-            style={{
-              fontFamily: 'Geist, sans-serif',
-              fontWeight: 600,
-            }}
-          >
-            {unit}
-          </p>
-        )}
+          {label}
+        </span>
       </div>
 
-      {/* Description + Status */}
-      {(description || sub) && (
-        <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
+      {/* KPI Value */}
+      <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
 
+        {/* Value + Unit */}
+        <div className="flex h-[36px] w-full flex-row items-center gap-2">
           <p
-            className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+            className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-gray-100"
             style={{
               fontFamily: 'Geist, sans-serif',
-              fontWeight: 400,
+              fontWeight: 800,
             }}
           >
-            {description || sub}
+            {value}
           </p>
 
-          <span
-            className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
-            style={{
-              color,
-              backgroundColor: lightColor,
-            }}
-          >
-            Validated
-          </span>
-
+          {unit && (
+            <p
+              className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
+              style={{
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 600,
+              }}
+            >
+              {unit}
+            </p>
+          )}
         </div>
-      )}
+
+        {/* Description + Status */}
+        {(description || sub) && (
+          <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
+
+            <p
+              className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
+              style={{
+                fontFamily: 'Geist, sans-serif',
+                fontWeight: 400,
+              }}
+            >
+              {description || sub}
+            </p>
+
+            <span
+              className={`inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold ${theme.badge}`}
+            >
+              Validated
+            </span>
+
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-);
+  )
+}
 
 // ── Horizontal bar ────────────────────────────────────────────────────────────
 const HBar = ({ name, rate, reconciled, total, color }) => (
@@ -235,8 +256,8 @@ const HorizontalStackedBar = ({ row, statuses, colors, labels, rowLabel }) => {
           )
         })}
       </div>
-      <p className="text-xs text-gray-500 mt-0.5 pl-1 truncate" title={row.full_name || rowLabel}>
-        {rowLabel} <span className="text-gray-400">({rowTotal.toLocaleString()})</span>
+      <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5 pl-1 truncate" title={row.full_name || rowLabel}>
+        {rowLabel} <span className="text-gray-400 dark:text-gray-400">({rowTotal.toLocaleString()})</span>
       </p>
     </div>
   )
@@ -417,7 +438,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
       {/* Back */}
       <div className="mb-4">
         <button onClick={() => navigate(-1)}
-          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700">
+          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
           <FiArrowLeft className="mr-2" /> Back
         </button>
       </div>
@@ -425,10 +446,10 @@ const DONUT_CATEGORY_STATUS_MAP = {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
         <div className='flex'>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Reconciliation <span className="text-[#8E288D]">#{id}</span>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            Reconciliation <span className="text-[#8E288D] dark:text-purple-400">#{id}</span>
           </h1>
-          <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
+          <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
             {/* <span>📁 {recon.customer_file}</span>
             <span>📁 {recon.internal_file}</span> */}
             <span>🕒 Created: {createdAt}</span>
@@ -438,11 +459,11 @@ const DONUT_CATEGORY_STATUS_MAP = {
         <div className="flex gap-2">
           <button
             onClick={() => navigate(`/results/${id}`)}
-            className="flex h-10 w-44 items-center justify-center rounded-lg hover:border-b-2 hover:border-[#8E288D] px-4 text-sm font-medium text-gray-600 shadow transition-colors hover:text-[#8E288D]">
+            className="flex h-10 w-44 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-b-2 hover:border-[#8E288D] dark:hover:border-purple-400 px-4 text-sm font-medium text-gray-600 dark:text-gray-300 shadow transition-colors hover:text-[#8E288D] dark:hover:text-purple-400">
             View Records
           </button>
           <button onClick={() => navigate(`/approval/${id}`)}
-            className="flex h-10 w-44 items-center justify-center rounded-lg hover:border-b-2 hover:border-[#8E288D] px-4 text-sm font-medium text-gray-600 shadow transition-colors hover:text-[#8E288D]">
+            className="flex h-10 w-44 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-b-2 hover:border-[#8E288D] dark:hover:border-purple-400 px-4 text-sm font-medium text-gray-600 dark:text-gray-300 shadow transition-colors hover:text-[#8E288D] dark:hover:text-purple-400">
             Approval
           </button>
         </div>
@@ -497,11 +518,11 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
       </div>
 
-      <div className="mb-6 flex gap-2 border-b border-gray-200">
+      <div className="mb-6 flex gap-2 border-b border-gray-200 dark:border-gray-800">
         {['erp', 'physical'].map(side => (
           <button type="button" key={side} onClick={event => { event.preventDefault(); setReportSide(side) }}
             className={`border-b-2 px-5 py-3 text-sm font-semibold capitalize ${
-              reportSide === side ? 'border-[#8E288D] text-[#8E288D]' : 'border-transparent text-gray-500 hover:text-gray-800'
+              reportSide === side ? 'border-[#8E288D] text-[#8E288D] dark:border-purple-400 dark:text-purple-400' : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
             }`}>
             {side === 'erp' ? 'ERP' : 'Physical'}
           </button>
@@ -510,9 +531,9 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
       {/* Pending notice */}
       {kpis.pending > 0 && (
-        <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex items-center gap-3">
-          <FiAlertCircle className="text-yellow-500 flex-shrink-0" />
-          <p className="text-sm text-yellow-800">
+        <div className="mb-6 bg-yellow-50 dark:bg-amber-950/30 border border-yellow-200 dark:border-amber-800/60 rounded-lg px-4 py-3 flex items-center gap-3">
+          <FiAlertCircle className="text-yellow-500 dark:text-amber-400 flex-shrink-0" />
+          <p className="text-sm text-yellow-800 dark:text-amber-200">
             <strong>{fmt(kpis.pending)}</strong> records are still <strong>pending approval</strong>.
             The charts below reflect current approved data. Approve remaining records to see full results.
           </p>
@@ -548,25 +569,25 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
         return (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <div className="flex h-[462px] min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm xl:col-span-2">
-              <div className="border-b border-gray-100 p-4">
+            <div className="flex h-[462px] min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm xl:col-span-2">
+              <div className="border-b border-gray-100 dark:border-gray-800 p-4">
                 <div className="mb-4 flex flex-wrap gap-2">
                   {tabs.map(t => (
                     <button type="button" key={t.key} onClick={event => { event.preventDefault(); setActiveTab(t.key); logActivity(`/report/${id}`, `TAB_SWITCH_${t.key.toUpperCase()}`) }}
                       className={`flex h-10 w-44 items-center justify-center px-4 text-sm font-medium transition-colors ${activeTab === t.key
-                        ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D]'
-                        : 'text-gray-600'
+                        ? 'text-[#8E288D] dark:text-purple-400 shadow border-b-2 border-[#8E288D] dark:border-purple-400'
+                        : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                         }`}>
                       {t.label}
                     </button>
                   ))}
                 </div>
-                <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800">
-                  <FiLayers className="text-[#8E288D]" /> {activeTab === 'report_aging' ? 'Asset Aging' : breakdownTitle}
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-800 dark:text-gray-100">
+                  <FiLayers className="text-[#8E288D] dark:text-purple-400" /> {activeTab === 'report_aging' ? 'Asset Aging' : breakdownTitle}
                 </h3>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-6">
-                <div className="mb-4 flex items-center justify-between text-xs text-gray-400">
+                <div className="mb-4 flex items-center justify-between text-xs text-gray-400 dark:text-gray-400">
                   <span>{reportSide === 'erp' ? 'ERP' : 'Physical'} records for reconciliation #{id}</span>
                   <span>{activeTab === 'report_aging'
                     ? `${agingData?.current_year || new Date().getFullYear()}`
@@ -578,15 +599,15 @@ const DONUT_CATEGORY_STATUS_MAP = {
                       <HorizontalStackedBar key={row.bucket} row={row} statuses={agingStatuses}
                         colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.bucket} />
                     ))}
-                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-gray-100 pt-3">
+                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-3">
                       {agingStatuses.map(status => (
-                        <div key={status} className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <div key={status} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
                           <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: STATUS_COLORS[status] }} />
                           {STATUS_LABELS[status]}
                         </div>
                       ))}
                     </div>
-                  </> : <p className="py-12 text-center text-gray-400">No aging data available</p>
+                  </> : <p className="py-12 text-center text-gray-400 dark:text-gray-500">No aging data available</p>
                 ) : activeTab === 'report_location' ? (
                   locationChart.length ? (
                     (() => {
@@ -599,7 +620,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
                             <HorizontalStackedBar key={row.name} row={row} statuses={locationStatuses}
                               colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
                           ))}
-                          <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-gray-100 pt-4 text-xs text-gray-600">
+                          <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-gray-100 dark:border-gray-800 pt-4 text-xs text-gray-600 dark:text-gray-300">
                             {locationStatuses.map(status => (
                               <span key={status} className="flex items-center gap-1.5">
                                 <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: STATUS_COLORS[status] }} />
@@ -610,29 +631,29 @@ const DONUT_CATEGORY_STATUS_MAP = {
                         </div>
                       )
                     })()
-                  ) : <p className="py-12 text-center text-gray-400">No location data available</p>
+                  ) : <p className="py-12 text-center text-gray-400 dark:text-gray-500">No location data available</p>
                 ) : breakdown.length ? (
                   <>
                     {breakdown.map(row => (
                       <HorizontalStackedBar key={row.name} row={row} statuses={breakdownStatuses}
                         colors={STATUS_COLORS} labels={STATUS_LABELS} rowLabel={row.name} />
                     ))}
-                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-gray-100 pt-3">
+                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-3">
                       {breakdownStatuses.map(status => (
-                        <div key={status} className="flex items-center gap-1.5 text-xs text-gray-600">
+                        <div key={status} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
                           <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: STATUS_COLORS[status] }} />
                           {STATUS_LABELS[status]}
                         </div>
                       ))}
                     </div>
                   </>
-                ) : <p className="py-12 text-center text-gray-400">No breakdown data available</p>}
+                ) : <p className="py-12 text-center text-gray-400 dark:text-gray-500">No breakdown data available</p>}
               </div>
             </div>
 
             <div className="w-full max-w-[616px] min-h-[462px] bg-white dark:bg-gray-900 rounded-[8px] border border-[#E2E8F0] dark:border-gray-800 p-6 flex flex-col gap-2">
-              <h3 className="mb-0 text-lg font-semibold text-gray-800">Reconciliation Status</h3>
-              <p className="mb-0 text-xs text-gray-400">
+              <h3 className="mb-0 text-lg font-semibold text-gray-800 dark:text-gray-100">Reconciliation Status</h3>
+              <p className="mb-0 text-xs text-gray-400 dark:text-gray-400">
                 {reportSide === 'erp' ? 'ERP' : 'Physical'} status for reconciliation #{id}
               </p>
               <div className="mb-6">
@@ -649,8 +670,12 @@ const DONUT_CATEGORY_STATUS_MAP = {
                         <div className="relative">
                           <ResponsiveContainer width="100%" height={260}>
                             <PieChart>
-                              <Pie data={donut} cx="50%" cy="50%" innerRadius={98} outerRadius={120}
-                                paddingAngle={5} cornerRadius={6} dataKey="value">
+                              <Pie data={donut} cx="50%"
+                                cy="50%"
+                                innerRadius={100}
+                                outerRadius={120}
+                                paddingAngle={5}
+                                cornerRadius={10} dataKey="value">
                                 {donut.map((entry, index) => (
                                   <Cell key={index} fill={getStatusColor(entry)}
                                     opacity={activeDonutVisible && activeDonutName !== entry.name ? 0.25 : 1} />
@@ -723,9 +748,12 @@ const DONUT_CATEGORY_STATUS_MAP = {
                   <div className="relative">
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
-                        <Pie data={donut} cx="50%" cy="50%"
-                          innerRadius={98} outerRadius={120}
-                          paddingAngle={5} cornerRadius={6} dataKey="value">
+                        <Pie data={donut} cx="50%"
+                            cy="50%"
+                            innerRadius={100}
+                            outerRadius={120}
+                            paddingAngle={15}
+                            cornerRadius={10} dataKey="value">
                           {donut.map((e, i) => (
                             <Cell key={i} fill={e.color}
                               opacity={activeDonutVisible && activeDonutName !== e.name ? 0.25 : 1} />

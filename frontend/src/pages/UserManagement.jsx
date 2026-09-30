@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import {
@@ -17,15 +18,15 @@ const DEPARTMENTS = [
 ]
 
 const ROLE_COLORS = {
-  officer: 'bg-blue-50 text-blue-700 border border-blue-200',
-  manager: 'bg-purple-50 text-[#8E288D] border border-purple-200',
-  admin:   'bg-red-50 text-red-600 border border-red-200',
+  officer: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800',
+  manager: 'bg-purple-50 text-[#8E288D] border border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800',
+  admin:   'bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800',
 }
 
 const STATUS_COLORS = {
-  active:    'bg-emerald-50 text-emerald-700',
-  pending:   'bg-amber-50 text-amber-600',
-  suspended: 'bg-rose-50 text-rose-600',
+  active:    'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800',
+  pending:   'bg-amber-50 text-amber-600 border border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
+  suspended: 'bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800',
 }
 
 const getUserStatus = user => user.status || (user.is_active ? 'active' : 'suspended')
@@ -48,10 +49,10 @@ const IconBtn = ({ onClick, title, className, children, disabled }) => (
 const Avatar = ({ name, picture }) => {
   const initials = (name || '?').slice(0, 2).toUpperCase()
   if (picture) {
-    return <img src={picture} alt={name} className="w-9 h-9 rounded-full object-cover ring-2 ring-white" />
+    return <img src={picture} alt={name} className="w-9 h-9 rounded-full object-cover ring-2 ring-white dark:ring-gray-700" />
   }
   return (
-    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#8E288D] to-[#CFB53B] flex items-center justify-center text-white text-xs font-bold ring-2 ring-white">
+    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#8E288D] to-[#CFB53B] flex items-center justify-center text-white text-xs font-bold ring-2 ring-white dark:ring-gray-700">
       {initials}
     </div>
   )
@@ -60,12 +61,12 @@ const Avatar = ({ name, picture }) => {
 // ── Shared form input helper (defined OUTSIDE component to prevent remount on every render) ──
 const Field = ({ label, children }) => (
   <div>
-    <label className="block text-sm font-semibold text-gray-700 mb-1.5">{label}</label>
+    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">{label}</label>
     {children}
   </div>
 )
 
-const inputCls = 'w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-4 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 focus:border-[#8E288D]'
+const inputCls = 'w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2.5 pl-9 pr-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 focus:border-[#8E288D]'
 
 const UserManagement = () => {
   const { user: currentUser } = useAuth()
@@ -288,14 +289,14 @@ const UserManagement = () => {
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="flex h-[48px] w-full flex-col gap-1">
-        <h2 className="text-[22px] font-extrabold text-[#1E293B] leading-[100%]"
+        <h2 className="text-[22px] font-extrabold text-[#1E293B] dark:text-gray-100 leading-[100%]"
           style={{
             height: '27px',
             fontFamily: 'inter sans-serif',
             fontWeight: 800,
             fontStyle: 'extra-bold',
           }}>User &amp; Permission Directory</h2>
-        <p className="text-[14px] text-[#64748B]"
+        <p className="text-[14px] text-[#64748B] dark:text-gray-400"
           style={{
             height: '17px',
             fontFamily: 'inter sans-serif',
@@ -307,21 +308,14 @@ const UserManagement = () => {
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
       <div className="grid w-full grid-cols-1 gap-4 p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Users */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
-          style={{
-            background: 'linear-gradient(to right, #FFFFFF 0%, #E1C3DF 100%)',
-          }}>
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-[#E1C3DF] dark:from-gray-900 dark:to-purple-950/30 dark:border-gray-800 p-0 shadow-sm transition-shadow hover:shadow-md">
 
           {/* KPI Label + Icon */}
-          <div className="relative h-[32px] flex items-left justify-left rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider"
-            style={{
-              color: '#000000',
-              backgroundColor: '#E1C3DF',
-            }}>
-            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#8E288D]">
+          <div className="relative h-[32px] flex items-center justify-start rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-[#E1C3DF] dark:bg-purple-900/40 text-black dark:text-purple-200">
+            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#8E288D] dark:text-purple-400">
               <FiUsers />
             </span>
-            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280] dark:text-gray-300"
               style={{
                 height: '14px',
                 fontFamily: 'Geist, sans-serif',
@@ -333,7 +327,7 @@ const UserManagement = () => {
           {/* KPI Value */}
           <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
             <div className="flex h-[36px] w-full flex-row items-center gap-2">
-              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-white"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 800,
@@ -342,7 +336,7 @@ const UserManagement = () => {
               </p>
 
               <p
-                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 600,
@@ -352,14 +346,14 @@ const UserManagement = () => {
             </div>
             <div className="flex h-[17px] w-full flex-row items-center gap-3 justify-between">
               <p
-                className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 400,
                 }}>
                 Total Registered Users
               </p>
-              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-purple-purple-100 px-2 text-[14px] font-extrabold text-[#8E288D]">
+              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-purple-100 dark:bg-purple-900/50 px-2 text-[14px] font-extrabold text-[#8E288D] dark:text-purple-300">
                 Validated
               </span>
             </div>
@@ -368,16 +362,13 @@ const UserManagement = () => {
 
 
         {/* Active Users */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
-          style={{
-            background: 'linear-gradient(to right, #FFFFFF 0%, #ECFDF5 100%)',
-          }}>
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-[#ECFDF5] dark:from-gray-900 dark:to-emerald-950/30 dark:border-gray-800 p-0 shadow-sm transition-shadow hover:shadow-md">
           {/* KPI Label + Icon */}
-          <div className="relative text-[#059669] bg-[#ECFDF5] h-[32px] flex items-left justify-left rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider">
-            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#059669]">
+          <div className="relative text-[#059669] dark:text-emerald-300 bg-[#ECFDF5] dark:bg-emerald-900/40 h-[32px] flex items-center justify-start rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider">
+            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#059669] dark:text-emerald-400">
               <FiUserCheck />
             </span>
-            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280] dark:text-gray-300"
               style={{
                 height: '14px',
                 fontFamily: 'Geist, sans-serif',
@@ -390,11 +381,11 @@ const UserManagement = () => {
           {/* KPI Value */}
           <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
             <div className="flex h-[36px] w-full flex-row items-center gap-2">
-              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]">
+              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-white">
                 {activeUsers}
               </p>
 
-              <p className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+              <p className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 600,
@@ -405,37 +396,27 @@ const UserManagement = () => {
 
             <div className="flex h-[17px] w-full flex-row items-center gap-3 justify-between">
               <p
-                className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 400,
                 }}>
                 Total Active Users
               </p>
-              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-purple-green-100 px-2 text-[14px] font-extrabold text-[#8E288D]">
+              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-emerald-100 dark:bg-emerald-900/50 px-2 text-[14px] font-extrabold text-emerald-700 dark:text-emerald-300">
                 Validated
               </span>
             </div>
-            {/* <span className="mt-1 inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-green-100 px-2 text-[14px] font-extrabold text-emerald-700">
-              Validated
-            </span> */}
           </div>
         </div>
 
 
         {/* Suspended Users */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
-          style={{
-            background: 'linear-gradient(to right, #FFFFFF 0%, #FEE2E2 100%)',
-          }}>
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-[#FEE2E2] dark:from-gray-900 dark:to-rose-950/30 dark:border-gray-800 p-0 shadow-sm transition-shadow hover:shadow-md">
 
           {/* KPI Label + Icon */}
-          <div className="relative h-[32px] flex items-left justify-left rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider"
-            style={{
-              color: '#DC2626',
-              backgroundColor: '#DC262610',
-            }}>
-            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+          <div className="relative h-[32px] flex items-center justify-start rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-rose-50 dark:bg-rose-900/40 text-[#DC2626] dark:text-rose-300">
+            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280] dark:text-gray-300"
               style={{
                 height: '14px',
                 fontFamily: 'Geist, sans-serif',
@@ -443,7 +424,7 @@ const UserManagement = () => {
                 fontStyle: 'normal',}}>Suspended Users
             </span>
 
-            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#DC2626]">
+            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#DC2626] dark:text-rose-400">
               <FiUserX />
             </span>
           </div>
@@ -451,11 +432,11 @@ const UserManagement = () => {
           {/* KPI Value */}
           <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
             <div className="flex h-[36px] w-full flex-row items-center gap-2">
-              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]">
+              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-white">
                 {suspendedUsers}
               </p>
 
-              <p className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+              <p className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 600,
@@ -466,14 +447,14 @@ const UserManagement = () => {
               
             
             <div className="flex h-[17px] w-full flex-row items-center gap-3 justify-between">
-              <p className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8]"
+              <p className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 400,
                 }}>
                 Total Suspended Users
               </p>
-              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-purple-green-100 px-2 text-[14px] font-extrabold text-[#8E288D]">
+              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-rose-100 dark:bg-rose-900/50 px-2 text-[14px] font-extrabold text-rose-700 dark:text-rose-300">
                 Validated
               </span>
             </div>
@@ -482,20 +463,13 @@ const UserManagement = () => {
 
 
         {/* Pending Approval */}
-        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
-          style={{
-            background: 'linear-gradient(to right, #FFFFFF 0%, #FEF3C7 100%)',
-          }}>
+        <div className="w-full h-[140px] rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-[#FEF3C7] dark:from-gray-900 dark:to-amber-950/30 dark:border-gray-800 p-0 shadow-sm transition-shadow hover:shadow-md">
 
           {/* KPI Label + Icon */}
           <div
-            className="relative h-[32px] flex items-left justify-left rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider"
-            style={{
-              color: '#D97706',
-              backgroundColor: '#D9770610',
-            }}
+            className="relative h-[32px] flex items-center justify-start rounded-[8px] gap-3 px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-amber-50 dark:bg-amber-900/40 text-[#D97706] dark:text-amber-300"
           >
-            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+            <span className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280] dark:text-gray-300"
               style={{
                 height: '14px',
                 fontFamily: 'Geist, sans-serif',
@@ -503,7 +477,7 @@ const UserManagement = () => {
                 fontStyle: 'normal',}}> Pending Approval
             </span>
 
-            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#D97706]">
+            <span className="absolute width-[20px] h-[20px] left-0 text-sm rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold text-[#D97706] dark:text-amber-400">
               <FiClock />
             </span>
           </div>
@@ -511,11 +485,11 @@ const UserManagement = () => {
           {/* KPI Value */}
           <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
             <div className="flex h-[36px] w-full flex-row items-center gap-2">
-              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]">
+              <p className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-white">
                 {pendingUsers}
               </p>
 
-              <p className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+              <p className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 600,
@@ -526,14 +500,14 @@ const UserManagement = () => {
 
             <div className="flex h-[17px] w-full flex-row items-center gap-3 justify-between">
               <p
-                className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="text-[13px] font_regular leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 400,
                 }}>
                 Total Pending Users
               </p>
-              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-purple-green-100 px-2 text-[14px] font-extrabold text-[#8E288D]">
+              <span className="inline-flex h-[24px] w-[77px] flex-row items-center justify-center gap-1 rounded-[8px] bg-amber-100 dark:bg-amber-900/50 px-2 text-[14px] font-extrabold text-amber-700 dark:text-amber-300">
                 Validated
               </span>
             </div>
@@ -543,12 +517,12 @@ const UserManagement = () => {
       </div>
 
       {/* ── Filter bar ───────────────────────────────────────────────────── */}
-      <div className="flex min-h-[76px] w-full flex-wrap items-center gap-4 rounded-[14px] border border-[#E2E8F0] bg-[#FFFFFF] p-5 shadow-sm">
+      <div className="flex min-h-[76px] w-full flex-wrap items-center gap-4 rounded-[14px] border border-[#E2E8F0] dark:border-gray-800 bg-[#FFFFFF] dark:bg-gray-900 p-5 shadow-sm">
 
         {/* Role */}
         <div className="flex h-[34px] min-w-[220px] flex-1 items-center gap-2 text-sm xl:max-w-[321.5px]">
           <span
-            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B]"
+            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B] dark:text-gray-300"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 600,
@@ -563,7 +537,7 @@ const UserManagement = () => {
               setFilterRole(e.target.value);
               setPage(1);
             }}
-            className="h-[40px] min-w-0 flex-1 rounded-[8px] border border-[#E2E8F0] bg-white px-3 text-sm text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
+            className="h-[40px] min-w-0 flex-1 rounded-[8px] border border-[#E2E8F0] dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-[#334155] dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
           >
             <option value="all">All Roles</option>
             <option value="officer">Officer</option>
@@ -575,7 +549,7 @@ const UserManagement = () => {
         {/* Status */}
         <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 text-sm xl:max-w-[321.5px]">
           <span
-            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B]"
+            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B] dark:text-gray-300"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 600,
@@ -590,7 +564,7 @@ const UserManagement = () => {
               setFilterStatus(e.target.value);
               setPage(1);
             }}
-            className="h-[40px] min-w-0 flex-1 rounded-[8px] border border-[#E2E8F0] bg-white px-3 text-sm text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
+            className="h-[40px] min-w-0 flex-1 rounded-[8px] border border-[#E2E8F0] dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-[#334155] dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
           >
             <option value="all">All Statuses</option>
             <option value="active">Active</option>
@@ -602,7 +576,7 @@ const UserManagement = () => {
         {/* Department */}
         <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 text-sm xl:max-w-[321.5px]">
           <span
-            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B]"
+            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B] dark:text-gray-300"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 600,
@@ -617,7 +591,7 @@ const UserManagement = () => {
               setFilterDept(e.target.value);
               setPage(1);
             }}
-            className="h-[40px] min-w-0 flex-1 rounded-[8px] border border-[#E2E8F0] bg-white px-3 text-sm text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
+            className="h-[40px] min-w-0 flex-1 rounded-[8px] border border-[#E2E8F0] dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-[#334155] dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
           >
             <option value="all">All Departments</option>
             {allDepts.map(d => (
@@ -631,7 +605,7 @@ const UserManagement = () => {
         {/* Search */}
         <div className="flex h-[40px] min-w-[220px] flex-1 items-center gap-2 text-sm xl:max-w-[321.5px]">
           <span
-            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B]"
+            className="shrink-0 text-[13px] font-semibold leading-[100%] tracking-[0%] text-[#64748B] dark:text-gray-300"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 600,
@@ -641,7 +615,7 @@ const UserManagement = () => {
           </span>
 
           <div className="relative min-w-0 flex-1">
-            <FiSearch className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94A3B8]" />
+            <FiSearch className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94A3B8] dark:text-gray-400" />
 
             <input
               type="text"
@@ -651,7 +625,7 @@ const UserManagement = () => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="h-[40px] w-full rounded-[8px] border border-[#E2E8F0] bg-white pl-9 pr-3 text-sm text-[#334155] focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
+              className="h-[40px] w-full rounded-[8px] border border-[#E2E8F0] dark:border-gray-700 bg-white dark:bg-gray-800 pl-9 pr-3 text-sm text-[#334155] dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
             />
           </div>
         </div>
@@ -670,58 +644,58 @@ const UserManagement = () => {
       </div>
 
       {/* ── Table ────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-[#E2E8F0] dark:border-gray-800 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="h-[43px] w-full bg-[#F8FAFC]">
-              <tr className="border-b border-[#E2E8F0]">
+            <thead className="h-[43px] w-full bg-[#F8FAFC] dark:bg-gray-800/80">
+              <tr className="border-b border-[#E2E8F0] dark:border-gray-800">
                 {['User', 'Role', 'Department', 'Last Active', 'Status', 'Actions'].map(h => (
-                  <th key={h} className={`px-5 py-3.5 text-left text-[12px] font-bold uppercase leading-[100%] text-[#64748B] ${h === 'Actions' ? 'text-right' : ''}`}
+                  <th key={h} className={`px-5 py-3.5 text-left text-[12px] font-bold uppercase leading-[100%] text-[#64748B] dark:text-gray-400 ${h === 'Actions' ? 'text-right' : ''}`}
                   style={{height: '15px', fontWeight: 700, fontStyle: 'bold'}}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E2E8F0]">
+            <tbody className="divide-y divide-[#E2E8F0] dark:divide-gray-800">
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-[#94A3B8]">
+                  <td colSpan={6} className="px-5 py-12 text-center text-sm text-[#94A3B8] dark:text-gray-400">
                     No users match the current filters.
                   </td>
                 </tr>
-              ) : paginated.map((user, userIndex) => (
-                <tr key={user.id} className="hover:bg-[#F8FAFC]/70 transition-colors group">
+              ) : paginated.map(user => (
+                <tr key={user.id} className="hover:bg-[#F8FAFC]/70 dark:hover:bg-gray-800/50 transition-colors group">
                   {/* User cell */}
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <Avatar name={user.full_name || user.username} picture={user.profile_picture} />
                       <div>
-                        <p className="text-sm font-semibold text-[#334155] leading-tight">
+                        <p className="text-sm font-semibold text-[#334155] dark:text-gray-200 leading-tight">
                           {user.full_name || user.username}
                           {user.id === currentUser?.id && (
-                            <span className="ml-1.5 text-[10px] text-[#94A3B8] font-normal">(You)</span>
+                            <span className="ml-1.5 text-[10px] text-[#94A3B8] dark:text-gray-400 font-normal">(You)</span>
                           )}
                         </p>
-                        <p className="text-xs text-gray-400">{user.email}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{user.email}</p>
                       </div>
                     </div>
                   </td>
 
                   {/* Role */}
                   <td className="px-5 py-3.5">
-                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${ROLE_COLORS[user.role] || 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${ROLE_COLORS[user.role] || 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}>
                       {user.role}
                     </span>
                   </td>
 
                   {/* Department */}
-                  <td className="px-5 py-3.5 text-sm text-gray-600">
-                    {user.department || <span className="text-gray-300">—</span>}
+                  <td className="px-5 py-3.5 text-sm text-gray-600 dark:text-gray-300">
+                    {user.department || <span className="text-gray-300 dark:text-gray-600">—</span>}
                   </td>
 
                   {/* Last Active (created_at as proxy) */}
-                  <td className="px-5 py-3.5 text-sm text-gray-500 whitespace-nowrap">
+                  <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                     {new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </td>
 
@@ -738,38 +712,52 @@ const UserManagement = () => {
                       <button
                         type="button"
                         onClick={event => {
-                          if (openActionMenu === user.id) {
+                          if (openActionMenu?.id === user.id) {
                             setOpenActionMenu(null)
                             return
                           }
-                          const rowBottom = event.currentTarget.getBoundingClientRect().bottom
-                          const isLastTwoRows = userIndex >= paginated.length - 2
-                          const opensUpward = isLastTwoRows || rowBottom + 180 > window.innerHeight
-                          setOpenActionMenu({ id: user.id, opensUpward })
+                          const buttonRect = event.currentTarget.getBoundingClientRect()
+                          const menuWidth = 176
+                          setOpenActionMenu({
+                            id: user.id,
+                            left: Math.max(8, buttonRect.right - menuWidth),
+                            top: buttonRect.bottom + 4,
+                          })
                         }}
                         aria-label={`Actions for ${user.full_name || user.username}`}
                         aria-expanded={openActionMenu?.id === user.id}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8E288D] transition-colors hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8E288D] dark:text-purple-400 transition-colors hover:bg-purple-50 dark:hover:bg-purple-950/40 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
                       >
                         <FiMoreVertical className="h-5 w-5" />
                       </button>
 
                       {openActionMenu?.id === user.id && (
-                        <div className={`absolute right-0 z-30 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 text-left shadow-xl ${openActionMenu.opensUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
-                          <button type="button" onClick={() => { setOpenActionMenu(null); openEditModal(user) }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-purple-50">
-                            <FiEdit2 className="h-4 w-4 text-[#8E288D]" /> Edit User
+                        createPortal(
+                        <div
+                          data-user-action-menu
+                          className="fixed z-[100] w-44 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 text-left shadow-xl"
+                          style={{
+                            left: openActionMenu.left,
+                            top: openActionMenu.top,
+                            maxHeight: `max(80px, calc(100vh - ${openActionMenu.top}px - 8px))`,
+                          }}
+                        >
+                          <button type="button" onClick={() => { setOpenActionMenu(null); openEditModal(user) }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-purple-50 dark:hover:bg-gray-700">
+                            <FiEdit2 className="h-4 w-4 text-[#8E288D] dark:text-purple-400" /> Edit User
                           </button>
-                          <button type="button" disabled={user.id === currentUser?.id} onClick={() => { setOpenActionMenu(null); handleUserAction(user, user.is_active ? 'deactivate' : 'activate') }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40">
-                            {user.is_active ? <FiUserX className="h-4 w-4 text-amber-600" /> : <FiUserCheck className="h-4 w-4 text-emerald-600" />}
+                          <button type="button" disabled={user.id === currentUser?.id} onClick={() => { setOpenActionMenu(null); handleUserAction(user, user.is_active ? 'deactivate' : 'activate') }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-amber-50 dark:hover:bg-amber-950/30 disabled:cursor-not-allowed disabled:opacity-40">
+                            {user.is_active ? <FiUserX className="h-4 w-4 text-amber-600 dark:text-amber-400" /> : <FiUserCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
                             {user.is_active ? 'Suspend User' : 'Activate User'}
                           </button>
-                          <button type="button" disabled={user.id === currentUser?.id} onClick={() => { setOpenActionMenu(null); handleUserAction(user, 'reset-password') }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40">
-                            <FiLock className="h-4 w-4 text-blue-600" /> Reset Password
+                          <button type="button" disabled={user.id === currentUser?.id} onClick={() => { setOpenActionMenu(null); handleUserAction(user, 'reset-password') }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:cursor-not-allowed disabled:opacity-40">
+                            <FiLock className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Reset Password
                           </button>
-                          <button type="button" disabled={user.id === currentUser?.id} onClick={() => { setOpenActionMenu(null); handleUserAction(user, 'delete') }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
+                          <button type="button" disabled={user.id === currentUser?.id} onClick={() => { setOpenActionMenu(null); handleUserAction(user, 'delete') }} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-500 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950/30 disabled:cursor-not-allowed disabled:opacity-40">
                             <FiTrash2 className="h-4 w-4" /> Delete User
                           </button>
-                        </div>
+                        </div>,
+                        document.body
+                        )
                       )}
                     </div>
                   </td>
@@ -780,15 +768,15 @@ const UserManagement = () => {
         </div>
 
         {/* Pagination */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50/50">
-          <span className="text-xs text-gray-500">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/40">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             Showing {filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safePage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length} users
           </span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={safePage === 1}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               <FiChevronLeft className="h-3.5 w-3.5" />
             </button>
@@ -798,7 +786,7 @@ const UserManagement = () => {
                 onClick={() => setPage(n)}
                 className={`w-7 h-7 rounded-lg text-xs font-semibold border transition ${n === safePage
                   ? 'bg-[#8E288D] text-white border-[#8E288D]'
-                  : 'border-gray-200 text-gray-600 hover:bg-white'}`}
+                  : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700'}`}
               >
                 {n}
               </button>
@@ -806,7 +794,7 @@ const UserManagement = () => {
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
-              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               <FiChevronRight className="h-3.5 w-3.5" />
             </button>
@@ -819,97 +807,81 @@ const UserManagement = () => {
       {/* ══════════════════════════════════════════════════════════════════ */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="flex items-center justify-between px-7 py-5 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <h3 className="text-xl font-extrabold text-[#5A1468]">Create New User</h3>
-                <Lock className="text-[#8E288D]" size={18} />
-              </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600 rounded-lg p-1 hover:bg-gray-100 transition">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-y-auto rounded-lg border border-[#8E288D]/30 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl">
+            <div className="flex min-h-20 items-center justify-between bg-[#efdfed] dark:bg-purple-950/50 px-7 py-4">
+              <h3 className="text-xl font-extrabold text-[#8E288D] dark:text-purple-300">Add New User</h3>
+              <button type="button" onClick={() => setShowCreateModal(false)} aria-label="Close add user form" className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e3c5df] dark:bg-purple-900/40 text-[#8E288D] dark:text-purple-300 transition hover:bg-[#d9b2d4] dark:hover:bg-purple-800/50">
                 <FiX className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleCreateUser} className="px-7 py-6 space-y-4">
-              <Field label="Full Name">
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+            <form onSubmit={handleCreateUser} className="flex flex-col">
+              <div className="grid grid-cols-1 gap-4 px-7 py-6">
+                <Field label="Full Name">
                   <input type="text" placeholder="e.g. Yoseph Daniel" value={formData.fullName}
                     onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                    className={inputCls} />
-                </div>
-              </Field>
-              <Field label="User Email">
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                    className={`${inputCls} rounded-lg py-3 pl-4`} />
+                </Field>
+                <Field label="Email Address">
                   <input type="email" required placeholder="e.g. yoseph@cbe.com.et" value={formData.email}
                     onChange={e => setFormData({ ...formData, email: e.target.value })}
-                    className={inputCls} />
-                </div>
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Department">
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={15} />
-                    <select value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })}
-                      className={`${inputCls} pr-7 appearance-none`}>
-                      <option value="">Select Dept.</option>
-                      {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                    <svg className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
+                    className={`${inputCls} rounded-lg py-3 pl-4`} />
                 </Field>
-                <Field label="Role">
-                  <div className="relative">
-                    <FiShield className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={15} />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Role">
                     <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}
-                      className={`${inputCls} pr-7 appearance-none`}>
+                      className={`${inputCls} appearance-none rounded-lg py-3 pl-4`}>
                       <option value="officer">Officer</option>
                       <option value="manager">Manager</option>
                       <option value="admin">Admin</option>
                     </select>
-                    <svg className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
-                </Field>
+                  </Field>
+                  <Field label="Department">
+                    <select value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })}
+                      className={`${inputCls} appearance-none rounded-lg py-3 pl-4`}>
+                      <option value="">Select Department</option>
+                      {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Security Password">
+                    <div className="relative">
+                      <input type={showPassword ? 'text' : 'password'} required placeholder="············" value={formData.password}
+                        onChange={e => setFormData({ ...formData, password: e.target.value })}
+                        className={`${inputCls} rounded-lg py-3 pl-4 pr-10`} />
+                      <button type="button" onClick={() => setShowPassword(p => !p)} aria-label={showPassword ? 'Hide password' : 'Show password'} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </Field>
+                  <Field label="Confirm Password">
+                    <div className="relative">
+                      <input type={showConfirmPassword ? 'text' : 'password'} required placeholder="············" value={formData.confirmPassword}
+                        onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                        className={`${inputCls} rounded-lg py-3 pl-4 pr-10`} />
+                      <button type="button" onClick={() => setShowConfirmPassword(p => !p)} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </Field>
+                </div>
               </div>
-              <Field label="Security Password">
-                <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                  <input type={showPassword ? 'text' : 'password'} required placeholder="············" value={formData.password}
-                    onChange={e => setFormData({ ...formData, password: e.target.value })}
-                    className={`${inputCls} pr-10`} />
-                  <button type="button" onClick={() => setShowPassword(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-              </Field>
-              <Field label="Confirm Password">
-                <div className="relative">
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
-                  <input type={showConfirmPassword ? 'text' : 'password'} required placeholder="············" value={formData.confirmPassword}
-                    onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className={`${inputCls} pr-10`} />
-                  <button type="button" onClick={() => setShowConfirmPassword(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                  </button>
-                </div>
-              </Field>
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800 px-7 py-5">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="w-36 h-10 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors sm:w-24"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="w-36 h-10 rounded-lg bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors"
+                  className="min-w-32 h-10 rounded-lg bg-[#8E288D] px-5 text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors"
                 >
-                  Create Account
+                  Add Member
                 </button>
               </div>
-              
             </form>
           </div>
         </div>
@@ -918,17 +890,18 @@ const UserManagement = () => {
       {/* ── Edit User Modal ────────────────────────────────────────────── */}
       {showEditModal && selectedUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="flex items-center justify-between px-7 py-5 border-b border-gray-100">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-y-auto rounded-lg border border-[#8E288D]/30 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl">
+            <div className="flex min-h-20 items-center justify-between bg-[#efdfed] dark:bg-purple-950/50 px-7 py-4">
               <div className="flex items-center gap-2">
-                <h3 className="text-xl font-extrabold text-[#5A1468]">Edit User</h3>
-                <FiEdit2 className="text-[#8E288D]" size={18} />
+                <h3 className="text-xl font-extrabold text-[#8E288D] dark:text-purple-300">Edit User</h3>
+                <FiEdit2 className="text-[#8E288D] dark:text-purple-300" size={18} />
               </div>
-              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 rounded-lg p-1 hover:bg-gray-100 transition">
+              <button type="button" onClick={() => setShowEditModal(false)} aria-label="Close edit user form" className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e3c5df] dark:bg-purple-900/40 text-[#8E288D] dark:text-purple-300 transition hover:bg-[#d9b2d4] dark:hover:bg-purple-800/50">
                 <FiX className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleEditUser} className="px-7 py-6 space-y-4">
+            <form onSubmit={handleEditUser} className="flex flex-col">
+              <div className="grid grid-cols-1 gap-4 px-7 py-6">
               <Field label="Full Name">
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
@@ -971,7 +944,7 @@ const UserManagement = () => {
                     <select value={editData.role}
                       disabled={selectedUser.id === currentUser?.id}
                       onChange={e => setEditData({ ...editData, role: e.target.value })}
-                      className={`${inputCls} pr-7 appearance-none disabled:bg-gray-50 disabled:text-gray-400`}>
+                      className={`${inputCls} pr-7 appearance-none disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-400`}>
                       <option value="officer">Officer</option>
                       <option value="manager">Manager</option>
                       <option value="admin">Admin</option>
@@ -980,9 +953,10 @@ const UserManagement = () => {
                   </div>
                 </Field>
               </div>
-              <div className="flex justify-end gap-3 pt-2">
+              </div>
+              <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800 px-7 py-5">
                 <button type="button" onClick={() => setShowEditModal(false)}
-                  className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                  className="w-36 h-10 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
                 <button type="submit"
                   className="w-36 h-10 rounded-lg bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors">
                     Save Changes</button>
@@ -995,32 +969,34 @@ const UserManagement = () => {
       {/* ── Activate / Deactivate Confirmation Modal ───────────────────── */}
       {showActionModal && selectedUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${pendingAction === 'deactivate' ? 'bg-amber-100' : 'bg-emerald-100'}`}>
+          <div className="w-full max-w-lg overflow-hidden rounded-lg border border-[#8E288D]/30 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl">
+            <div className="flex min-h-20 items-center gap-3 bg-[#efdfed] dark:bg-purple-950/50 px-7 py-4">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${pendingAction === 'deactivate' ? 'bg-amber-100 dark:bg-amber-900/40' : 'bg-emerald-100 dark:bg-emerald-900/40'}`}>
                 {pendingAction === 'deactivate'
-                  ? <FiUserX className="h-6 w-6 text-amber-600" />
-                  : <FiUserCheck className="h-6 w-6 text-emerald-600" />}
+                  ? <FiUserX className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                  : <FiUserCheck className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />}
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">
+                <h3 className="text-xl font-extrabold text-[#8E288D] dark:text-purple-300">
                   {pendingAction === 'deactivate' ? 'Deactivate User' : 'Activate User'}
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {pendingAction === 'deactivate' ? 'This will disable the user account.' : 'This will re-enable the user account.'}
                 </p>
               </div>
             </div>
-            <p className="text-gray-700 mb-6 text-sm">
-              Are you sure you want to {pendingAction === 'deactivate' ? 'deactivate' : 'activate'} <strong>{selectedUser.username}</strong>?
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => { setShowActionModal(false); setSelectedUser(null); setPendingAction(null) }}
-                className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={confirmPendingAction}
-                className={`w-36 h-10 rounded-lg text-sm font-semibold text-white transition-colors ${pendingAction === 'deactivate' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-                {pendingAction === 'deactivate' ? 'Deactivate' : 'Activate'}
-              </button>
+            <div className="px-7 py-6">
+              <p className="mb-6 text-sm text-gray-700 dark:text-gray-300">
+                Are you sure you want to {pendingAction === 'deactivate' ? 'deactivate' : 'activate'} <strong>{selectedUser.username}</strong>?
+              </p>
+              <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800 px-7 py-5 -mx-7 -mb-6">
+                <button onClick={() => { setShowActionModal(false); setSelectedUser(null); setPendingAction(null) }}
+                  className="w-36 h-10 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+                <button onClick={confirmPendingAction}
+                  className={`w-36 h-10 rounded-lg text-sm font-semibold text-white transition-colors ${pendingAction === 'deactivate' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                  {pendingAction === 'deactivate' ? 'Deactivate' : 'Activate'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1029,46 +1005,41 @@ const UserManagement = () => {
       {/* ── Reset Password Modal ───────────────────────────────────────── */}
       {showResetPasswordModal && selectedUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <FiLock className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Reset Password</h3>
-                  <p className="text-xs text-gray-500">Set a new password for <strong>{selectedUser.username}</strong></p>
-                </div>
+          <div className="w-full max-w-2xl overflow-hidden rounded-lg border border-[#8E288D]/30 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl">
+            <div className="flex min-h-20 items-center justify-between bg-[#efdfed] dark:bg-purple-950/50 px-7 py-4">
+              <div>
+                <h3 className="text-xl font-extrabold text-[#8E288D] dark:text-purple-300">Reset Password</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Set a new password for <strong>{selectedUser.username}</strong></p>
               </div>
-              <button onClick={() => { setShowResetPasswordModal(false); setSelectedUser(null); setResetForm({ newPassword: '', confirmPassword: '' }) }}
-                className="text-gray-400 hover:text-gray-600 rounded-lg p-1 hover:bg-gray-100 transition">
+              <button type="button" onClick={() => { setShowResetPasswordModal(false); setSelectedUser(null); setResetForm({ newPassword: '', confirmPassword: '' }) }} aria-label="Close reset password form"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e3c5df] dark:bg-purple-900/40 text-[#8E288D] dark:text-purple-300 transition hover:bg-[#d9b2d4] dark:hover:bg-purple-800/50">
                 <FiX className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
-              <div className="relative">
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">New Password</label>
-                <Hash className="absolute left-3 top-[2.35rem] text-gray-400" size={15} />
-                <input type={showPassword ? 'text' : 'password'} required placeholder="············" value={resetForm.newPassword}
-                  onChange={e => setResetForm({ ...resetForm, newPassword: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 focus:border-[#8E288D]" />
-                <button type="button" onClick={() => setShowPassword(p => !p)} className="absolute right-3 top-[2.35rem] text-gray-400 hover:text-gray-600">
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
+            <form onSubmit={handleResetPasswordSubmit} className="flex flex-col">
+              <div className="grid grid-cols-1 gap-4 px-7 py-6 sm:grid-cols-2">
+                <div className="relative">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">New Password</label>
+                  <input type={showPassword ? 'text' : 'password'} required placeholder="············" value={resetForm.newPassword}
+                    onChange={e => setResetForm({ ...resetForm, newPassword: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 py-3 pl-4 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 focus:border-[#8E288D]" />
+                  <button type="button" onClick={() => setShowPassword(p => !p)} aria-label={showPassword ? 'Hide password' : 'Show password'} className="absolute right-3 top-[2.35rem] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                <div className="relative">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Confirm Password</label>
+                  <input type={showConfirmPassword ? 'text' : 'password'} required placeholder="············" value={resetForm.confirmPassword}
+                    onChange={e => setResetForm({ ...resetForm, confirmPassword: e.target.value })}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 py-3 pl-4 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 focus:border-[#8E288D]" />
+                  <button type="button" onClick={() => setShowConfirmPassword(p => !p)} aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'} className="absolute right-3 top-[2.35rem] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
               </div>
-              <div className="relative">
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Confirm Password</label>
-                <Hash className="absolute left-3 top-[2.35rem] text-gray-400" size={15} />
-                <input type={showConfirmPassword ? 'text' : 'password'} required placeholder="············" value={resetForm.confirmPassword}
-                  onChange={e => setResetForm({ ...resetForm, confirmPassword: e.target.value })}
-                  className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30 focus:border-[#8E288D]" />
-                <button type="button" onClick={() => setShowConfirmPassword(p => !p)} className="absolute right-3 top-[2.35rem] text-gray-400 hover:text-gray-600">
-                  {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800 px-7 py-5">
                 <button type="button" onClick={() => { setShowResetPasswordModal(false); setSelectedUser(null); setResetForm({ newPassword: '', confirmPassword: '' }) }}
-                  className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                  className="w-36 h-10 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
                 <button type="submit"
                   className="w-36 h-10 rounded-lg bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7A1E79] transition-colors">Reset Password</button>
               </div>
@@ -1080,24 +1051,26 @@ const UserManagement = () => {
       {/* ── Delete Confirmation Modal ──────────────────────────────────── */}
       {showDeleteModal && selectedUser && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <FiTrash2 className="h-6 w-6 text-red-500" />
+          <div className="w-full max-w-lg overflow-hidden rounded-lg border border-[#8E288D]/30 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-2xl">
+            <div className="flex min-h-20 items-center gap-3 bg-[#efdfed] dark:bg-purple-950/50 px-7 py-4">
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center">
+                <FiTrash2 className="h-6 w-6 text-red-500 dark:text-red-400" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Delete User</h3>
-                <p className="text-sm text-gray-500">This action cannot be undone</p>
+                <h3 className="text-xl font-extrabold text-[#8E288D] dark:text-purple-300">Delete User</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">This action cannot be undone</p>
               </div>
             </div>
-            <p className="text-sm text-gray-700 mb-6">
-              Are you sure you want to delete <strong>{selectedUser.full_name}</strong>? All associated reconciliations will also be deleted.
-            </p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => { setShowDeleteModal(false); setSelectedUser(null) }}
-                className="w-36 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={handleDeleteUser}
-                className="w-36 h-10 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 transition-colors">Delete User</button>
+            <div className="px-7 py-6">
+              <p className="mb-6 text-sm text-gray-700 dark:text-gray-300">
+                Are you sure you want to delete <strong>{selectedUser.full_name}</strong>? All associated reconciliations will also be deleted.
+              </p>
+              <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800 px-7 py-5 -mx-7 -mb-6">
+                <button onClick={() => { setShowDeleteModal(false); setSelectedUser(null) }}
+                  className="w-36 h-10 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+                <button onClick={handleDeleteUser}
+                  className="w-36 h-10 rounded-lg bg-red-500 text-sm font-semibold text-white hover:bg-red-600 transition-colors">Delete User</button>
+              </div>
             </div>
           </div>
         </div>

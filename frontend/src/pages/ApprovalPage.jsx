@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -117,17 +117,38 @@ const getAllowedStatusValues = category => {
   return new Set(['pending', 'reconciled', 'unreconciled'])
 }
 
+const effectiveStatus = (preferredStatus, fallbackStatus) => {
+  const pendingStatuses = new Set(['pending', 'checking'])
+  if (pendingStatuses.has(preferredStatus) && fallbackStatus && !pendingStatuses.has(fallbackStatus)) {
+    return fallbackStatus
+  }
+  return preferredStatus || fallbackStatus || 'pending'
+}
+
 // ── Per-record status dropdown ────────────────────────────────────────────────
 const StatusDropdown = ({ recordId, category, current, onSelect, loading }) => {
   const [open, setOpen] = useState(false)
+  const containerRef = useRef(null)
   const currentStatus = STATUS_MAP[current] || STATUS_MAP.pending
   const cls = statusBadgeCls[current] || statusBadgeCls.pending
   const allowedStatuses = getAllowedStatusValues(category)
 
+  // Close on outside click without blocking the underlying click target
+  useEffect(() => {
+    if (!open) return
+    const handleOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [open])
+
   if (loading) return <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#8E288D]" />
 
   return (
-    <div className="relative inline-block text-left">
+    <div className="relative inline-block text-left" ref={containerRef}>
       <button
         onClick={() => setOpen(o => !o)}
         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border cursor-pointer hover:opacity-80 ${cls}`}
@@ -136,27 +157,24 @@ const StatusDropdown = ({ recordId, category, current, onSelect, loading }) => {
         <FiChevronDown className="w-3 h-3" />
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 mt-1 z-20 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[220px]">
-            {STATUSES.map(s => (
-              <button
-                key={s.value}
-                disabled={!allowedStatuses.has(s.value) || s.value === current}
-                onClick={() => { setOpen(false); onSelect(recordId, s.value) }}
-                className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 ${
-                  !allowedStatuses.has(s.value) || s.value === current
-                    ? 'cursor-not-allowed text-gray-300'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[s.value].split(' ')[0]} ${!allowedStatuses.has(s.value) || s.value === current ? 'opacity-40' : ''}`} />
-                {s.label}
-                {s.value === current && ' (current)'}
-              </button>
-            ))}
-          </div>
-        </>
+        <div className="absolute left-0 mt-1 z-20 bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[220px]">
+          {STATUSES.map(s => (
+            <button
+              key={s.value}
+              disabled={!allowedStatuses.has(s.value) || s.value === current}
+              onClick={() => { setOpen(false); onSelect(recordId, s.value) }}
+              className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 ${
+                !allowedStatuses.has(s.value) || s.value === current
+                  ? 'cursor-not-allowed text-gray-300'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${statusBadgeCls[s.value].split(' ')[0]} ${!allowedStatuses.has(s.value) || s.value === current ? 'opacity-40' : ''}`} />
+              {s.label}
+              {s.value === current && ' (current)'}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -196,9 +214,9 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
 
   const getStatusValue = (record) => {
     if (stage === 'approve') {
-      return record?.approver_status || record?.approval_status || record?.check_status || record?.checker_status || 'pending'
+      return effectiveStatus(record?.approver_status, record?.approval_status)
     }
-    return record?.check_status || record?.checker_status || 'pending'
+    return effectiveStatus(record?.checker_status, record?.check_status)
   }
 
   const getTargetSummary = targetCategory => {
@@ -274,7 +292,12 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
     return selectedCount >= targetSummary.total
   }
 
-  const loadingKey = loading && Object.keys(loading).find(k => k.startsWith(category) && loading[k])
+  const isBulkLoading = loading && Object.keys(loading).some(k => {
+    if (!loading[k]) return false
+    if (selectionMode) return k.startsWith('Selected')
+    if (category === 'Unmatched') return k.startsWith('Unmatched') || k.startsWith('Physical Unmatched') || k.startsWith('ERP Unmatched')
+    return k.startsWith(category)
+  })
   const categorySummary = selectionMode
     ? { total: selectedRecords.length }
     : category === 'Unmatched'
@@ -294,10 +317,10 @@ const BulkDropdown = ({ category, onSelect, loading, approvalSummary, records = 
       <button
         type="button"
         onClick={() => { setOpen(o => !o); setSubCat(null) }}
-        disabled={!!loadingKey || noRecords}
+        disabled={!!isBulkLoading || noRecords}
         className={`inline-flex items-center justify-center gap-1 rounded text-xs font-medium text-white bg-[#8E288D] hover:bg-[#7A1E79] disabled:cursor-not-allowed disabled:opacity-50 transition-colors ${className}`}
       >
-        {loadingKey ? <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" /> : null}
+        {isBulkLoading ? <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" /> : null}
         {actionLabel} <FiChevronDown className="w-3 h-3" />
       </button>
 
@@ -424,7 +447,7 @@ const ApprovalPage = () => {
   const selectedRecords = Array.from(selectedRecordMap.values())
   const visibleRowsSelected = records.length > 0 && records.every(record => selectedRecordMap.has(record.id))
   const isRecordChecked = (record) => {
-    const value = record?.checker_status || record?.check_status || 'pending'
+    const value = effectiveStatus(record?.checker_status, record?.check_status)
     return value !== 'pending' && value !== 'checking' && value !== '' && value !== null
   }
 
@@ -672,7 +695,22 @@ const ApprovalPage = () => {
       const isPrivilegedReviewer = hasRole('manager') || hasRole('admin')
       const usingSelection = selectedRecords.length > 0
       const allRecordsForCategory = usingSelection ? selectedRecords : getRecordsForCategory(category)
-      const allChecked = allRecordsForCategory.length > 0 && allRecordsForCategory.every(isRecordChecked)
+      // For selection mode: check local records (exact set is known).
+      // For category-wide mode: prefer server-side stage_counts (accurate for 66K+ records),
+      // fall back to local records only when summary is unavailable.
+      let allChecked
+      if (usingSelection) {
+        allChecked = allRecordsForCategory.length > 0 && allRecordsForCategory.every(isRecordChecked)
+      } else {
+        const checkCounts = summary[category]?.stage_counts?.check
+        if (checkCounts && Object.keys(checkCounts).length) {
+          const total = Object.values(checkCounts).reduce((s, c) => s + Number(c || 0), 0)
+          const pending = Number(checkCounts.pending || 0) + Number(checkCounts.checking || 0)
+          allChecked = total > 0 && pending === 0
+        } else {
+          allChecked = allRecordsForCategory.length > 0 && allRecordsForCategory.every(isRecordChecked)
+        }
+      }
       if (isPrivilegedReviewer && !allChecked) {
         toast.error('All records in this category must be checked before bulk approval can be done.')
         return
@@ -1224,7 +1262,7 @@ const ApprovalPage = () => {
                         <StatusDropdown
                           recordId={rec.id}
                           category={rec.category}
-                          current={rec.checker_status || rec.check_status || 'pending'}
+                          current={effectiveStatus(rec.checker_status, rec.check_status)}
                           onSelect={handleRecordDecision}
                           loading={!!actionLoading[rec.id]}
                         />
@@ -1232,7 +1270,7 @@ const ApprovalPage = () => {
                     ) : (
                       <div className="px-4 py-2.5">
                         <span className="text-xs font-bold" style={{ color: '#475569' }}>
-                          {STATUS_MAP[rec.checker_status || rec.check_status || 'pending']?.label || 'Pending'}
+                          {STATUS_MAP[effectiveStatus(rec.checker_status, rec.check_status)]?.label || 'Pending'}
                         </span>
                       </div>
                     )}

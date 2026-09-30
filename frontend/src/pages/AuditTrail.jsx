@@ -35,9 +35,9 @@ const getMeta = operation => OP_META[operation] || {
 const getStatus = operation => operation === 'LOGIN_FAILED' ? 'Failed' : operation === 'PROCESS_RECONCILIATION' ? 'Running' : 'Success'
 
 const statusClasses = {
-  Success: 'text-[#10B981]',
-  Running: 'text-blue-600',
-  Failed: 'text-red-600',
+  Success: 'text-[#10B981] dark:text-emerald-400',
+  Running: 'text-blue-600 dark:text-blue-400',
+  Failed: 'text-red-600 dark:text-rose-400',
 }
 
 
@@ -131,8 +131,8 @@ const AuditTrail = () => {
   if (loading) return <div className="flex h-64 items-center justify-center"><div className="h-12 w-12 animate-spin rounded-full border-b-2 border-[#8E288D]" /></div>
 
   return (
-    <div className="min-w-0 space-y-5 bg-[#f7f9fc] pb-10">
-      <p className="text-lg text-slate-500">Track all system activities and user actions across the platform</p>
+    <div className="min-w-0 space-y-5 bg-[#f7f9fc] dark:bg-transparent pb-10">
+      <p className="text-lg text-slate-500 dark:text-gray-400">Track all system activities and user actions across the platform</p>
 
       <div className="grid w-full grid-cols-1 gap-4 p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -141,36 +141,39 @@ const AuditTrail = () => {
             value: totalEvents.toLocaleString(),
             valueUnit: 'events Recorded',
             note: `${todayEvents.toLocaleString()} events Recorded`,
-            // description: 'Total Registered Events',
             status: `${todayEvents.toLocaleString()} + events`,
             icon: <FiActivity />,
             color: '#8E288D',
-            lightColor: '#E1C3DF',
-            statusBg: '#E1C3DF',
+            darkColor: 'text-purple-400',
+            bgGradient: 'bg-gradient-to-r from-white to-[#E1C3DF] dark:from-gray-900 dark:to-purple-950/30 dark:border-gray-800',
+            badgeBg: 'bg-[#E1C3DF] dark:bg-purple-900/40 text-black dark:text-purple-200',
+            statusText: 'text-[#8E288D] dark:text-purple-300',
           },
           {
             label: 'User Actions',
             value: userActions.toLocaleString(),
             valueUnit: 'Login Attempts Recorded',
             note: `${new Set(logs.map(log => log.user_id)).size} unique users`,
-            // description: 'Total User Actions',
             status: `${new Set(logs.map(log => log.user_id)).size} unique users`,
             icon: <FiUser />,
             color: '#CFB53B',
-            lightColor: '#F5EFCF',
-            statusBg: '#F5EFCF',
+            darkColor: 'text-amber-400',
+            bgGradient: 'bg-gradient-to-r from-white to-[#F5EFCF] dark:from-gray-900 dark:to-amber-950/30 dark:border-gray-800',
+            badgeBg: 'bg-[#F5EFCF] dark:bg-amber-900/40 text-black dark:text-amber-200',
+            statusText: 'text-[#CFB53B] dark:text-amber-300',
           },
           {
             label: 'System Events',
             value: systemEvents.toLocaleString(),
             valueUnit: 'Automated Events',
             note: 'No failure alerts',
-            // description: 'Total Automated Events',
             status: 'Healthy',
             icon: <FiSettings />,
             color: '#10B981',
-            lightColor: '#D1FAE5',
-            statusBg: '#D1FAE5',
+            darkColor: 'text-emerald-400',
+            bgGradient: 'bg-gradient-to-r from-white to-[#D1FAE5] dark:from-gray-900 dark:to-emerald-950/30 dark:border-gray-800',
+            badgeBg: 'bg-[#D1FAE5] dark:bg-emerald-900/40 text-black dark:text-emerald-200',
+            statusText: 'text-[#10B981] dark:text-emerald-300',
           },
           {
             label: 'Flagged Items',
@@ -179,51 +182,36 @@ const AuditTrail = () => {
             note: flaggedItems
               ? 'Requires security review'
               : 'No security alerts',
-            // description: 'Security Flagged Items',
             status: flaggedItems ? 'Review' : 'Requires Security Review',
             icon: <FiAlertTriangle />,
             color: '#DC2626',
-            lightColor: '#FEE2E2',
-            statusBg: '#FEE2E2',
+            darkColor: 'text-rose-400',
+            bgGradient: 'bg-gradient-to-r from-white to-[#FEE2E2] dark:from-gray-900 dark:to-rose-950/30 dark:border-gray-800',
+            badgeBg: 'bg-[#FEE2E2] dark:bg-rose-900/40 text-black dark:text-rose-200',
+            statusText: 'text-[#DC2626] dark:text-rose-300',
           },
         ].map(card => (
           <div
             key={card.label}
-            className="h-[140px] w-full rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md"
-            style={{
-              background: `linear-gradient(to right, #FFFFFF 0%, ${card.lightColor} 100%)`,
-            }}
+            className={`h-[140px] w-full rounded-2xl border border-slate-100 p-0 shadow-sm transition-shadow hover:shadow-md ${card.bgGradient}`}
           >
             {/* KPI Label + Icon */}
             <div
-              className="relative flex h-[32px] items-center justify-left gap-3 rounded-[8px] px-3 py-1.5 text-xs font-bold uppercase tracking-wider"
-              style={{
-                color: '#000000',
-                backgroundColor: card.lightColor,
-              }}
+              className={`relative flex h-[32px] items-center justify-start gap-3 rounded-[8px] px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${card.badgeBg}`}
             >
               {/* Icon */}
               <span
-                className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px]"
+                className={`absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px] ${card.darkColor}`}
                 style={{
                   color: card.color,
-                  fontSize: '16px',
                 }}
               >
                 {card.icon}
               </span>
-              {/* <span
-                className="absolute left-0 flex h-[20px] w-[20px] items-center justify-center rounded-[6px] px-3 py-0.5 text-[16px] font-extrabold"
-                style={{
-                  color: card.color,
-                }}
-              >
-                {card.icon}
-              </span> */}
 
               {/* Label */}
               <span
-                className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+                className="ml-8 mt-1 text-center text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280] dark:text-gray-300"
                 style={{
                   height: '14px',
                   fontFamily: 'Geist, sans-serif',
@@ -241,7 +229,7 @@ const AuditTrail = () => {
               {/* Value */}
               <div className="flex h-[36px] w-full flex-row items-center gap-2">
                 <p
-                  className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                  className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-white"
                   style={{
                     fontFamily: 'Geist, sans-serif',
                     fontWeight: 800,
@@ -251,7 +239,7 @@ const AuditTrail = () => {
                 </p>
 
                 <p
-                  className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                  className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                   style={{
                     fontFamily: 'Geist, sans-serif',
                     fontWeight: 600,
@@ -264,9 +252,8 @@ const AuditTrail = () => {
               {/* Description + Status */}
               <div className="flex h-[24px] w-full items-center justify-end pr-2">
                 <span
-                  className="flex items-center justify-center px-2 text-[12px] font-bold"
+                  className={`flex items-center justify-center px-2 text-[12px] font-bold ${card.statusText}`}
                   style={{
-                    color: card.color,
                     fontFamily: 'Geist, sans-serif',
                     fontWeight: 700,
                   }}
@@ -274,57 +261,32 @@ const AuditTrail = () => {
                   {card.status}
                 </span>
               </div>
-              {/* <div className="flex h-[24px] w-full flex-row items-center justify-between gap-3">
-                <p
-                  className="text-[12px] font-normal leading-[100%] tracking-[0%] text-[#94A3B8]"
-                  style={{
-                    fontFamily: 'Geist, sans-serif',
-                    fontWeight: 400,
-                  }}
-                >
-                  {card.description}
-                </p>
-
-                <span
-                  className="flex h-[16px] w-[146px] items-center justify-center text-[12px] font-bold"
-                  style={{
-                    color: card.color,
-                    backgroundColor: card.statusBg,
-                    fontFamily: 'Geist, sans-serif',
-                    fontWeight: 700,
-                  }}
-                >
-                  {card.status}
-                </span>
-              </div> */}
             </div>
           </div>
         ))}
       </div>
 
-      <div className="grid w-full grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-2 lg:grid-cols-5">
-      {/* <div className="flex min-h-[76px] w-full flex-wrap items-center gap-4 rounded-[14px] border border-[#E2E8F0] bg-[#FFFFFF] p-5 shadow-sm"> */}
+      <div className="grid w-full grid-cols-1 gap-3 rounded-xl border border-slate-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 shadow-sm md:grid-cols-2 lg:grid-cols-5">
 
         {/* Search */}
-        {/* <div className="relative min-w-0 lg:col-span-2"> */}
         <div className="relative lg:col-span-2 h-[36px] min-w-0 flex-1 items-center gap-2 text-sm xl:max-w-[643px]">
-          <FiSearch className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94A3B8]" />
+          <FiSearch className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94A3B8] dark:text-gray-400" />
           <input
             value={search}
             onChange={event => setSearch(event.target.value)}
             placeholder="Search by keyword, user, IP ..."
-            className="w-full rounded-xl border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D]"
+            className="w-full rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2.5 pl-10 pr-3 text-sm text-slate-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-none transition focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D]"
           />
         </div>
 
         {/* Date Range */}
         <label className="relative flex items-center gap-2">
-          <FiCalendar className="absolute left-3 z-10 text-slate-500" />
+          <FiCalendar className="absolute left-3 z-10 text-slate-500 dark:text-gray-400" />
 
           <select
             value={dateRange}
             onChange={event => setDateRange(Number(event.target.value))}
-            className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-sm font-semibold text-slate-700 outline-none transition hover:border-slate-300 focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D]"
+            className="w-full appearance-none rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2.5 pl-10 pr-9 text-sm font-semibold text-slate-700 dark:text-gray-200 outline-none transition hover:border-slate-300 dark:hover:border-gray-600 focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D]"
           >
             <option value={1}>Last 1 Day</option>
 
@@ -335,17 +297,17 @@ const AuditTrail = () => {
             ))}
           </select>
 
-          <FiChevronDown className="pointer-events-none absolute right-3 text-slate-500" />
+          <FiChevronDown className="pointer-events-none absolute right-3 text-slate-500 dark:text-gray-400" />
         </label>
 
         {/* Event Type */}
         <label className="relative flex items-center gap-2">
-          <FiFilter className="absolute left-3 z-10 text-slate-500" />
+          <FiFilter className="absolute left-3 z-10 text-slate-500 dark:text-gray-400" />
 
           <select
             value={filter}
             onChange={event => setFilter(event.target.value)}
-            className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-sm font-semibold text-slate-700 outline-none transition hover:border-slate-300 focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D]"
+            className="w-full appearance-none rounded-xl border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-2.5 pl-10 pr-9 text-sm font-semibold text-slate-700 dark:text-gray-200 outline-none transition hover:border-slate-300 dark:hover:border-gray-600 focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D]"
           >
             <option value="all">All Event Types</option>
 
@@ -356,7 +318,7 @@ const AuditTrail = () => {
             ))}
           </select>
 
-          <FiChevronDown className="pointer-events-none absolute right-3 text-slate-500" />
+          <FiChevronDown className="pointer-events-none absolute right-3 text-slate-500 dark:text-gray-400" />
         </label>
 
         {/* Export */}
@@ -373,50 +335,50 @@ const AuditTrail = () => {
 
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm">
         {filteredLogs.length === 0 ?
-          <div className="p-12 text-center text-slate-500">
-            <FiActivity className="mx-auto mb-3 h-12 w-12 text-slate-300" />
+          <div className="p-12 text-center text-slate-500 dark:text-gray-400">
+            <FiActivity className="mx-auto mb-3 h-12 w-12 text-slate-300 dark:text-gray-600" />
             <p className="font-medium">No audit logs found</p>
             <p className="mt-1 text-sm">Try adjusting your filters or search</p>
           </div> :
           <div className="overflow-x-auto">
             <table className="min-w-[1050px] w-full text-center dark:bg-gray-900">
-              <thead className="bg-slate-50 text-[12px] uppercase tracking-wide text-[#64748B] text-center dark:bg-gray-800">
+              <thead className="bg-slate-50 text-[12px] uppercase tracking-wide text-[#64748B] dark:text-gray-400 text-center dark:bg-gray-800">
                 <tr>
                   {['Timestamp', 'User', 'Action', 'Module', 'Details', 'IP Address', 'Status'].map(header => 
-                  <th key={header} className="border-b border-slate-200 px-4 py-3 font-bold">{header}</th>
+                  <th key={header} className="border-b border-slate-200 dark:border-gray-800 px-4 py-3 font-bold">{header}</th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-gray-700">
+              <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
                 {paginatedLogs.map(log => { const meta = getMeta(log.operation_type); 
                 const Icon = meta.icon; const status = getStatus(log.operation_type);
                 const expanded = expandedLog === log.id; 
                 return <React.Fragment key={log.id}>
-                <tr onClick={() => setExpandedLog(expanded ? null : log.id)} className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-gray-800">
-                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
+                <tr onClick={() => setExpandedLog(expanded ? null : log.id)} className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-gray-800/60">
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500 dark:text-gray-400">
                     {new Date(log.timestamp).toLocaleString()}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-slate-700 dark:text-gray-200">
                     <div>{log.full_name || 'Name unavailable'}</div>
-                    <div className="text-xs font-normal text-slate-400">
-                      User Name: <span className='text-[#8E288D] text-sm'>{log.username || `User #${log.user_id}`}</span>
+                    <div className="text-xs font-normal text-slate-400 dark:text-gray-400">
+                      User Name: <span className='text-[#8E288D] dark:text-purple-400 text-sm'>{log.username || `User #${log.user_id}`}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-700">
+                  <td className="px-4 py-3 text-sm text-slate-700 dark:text-gray-200">
                     <span className="inline-flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-[#8E288D]" />
+                      <Icon className="h-4 w-4 text-[#8E288D] dark:text-purple-400" />
                       {meta.label}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-400">
+                  <td className="px-4 py-3 text-sm text-slate-400 dark:text-gray-400">
                     {meta.module}
                   </td>
-                  <td className="max-w-[360px] truncate px-4 py-3 text-sm text-slate-600">
+                  <td className="max-w-[360px] truncate px-4 py-3 text-sm text-slate-600 dark:text-gray-300">
                     {Object.values(log.details || {}).join('; ') || `${meta.label} recorded`}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-400">
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-400 dark:text-gray-400">
                     {log.ip_address || 'Unknown'}
                   </td>
                   <td className="px-4 py-3">
@@ -426,12 +388,12 @@ const AuditTrail = () => {
                   </td>
                 </tr>
                 {expanded && 
-                <tr className="bg-slate-50">
+                <tr className="bg-slate-50 dark:bg-gray-800/80">
                   <td colSpan={7} className="px-4 py-3">
-                    <div className="grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-2 text-xs text-slate-600 dark:text-gray-300 sm:grid-cols-3">
                       {Object.entries(log.details || {}).map(([key, value]) => 
                       <div key={key}>
-                        <span className="text-slate-400">{key.replace(/_/g, ' ')}: 
+                        <span className="text-slate-400 dark:text-gray-400">{key.replace(/_/g, ' ')}: 
                         </span>
                         <span className="font-semibold">
                           {String(value)}
@@ -443,7 +405,7 @@ const AuditTrail = () => {
               </tbody>
             </table>
           </div>}
-        {filteredLogs.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50/50 px-5 py-3 dark:border-gray-700 dark:bg-gray-800"><span className="text-xs text-gray-500 dark:text-gray-300">Showing {(safePage - 1) * LOGS_PER_PAGE + 1}–{Math.min(safePage * LOGS_PER_PAGE, filteredLogs.length)} of {filteredLogs.length} logs</span><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-gray-300">Logs <select value={limit} onChange={event => setLimit(Number(event.target.value))} className="appearance-none rounded-lg border border-[#972b91] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none transition hover:border-[#7d2278] focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D] dark:bg-gray-900 dark:text-gray-200"><option value="50">50 logs</option><option value="100">100 logs</option><option value="200">200 logs</option><option value="500">500 logs</option><option value="1000">1 000 logs</option></select></label><div className="flex items-center gap-1"><button onClick={() => setPage(current => Math.max(1, current - 1))} disabled={safePage === 1} aria-label="Previous page" className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"><FiChevronLeft className="h-3.5 w-3.5" /></button>{paginationItems.map((item, index) => item === 'ellipsis-left' || item === 'ellipsis-right' ? <span key={`${item}-${index}`} className="flex h-7 w-5 items-center justify-center text-xs text-gray-400">...</span> : <button key={item} onClick={() => setPage(item)} aria-current={item === safePage ? 'page' : undefined} className={`h-7 w-7 rounded-lg border text-xs font-semibold transition ${item === safePage ? 'border-[#8E288D] bg-[#8E288D] text-white' : 'border-gray-200 text-gray-600 hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'}`}>{item}</button>)}<button onClick={() => setPage(current => Math.min(totalPages, current + 1))} disabled={safePage === totalPages} aria-label="Next page" className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"><FiChevronRight className="h-3.5 w-3.5" /></button></div></div></div>}
+        {filteredLogs.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/40 px-5 py-3"><span className="text-xs text-gray-500 dark:text-gray-300">Showing {(safePage - 1) * LOGS_PER_PAGE + 1}–{Math.min(safePage * LOGS_PER_PAGE, filteredLogs.length)} of {filteredLogs.length} logs</span><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-gray-300">Logs <select value={limit} onChange={event => setLimit(Number(event.target.value))} className="appearance-none rounded-lg border border-[#972b91] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none transition hover:border-[#7d2278] focus:border-[#8E288D] focus:ring-1 focus:ring-[#8E288D] dark:bg-gray-900 dark:text-gray-200"><option value="50">50 logs</option><option value="100">100 logs</option><option value="200">200 logs</option><option value="500">500 logs</option><option value="1000">1 000 logs</option></select></label><div className="flex items-center gap-1"><button onClick={() => setPage(current => Math.max(1, current - 1))} disabled={safePage === 1} aria-label="Previous page" className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"><FiChevronLeft className="h-3.5 w-3.5" /></button>{paginationItems.map((item, index) => item === 'ellipsis-left' || item === 'ellipsis-right' ? <span key={`${item}-${index}`} className="flex h-7 w-5 items-center justify-center text-xs text-gray-400">...</span> : <button key={item} onClick={() => setPage(item)} aria-current={item === safePage ? 'page' : undefined} className={`h-7 w-7 rounded-lg border text-xs font-semibold transition ${item === safePage ? 'border-[#8E288D] bg-[#8E288D] text-white' : 'border-gray-200 text-gray-600 hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'}`}>{item}</button>)}<button onClick={() => setPage(current => Math.min(totalPages, current + 1))} disabled={safePage === totalPages} aria-label="Next page" className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-white dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-40"><FiChevronRight className="h-3.5 w-3.5" /></button></div></div></div>}
       </div>
     </div>
   )

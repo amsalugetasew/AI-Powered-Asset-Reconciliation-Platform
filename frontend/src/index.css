@@ -380,3 +380,18 @@ html.dark button.border-gray-100:hover {
 .reconciliation-table + * {
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* React Toastify - CBE Purple Success Toast */
+.Toastify__toast--success {
+  --toastify-icon-color-success: #8E288D !important;
+}
+
+.Toastify__toast--success .Toastify__toast-icon {
+  color: #8E288D !important;
+}
+
+.Toastify__toast--success .Toastify__toast-icon svg {
+  color: #8E288D !important;
+  fill: #8E288D !important;
+  stroke: #ffffff!important;
+}

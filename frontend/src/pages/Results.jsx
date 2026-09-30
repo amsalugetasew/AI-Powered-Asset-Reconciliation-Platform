@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -239,30 +239,30 @@ const Results = () => {
 
   // Overall distribution chart
   const chartData = [
-    { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
-    { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
-    { name: 'Manual Review', value: stats.manual_review, color: '#CFB53B' },
+    { name: 'Rule Matched', value: stats.rule_matched, color: '#7a2175' },
+    { name: 'AI Matched', value: stats.ai_matched, color: '#95298E' },
+    { name: 'Manual Review', value: stats.manual_review, color: '#a34d9c' },
     { name: 'Unmatched', value: stats.customer_unmatched, color: '#BE123C' }
   ]
 
   // Physical records breakdown
   const customerReconciled = stats.rule_matched + stats.ai_matched + stats.manual_review
   const customerData = [
-    { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
-    { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
-    { name: 'Manual Review', value: stats.manual_review, color: '#CFB53B' },
+    { name: 'Rule Matched', value: stats.rule_matched, color: '#7a2175' },
+    { name: 'AI Matched', value: stats.ai_matched, color: '#95298E' },
+    { name: 'Manual Review', value: stats.manual_review, color: '#a34d9c' },
     { name: 'Unmatched', value: stats.customer_unmatched, color: '#BE123C' },
-    { name: 'Duplicate', value: stats.customer_duplicates || 0, color: '#000000' }
+    { name: 'Duplicate', value: stats.customer_duplicates || 0, color: '#8c8c8c' }
   ]
 
   // ERP records breakdown (assuming similar distribution)
   const internalReconciled = stats.rule_matched + stats.ai_matched
   const internalData = [
-    { name: 'Rule Matched', value: stats.rule_matched, color: '#8E288D' },
-    { name: 'AI Matched', value: stats.ai_matched, color: '#CFB53B' },
-    { name: 'Manual Review', value: stats.manual_review, color: '#CFB53B' },
+    { name: 'Rule Matched', value: stats.rule_matched, color: '#7a2175' },
+    { name: 'AI Matched', value: stats.ai_matched, color: '#95298E' },
+    { name: 'Manual Review', value: stats.manual_review, color: '#a34d9c' },
     { name: 'Unmatched', value: stats.internal_unmatched, color: '#BE123C' },
-    { name: 'Duplicate', value: stats.internal_duplicates || 0, color: '#000000' }
+    { name: 'Duplicate', value: stats.internal_duplicates || 0, color: '#8c8c8c' }
   ]
 
   // Comparison bar chart data
@@ -285,53 +285,39 @@ const Results = () => {
   ]
 
   return (
-    <div className="min-w-0 bg-[#f7f9fc] px-0 pb-10 lg:px-6">
-      <div className="mb-4 flex items-center gap-2 border-b border-slate-200 pb-3 text-sm text-slate-400">
-        <button onClick={() => navigate('/')} className="font-semibold text-[#8E288D] hover:text-[#7A1E79]">
+    <div className="min-w-0 bg-[#f7f9fc] dark:bg-gray-950 px-0 pb-10 lg:px-6">
+      <div className="mb-4 flex items-center gap-2 border-b border-slate-200 dark:border-gray-800 pb-3 text-sm text-slate-400 dark:text-gray-400">
+        <button onClick={() => navigate('/')} className="font-semibold text-[#8E288D] hover:text-[#7A1E79] dark:text-purple-400 dark:hover:text-purple-300">
           Upload &amp; Reconcile
         </button>
         <span>›</span>
-        <span className="font-medium text-slate-500">Full Result</span>
+        <span className="font-medium text-slate-500 dark:text-gray-400">Full Result</span>
       </div>
 
-      <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-5 flex flex-col gap-4 border-b border-slate-200 dark:border-gray-800 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">Reconciliation Results #{id}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Execution Timestamp: {new Date(reconciliation.completed_at).toLocaleString()} <span className="text-slate-400">(Automatic Daily Sync)</span>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 dark:text-gray-100">Reconciliation Results #{id}</h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">
+            Execution Timestamp: {new Date(reconciliation.completed_at).toLocaleString()} <span className="text-slate-400 dark:text-gray-500">(Automatic Daily Sync)</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {/* <button
-            onClick={() => openAIModal({
-              chartData,
-              chartType: 'pie',
-              title: `AI Analysis - Reconciliation #${id}`,
-              targetLabel: 'Asset Matching Distribution',
-              analysisContext: { source: 'Asset Matching Distribution Chart' }
-            })}
-            className="inline-flex items-center px-4 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium 
-             bg-gradient-to-r from-gray-200 to-gray-300 text-gray-700 rounded-lg hover:from-gray-400 hover:to-300"
-          >
-            <FiZap className="w-5 h-5 mr-2" />
-            AI Insights
-          </button> */}
           <button
             onClick={() => navigate(`/report/${id}`)}
-            className="flex h-10 w-46 items-center justify-center rounded-lg hover:border-b-2 hover:border-[#8E288D] px-4 text-sm font-medium text-gray-600 shadow transition-colors hover:text-[#8E288D]">
+            className="flex h-10 w-46 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-b-2 hover:border-[#8E288D] dark:hover:border-purple-400 px-4 text-sm font-medium text-gray-600 dark:text-gray-300 shadow transition-colors hover:text-[#8E288D] dark:hover:text-purple-400">
             <FiBarChart2 className="w-5 h-5 mr-2" />
             Dashboard Report
           </button>
           <button
             onClick={() => navigate(`/approval/${id}`)}
-            className="flex h-10 w-46 items-center justify-center rounded-lg hover:border-b-2 hover:border-[#8E288D] px-4 text-sm font-medium text-gray-600 shadow transition-colors hover:text-[#8E288D]"
+            className="flex h-10 w-46 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-b-2 hover:border-[#8E288D] dark:hover:border-purple-400 px-4 text-sm font-medium text-gray-600 dark:text-gray-300 shadow transition-colors hover:text-[#8E288D] dark:hover:text-purple-400"
           >
             <FiCheck className="mr-2" />
             {hasRole('manager') ? 'Review & Approve' : 'View Approval Status'}
           </button>
           <button
             onClick={handleDownload}
-            className="flex h-10 w-46 items-center justify-center rounded-lg hover:border-b-2 hover:border-[#8E288D] px-4 text-sm font-medium text-gray-600 shadow transition-colors hover:text-[#8E288D]"
+            className="flex h-10 w-46 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-b-2 hover:border-[#8E288D] dark:hover:border-purple-400 px-4 text-sm font-medium text-gray-600 dark:text-gray-300 shadow transition-colors hover:text-[#8E288D] dark:hover:text-purple-400"
           >
             <FiDownload className="mr-2" />
             Download
@@ -773,32 +759,9 @@ const Results = () => {
 
       {/* Overall Statistics Summary */}
       <div className="mt-8 mb-8">
-        <h2 className="text-xl font-bold text-[#6C5B7B] mb-2">Statistics Summary Before Human Review</h2>
+        <h2 className="text-xl font-bold text-[#6C5B7B] dark:text-purple-300 mb-2">Statistics Summary Before Human Review</h2>
         <div className="h-1 w-90 bg-gradient-to-r from-[#8E288D] to-[#CFB53C] rounded"></div>
       </div>
-
-      {/* <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: 'Total Matched', value: totalMatched, detail: `${matchRate}% match rate`, icon: FiCheckCircle, color: '#8E288D' },
-          { label: 'Exact Matched', value: stats.rule_matched, detail: 'Rule-based matches', icon: FiCheckCircle, color: '#008080' },
-          { label: 'AI Matched', value: stats.ai_matched, detail: 'AI-assisted matches', icon: FiZap, color: '#CFB53B' },
-          { label: 'Unmatched', value: stats.customer_unmatched, detail: 'Physical records', icon: FiXCircle, color: '#BE123C' },
-        ].map(card => {
-          const Icon = card.icon
-          return (
-            <div key={card.label} className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                <Icon className="h-4 w-4" style={{ color: card.color }} />
-                {card.label}
-              </div>
-              <p className="mt-3 truncate text-2xl font-extrabold text-slate-800" title={Number(card.value || 0).toLocaleString()}>
-                {Number(card.value || 0).toLocaleString()}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">{card.detail}</p>
-            </div>
-          )
-        })}
-      </div> */}
 
       <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
         {[
@@ -813,7 +776,7 @@ const Results = () => {
             source: 'results_erp_distribution',
           },
         ].map(panel => (
-          <section key={panel.side} className="min-w-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm cursor-context-menu"
+          <section key={panel.side} className="min-w-0 rounded-xl border border-gray-200 bg-white p-4 shadow-sm cursor-context-menu dark:border-gray-800 dark:bg-gray-900"
             title="Right-click for AI insights"
             onContextMenu={event => openAIContextMenu(event, {
               chartData: panel.data,
@@ -822,22 +785,43 @@ const Results = () => {
               targetLabel: `${panel.side} Record Distribution`,
               analysisContext: { source: panel.source, reconciliationId: Number(id) },
             })}>
-            <h3 className="mb-2 border-b border-gray-100 pb-2 text-base font-semibold text-slate-800">
+            <h3 className="mb-2 border-b border-gray-100 dark:border-gray-800 pb-2 text-base font-semibold text-slate-800 dark:text-gray-100">
               {panel.side} Record Distribution
             </h3>
             <div className="relative">
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
-                  <Pie data={panel.data} cx="50%" cy="50%" innerRadius={98} outerRadius={120}
-                    paddingAngle={5} cornerRadius={6} dataKey="value">
+                  <Pie
+                    data={panel.data}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={100}
+                    outerRadius={120}
+                    paddingAngle={5}
+                    cornerRadius={6}
+                    dataKey="value">
                     {panel.data.map((entry, index) => (
-                      <Cell key={`${panel.side}-${index}`} fill={entry.color}
-                        opacity={panel.activeName && panel.activeName !== entry.name ? 0.25 : 1} />
+                      <Cell
+                        key={`${panel.side}-${index}`}
+                        fill={entry.color}
+                        opacity={
+                          panel.activeName && panel.activeName !== entry.name
+                            ? 0.25
+                            : 1
+                        }
+                      />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ fontSize: '12px', fontWeight: '500' }} />
+
+                  <Tooltip
+                    contentStyle={{
+                      fontSize: '12px',
+                      fontWeight: '500',
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
+
               <DonutCenterLabel total={panel.total} />
             </div>
             <DonutChartLegend data={panel.data} getColor={entry => entry.color}
@@ -869,8 +853,12 @@ const Results = () => {
                     <div className="relative">
                       <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
-                          <Pie data={chartData} cx="50%" cy="50%" innerRadius={98} outerRadius={120}
-                            paddingAngle={5} cornerRadius={6} dataKey="value">
+                          <Pie data={chartData} cx="50%"
+                            cy="50%"
+                            innerRadius={100}
+                            outerRadius={120}
+                            paddingAngle={5}
+                            cornerRadius={6} dataKey="value">
                             {chartData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={entry.color}
                                 opacity={activePhysicalDonutName && activePhysicalDonutName !== entry.name ? 0.25 : 1} />

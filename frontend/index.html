@@ -15,6 +15,18 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0"/>
     <title>AI - Enabled Asset Reconciliation</title>
+    <script>
+      // Early safety guard against third-party extension / PerformanceObserver errors
+      window.addEventListener('error', function(event) {
+        if (
+          (event.message && (event.message.indexOf("reading 'startTime'") !== -1 || event.message.indexOf('reportAllChanges') !== -1)) ||
+          (event.error && event.error.stack && event.error.stack.indexOf('reportAllChanges') !== -1)
+        ) {
+          if (event.preventDefault) event.preventDefault();
+          if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+        }
+      });
+    </script>
   </head>
 
   <body>

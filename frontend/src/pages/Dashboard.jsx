@@ -10,13 +10,13 @@ import AIContextMenu from '../components/AIContextMenu'
 import {
   FiUpload, FiDownload, FiClock, FiCheckCircle, FiXCircle, FiLoader,
   FiFileText, FiFilter, FiSearch, FiCheck, FiCopy, FiTarget,
-  FiTrash2, FiChevronLeft, FiChevronRight, FiUser, FiBarChart2, FiEye,
+  FiTrash2, FiChevronLeft, FiChevronRight, FiUser, FiBarChart2, FiEye,FiArrowLeft,
   FiRefreshCw, FiMinusCircle, FiPlus, FiLayers, FiMapPin,FiPackage, FiHelpCircle
 } from 'react-icons/fi'
 
 // ── Palette for charts ─────────────────────────────────────────────────────────
 const AGING_BUCKET_CONFIG = [
-  { key: '< 1 yr',    label: '< 1 yr',    color: '#22c55e' },  // green  – fresh
+  { key: '< 1 yr',    label: '< 1 yr',    color: '#7a2175' },  // green  – fresh
   { key: '1 – 3 yr',  label: '1 – 3 yr',  color: '#95298E' },  // blue
   { key: '3 – 5 yr',  label: '3 – 5 yr',  color: '#a34d9c' },  // brand purple
   { key: '5 – 10 yr', label: '5 – 10 yr', color: '#c387be' },  // amber
@@ -313,8 +313,8 @@ const DonutAgingChart = ({ agingData, agingYear, monthLabel, totalERPCount, side
   ]
 
   // SVG donut parameters
-  const size        = 260
-  const sw          = 22           // stroke width
+  const size        = 240
+  const sw          = 20           // stroke width
   const radius      = (size - sw) / 2
   const cx          = size / 2
   const cy          = size / 2
@@ -881,30 +881,22 @@ const Dashboard = () => {
 
         {/* Card 1: Reconciled */}
         <div
-          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
-          style={{
-            background: 'linear-gradient(to right, #FFFFFF 0%, #E1C3DF 100%)',
-          }}
+          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-[#E1C3DF] p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:from-gray-900 dark:to-purple-950/40 dark:bg-gray-900"
         >
           {/* KPI Label + Icon */}
           <div
-            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
-            style={{
-              color: '#000000',
-              backgroundColor: '#E1C3DF',
-            }}
+            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5 bg-[#E1C3DF] dark:bg-purple-900/60"
           >
             {/* Icon */}
             <span
-              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
-              style={{ color: '#8E288D' }}
+              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px] text-[#8E288D] dark:text-purple-300"
             >
               <FiCheckCircle />
             </span>
 
             {/* Label */}
             <span
-              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280] dark:text-purple-200"
               style={{
                 height: '14px',
                 fontFamily: 'Geist, sans-serif',
@@ -919,7 +911,7 @@ const Dashboard = () => {
           <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
             <div className="flex h-[36px] w-full flex-row items-center gap-2">
               <p
-                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-gray-100"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 800,
@@ -929,7 +921,7 @@ const Dashboard = () => {
               </p>
 
               <p
-                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 600,
@@ -942,7 +934,7 @@ const Dashboard = () => {
             {/* Description + Percentage */}
             <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
               <p
-                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 400,
@@ -952,11 +944,7 @@ const Dashboard = () => {
               </p>
 
               <span
-                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
-                style={{
-                  color: '#8E288D',
-                  backgroundColor: '#E1C3DF',
-                }}
+                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold text-[#8E288D] bg-[#E1C3DF] dark:text-purple-200 dark:bg-purple-900/60"
               >
                 {reconciledRate}%
               </span>
@@ -967,30 +955,22 @@ const Dashboard = () => {
 
         {/* Card 2: Unmatched ERP Records */}
         <div
-          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
-          style={{
-            background: 'linear-gradient(to right, #FFFFFF 0%, #FCE4EA 100%)',
-          }}
+          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-[#FCE4EA] p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:from-gray-900 dark:to-rose-950/40 dark:bg-gray-900"
         >
           {/* KPI Label + Icon */}
           <div
-            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
-            style={{
-              color: '#000000',
-              backgroundColor: '#FCE4EA',
-            }}
+            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5 bg-[#FCE4EA] dark:bg-rose-900/60"
           >
             {/* Icon */}
             <span
-              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
-              style={{ color: '#BE123C' }}
+              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px] text-[#BE123C] dark:text-rose-300"
             >
               <FiHelpCircle />
             </span>
 
             {/* Label */}
             <span
-              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280] dark:text-rose-200"
               style={{
                 height: '14px',
                 fontFamily: 'Geist, sans-serif',
@@ -1005,7 +985,7 @@ const Dashboard = () => {
           <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
             <div className="flex h-[36px] w-full flex-row items-center gap-2">
               <p
-                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-gray-100"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 800,
@@ -1015,7 +995,7 @@ const Dashboard = () => {
               </p>
 
               <p
-                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 600,
@@ -1028,7 +1008,7 @@ const Dashboard = () => {
             {/* Description + Percentage */}
             <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
               <p
-                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 400,
@@ -1038,11 +1018,7 @@ const Dashboard = () => {
               </p>
 
               <span
-                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
-                style={{
-                  color: '#BE123C',
-                  backgroundColor: '#FCE4EA',
-                }}
+                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold text-[#BE123C] bg-[#FCE4EA] dark:text-rose-200 dark:bg-rose-900/60"
               >
                 {unmatchedRate}%
               </span>
@@ -1052,29 +1028,22 @@ const Dashboard = () => {
 
          {/* Card 3: Shortage Assets */}
         <div
-          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
-          style={{
-            background: 'linear-gradient(to right, #FFFFFF 0%, #FEE2E2 100%)',
-          }}>
+          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-[#FEE2E2] p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:from-gray-900 dark:to-red-950/40 dark:bg-gray-900"
+        >
           {/* KPI Label + Icon */}
           <div
-            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
-            style={{
-              color: '#000000',
-              backgroundColor: '#FEE2E2',
-            }}
+            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5 bg-[#FEE2E2] dark:bg-red-900/60"
             title="ERP records not found in the physical count">
             {/* Icon */}
             <span
-              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
-              style={{ color: '#F33838' }}
+              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px] text-[#F33838] dark:text-red-300"
             >
               <FiMinusCircle />
             </span>
 
             {/* Label */}
             <span
-              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280] dark:text-red-200"
               style={{
                 height: '14px',
                 fontFamily: 'Geist, sans-serif',
@@ -1089,7 +1058,7 @@ const Dashboard = () => {
           <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
             <div className="flex h-[36px] w-full flex-row items-center gap-2">
               <p
-                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-gray-100"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 800,
@@ -1099,7 +1068,7 @@ const Dashboard = () => {
               </p>
 
               <p
-                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 600,
@@ -1112,7 +1081,7 @@ const Dashboard = () => {
             {/* Description + Percentage */}
             <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
               <p
-                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 400,
@@ -1123,11 +1092,7 @@ const Dashboard = () => {
               </p>
 
               <span
-                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
-                style={{
-                  color: '#F33838',
-                  backgroundColor: '#FEE2E2',
-                }}
+                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold text-[#F33838] bg-[#FEE2E2] dark:text-red-200 dark:bg-red-900/60"
               >
                 {shortageRate}%
               </span>
@@ -1137,31 +1102,23 @@ const Dashboard = () => {
 
         {/* Card 4: Surplus Assets */}
         <div
-          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-white p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
-          style={{
-            background: 'linear-gradient(to right, #FFFFFF 0%, #FEF3C7 100%)',
-          }}
+          className="w-full h-[140px] rounded-2xl border border-slate-100 bg-gradient-to-r from-white to-[#FEF3C7] p-0 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:from-gray-900 dark:to-amber-950/40 dark:bg-gray-900"
         >
           {/* KPI Label + Icon */}
           <div
-            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5"
-            style={{
-              color: '#000000',
-              backgroundColor: '#FEF3C7',
-            }}
+            className="relative flex h-[32px] items-center justify-start rounded-[8px] gap-3 px-3 py-1.5 bg-[#FEF3C7] dark:bg-amber-900/60"
             title="Assets found in Physical/Customer records but not in ERP"
           >
             {/* Icon */}
             <span
-              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px]"
-              style={{ color: '#B45309' }}
+              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px] text-[#B45309] dark:text-amber-300"
             >
               <FiPackage />
             </span>
 
             {/* Label */}
             <span
-              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280]"
+              className="ml-8 mt-1 text-[11px] font-bold uppercase leading-[100%] tracking-[0.30px] text-[#6B7280] dark:text-amber-200"
               style={{
                 height: '14px',
                 fontFamily: 'Geist, sans-serif',
@@ -1176,7 +1133,7 @@ const Dashboard = () => {
           <div className="flex h-[98px] w-full flex-col gap-2 px-5 py-[15px]">
             <div className="flex h-[36px] w-full flex-row items-center gap-2">
               <p
-                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A]"
+                className="text-[28px] font-extrabold leading-[100%] tracking-[0%] text-[#0F172A] dark:text-gray-100"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 800,
@@ -1186,7 +1143,7 @@ const Dashboard = () => {
               </p>
 
               <p
-                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="text-[14px] font-semibold leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 600,
@@ -1199,7 +1156,7 @@ const Dashboard = () => {
             {/* Description + Percentage */}
             <div className="flex h-[17px] w-full flex-row items-center justify-between gap-3">
               <p
-                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8]"
+                className="truncate text-[13px] leading-[100%] tracking-[0%] text-[#94A3B8] dark:text-gray-400"
                 style={{
                   fontFamily: 'Geist, sans-serif',
                   fontWeight: 400,
@@ -1210,11 +1167,7 @@ const Dashboard = () => {
               </p>
 
               <span
-                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold"
-                style={{
-                  color: '#B45309',
-                  backgroundColor: '#FEF3C7',
-                }}
+                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold text-[#B45309] bg-[#FEF3C7] dark:text-amber-200 dark:bg-amber-900/60"
               >
                 {surplusRate}%
               </span>
@@ -1230,8 +1183,8 @@ const Dashboard = () => {
           <button type="button" key={side} onClick={event => { event.preventDefault(); setDashboardSide(side) }}
             className={`border-b-2 px-5 py-3 text-sm font-semibold ${
               dashboardSide === side
-                ? 'border-[#8E288D] text-[#8E288D]'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
+                ? 'border-[#8E288D] text-[#8E288D] dark:border-purple-400 dark:text-purple-400'
+                : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
             }`}>
             {side === 'erp' ? 'ERP' : 'Physical'}
           </button>
@@ -1250,8 +1203,8 @@ const Dashboard = () => {
               ].map(tab => (
                 <button type="button" key={tab.key} onClick={event => { event.preventDefault(); setDashboardChartTab(tab.key) }}
                   className={`flex h-10 w-44 items-center justify-center px-4 text-sm font-medium transition-colors ${dashboardChartTab === tab.key
-                      ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D]'
-                      : 'text-gray-600'
+                      ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D] dark:text-purple-400 dark:border-purple-400'
+                      : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                     }`}>
                   {tab.label}
                 </button>
@@ -1372,12 +1325,21 @@ const Dashboard = () => {
                 type="button"
                 onClick={() => setShowTrash(value => !value)}
                 className={`inline-flex h-8 w-[120px] items-center justify-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold transition-colors ${showTrash
-                    ? 'border-[#701460] bg-[#701460] text-white'
-                    : 'border-gray-200 text-gray-600 hover:border-[#701460] hover:text-[#701460] dark:border-gray-700 dark:text-gray-300'
+                  ? 'border-[#701460] bg-[#701460] text-white'
+                  : 'border-gray-200 text-gray-600 hover:border-[#701460] hover:text-[#701460] dark:border-gray-700 dark:text-gray-300'
                   }`}
               >
-                <FiTrash2 className="h-3.5 w-3.5" />
-                {showTrash ? 'Main' : 'Trash'}
+                {showTrash ? (
+                  <>
+                    <FiArrowLeft className="h-3.5 w-3.5" />
+                    Main
+                  </>
+                ) : (
+                  <>
+                    <FiTrash2 className="h-3.5 w-3.5" />
+                    Trash
+                  </>
+                )}
               </button>
             )}
           </div>
@@ -1531,8 +1493,8 @@ const Dashboard = () => {
                             <button
                               onClick={() => setAssignmentModal({
                                 id: recon.id,
-                                assignment_scope: recon.assignment_scope || 'all_officers',
-                                assignee_id: recon.assigned_to || (assignableUsers[0]?.id || ''),
+                                assignment_scope: 'all_officers',
+                                assignee_id: '',
                                 assignment_note: recon.assignment_note || '',
                               })}
                               className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors"
@@ -1554,7 +1516,7 @@ const Dashboard = () => {
                           ) : hasRole('admin') && (
                             <button
                               onClick={() => setDeleteConfirmId(recon.id)}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/50 transition-colors"
                               title="Move Reconciliation to Trash"
                             >
                               <FiTrash2 className="h-4 w-4" />
@@ -1695,8 +1657,8 @@ const Dashboard = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-gray-100 dark:border-gray-800">
             <div className="flex items-center space-x-3 mb-3">
-              <div className="p-2.5 bg-rose-100 dark:bg-rose-950/60 rounded-xl">
-                <FiTrash2 className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+              <div className="p-2.5 bg-red-100 dark:bg-red-950/60 rounded-xl">
+                <FiTrash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-gray-900 dark:text-white">Delete Reconciliation</h3>
@@ -1717,7 +1679,7 @@ const Dashboard = () => {
               <button
                 onClick={() => handleDelete(deleteConfirmId)}
                 disabled={deleting}
-                className="w-32 h-10 rounded-lg bg-rose-600 text-sm font-semibold text-white hover:bg-rose-700 transition-colors flex items-center justify-center space-x-1.5"
+                className="w-32 h-10 rounded-lg bg-red-500 text-sm font-semibold text-white hover:bg-red-600 transition-colors flex items-center justify-center space-x-1.5"
               >
                 {deleting ? <FiLoader className="animate-spin h-3.5 w-3.5" /> : <FiTrash2 className="h-3.5 w-3.5" />}
                 <span>{deleting ? 'Deleting...' : 'Delete Job'}</span>

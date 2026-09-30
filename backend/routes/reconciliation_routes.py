@@ -196,6 +196,13 @@ def _variance_status_error(match_category, approval_decision):
     return None
 
 
+def _effective_review_status(preferred_status, fallback_status):
+    pending_statuses = {None, '', 'pending', 'checking'}
+    if preferred_status in pending_statuses and fallback_status not in pending_statuses:
+        return fallback_status
+    return preferred_status or fallback_status or 'pending'
+
+
 def _auto_save_records(reconciliation_id, report_path):
     """
     Parse the Excel report and save all records to DB with approval_status='pending'.
@@ -536,14 +543,16 @@ def assign_reconciliation(reconciliation_id):
             reconciliation.assignment_scope = 'specific_user'
             ReconciliationRecord.query.filter_by(reconciliation_id=reconciliation.id).update({
                 'check_status': 'checking',
-                'checked_by': assignee.id,
-                'checked_at': datetime.utcnow()
+                'checker_status': 'checking',
+                'checked_by': None,
+                'checked_at': None
             })
         else:
             reconciliation.assigned_to = None
             reconciliation.assignment_scope = 'all_officers'
             ReconciliationRecord.query.filter_by(reconciliation_id=reconciliation.id).update({
                 'check_status': 'pending',
+                'checker_status': 'pending',
                 'checked_by': None,
                 'checked_at': None
             })
@@ -1468,7 +1477,8 @@ def approve_record():
         if stage == 'approver' and current_user.role not in ['manager', 'admin']:
             return jsonify({'error': 'Only managers or admins may approve checked records.'}), 403
 
-        if stage == 'approver' and (record.checker_status or record.check_status or 'pending') in [None, '', 'pending', 'checking']:
+        checker_status = _effective_review_status(record.checker_status, record.check_status)
+        if stage == 'approver' and checker_status in [None, '', 'pending', 'checking']:
             return jsonify({'error': 'This record must be checked before it can be approved.'}), 400
 
         if stage == 'checker':
@@ -1479,7 +1489,7 @@ def approve_record():
             actor_name = current_user.username
             action_type = 'CHECK_RECORD'
         else:
-            if (record.checker_status or record.check_status or 'pending') in [None, '', 'pending', 'checking']:
+            if checker_status in [None, '', 'pending', 'checking']:
                 return jsonify({'error': 'This record must be checked before it can be approved'}), 400
             record.approval_status = approval_decision
             record.approver_status = approval_decision
@@ -1600,7 +1610,7 @@ def approve_group():
         if stage == 'approver':
             if selected_records is not None:
                 pending_checked = sum(
-                    (record.check_status or record.checker_status or 'pending') in [None, '', 'pending', 'checking']
+                    _effective_review_status(record.checker_status, record.check_status) in [None, '', 'pending', 'checking']
                     for record in selected_records
                 )
             else:
@@ -1615,7 +1625,7 @@ def approve_group():
                 pending_checked = ReconciliationRecord.query.filter(
                     ReconciliationRecord.reconciliation_id == reconciliation_id,
                     category_filter,
-                    db.or_(
+                    db.and_(
                         ReconciliationRecord.check_status.in_([None, '', 'pending', 'checking']),
                         ReconciliationRecord.checker_status.in_([None, '', 'pending', 'checking'])
                     )
@@ -1698,7 +1708,7 @@ def approve_group():
             }), 404
 
         if stage == 'approver' and any(
-            (record.checker_status or record.check_status or 'pending') in [None, '', 'pending', 'checking']
+            _effective_review_status(record.checker_status, record.check_status) in [None, '', 'pending', 'checking']
             for record in records
         ):
             return jsonify({'error': 'Every selected record must be checked before approval.'}), 400
@@ -1711,7 +1721,7 @@ def approve_group():
                 record.checked_by = current_user.id
                 record.checked_at = datetime.utcnow()
             else:
-                if (record.checker_status or record.check_status or 'pending') in [None, '', 'pending', 'checking']:
+                if _effective_review_status(record.checker_status, record.check_status) in [None, '', 'pending', 'checking']:
                     return jsonify({'error': 'All records in this category must be checked before approval'}), 400
                 record.approval_status = approval_decision
                 record.approver_status = approval_decision
@@ -1778,7 +1788,7 @@ def get_approval_summary(reconciliation_id):
                             'message': 'You can only view your own or assigned reconciliation records.'}), 403
 
         # Get counts by category and approval status
-        from sqlalchemy import func
+        from sqlalchemy import case, func
         
         results = db.session.query(
             ReconciliationRecord.match_category,
@@ -1811,17 +1821,25 @@ def get_approval_summary(reconciliation_id):
             else:
                 summary[match_category][key] = count
 
+        checker_stage_status = case(
+            (ReconciliationRecord.checker_status.in_([None, '', 'pending', 'checking']), ReconciliationRecord.check_status),
+            else_=ReconciliationRecord.checker_status,
+        )
+        approver_stage_status = case(
+            (ReconciliationRecord.approver_status.in_([None, '', 'pending', 'checking']), ReconciliationRecord.approval_status),
+            else_=ReconciliationRecord.approver_status,
+        )
         stage_results = db.session.query(
             ReconciliationRecord.match_category,
-            func.coalesce(ReconciliationRecord.checker_status, ReconciliationRecord.check_status),
-            func.coalesce(ReconciliationRecord.approver_status, ReconciliationRecord.approval_status),
+            checker_stage_status,
+            approver_stage_status,
             func.count(ReconciliationRecord.id)
         ).filter(
             ReconciliationRecord.reconciliation_id == reconciliation_id
         ).group_by(
             ReconciliationRecord.match_category,
-            func.coalesce(ReconciliationRecord.checker_status, ReconciliationRecord.check_status),
-            func.coalesce(ReconciliationRecord.approver_status, ReconciliationRecord.approval_status)
+            checker_stage_status,
+            approver_stage_status,
         ).all()
         for match_category, checker_status, approver_status, count in stage_results:
             category_summary = summary.setdefault(match_category, {

@@ -63,7 +63,14 @@ const Register = () => {
         <div className="w-full max-w-[420px]">
           {/* Mobile logo */}
           <div className="relative z-10 flex flex-col items-center text-center pt-2">
-            <img src={iconImage} alt="Commercial Bank of Ethiopia" className="h-26 w-64 object-contain drop-shadow-lg" />
+            <div className="w-36 h-14 flex items-center justify-center overflow-visible flex-shrink-0">
+              <img
+                src={iconImage}
+                alt="CBE Logo"
+                className="w-32 h-20 object-contain scale-150"
+              />
+            </div>
+            {/* <img src={iconImage} alt="Commercial Bank of Ethiopia" className="h-26 w-64 object-contain drop-shadow-lg" /> */}
             {/* <p className="mt-4 text-[#E8C547] font-bold tracking-[0.18em] text-sm uppercase">
                       Commercial Bank of Ethiopia
                     </p> */}

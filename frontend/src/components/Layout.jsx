@@ -5,9 +5,9 @@ import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-toastify'
 import { RoleBadge } from './RoleGuard'
 import iconImage from '../assets/CBE_Logo.png'
-import { 
-  FiHome, FiUpload, FiBarChart2, FiLogOut, FiMenu, FiX,  FiUser, FiSettings, FiSearch, 
-  FiBell, FiChevronDown, FiUsers, FiFileText, FiCheckCircle, FiAlertCircle,  FiXCircle, FiInfo, FiEye, FiTrash2, FiMoon, FiSun,
+import {
+  FiHome, FiUpload, FiBarChart2, FiLogOut, FiMenu, FiX, FiUser, FiSettings, FiSearch,
+  FiBell, FiChevronDown, FiUsers, FiFileText, FiCheckCircle, FiAlertCircle, FiXCircle, FiInfo, FiEye, FiTrash2, FiMoon, FiSun,
   FiChevronsLeft, FiChevronsRight
 } from 'react-icons/fi'
 import { Eye, EyeOff } from "lucide-react";
@@ -96,15 +96,15 @@ const Layout = () => {
   const severityIcon = (s) => {
     if (s === 'success') return <FiCheckCircle className="text-green-500 flex-shrink-0" />
     if (s === 'warning') return <FiAlertCircle className="text-yellow-500 flex-shrink-0" />
-    if (s === 'error')   return <FiXCircle className="text-red-500 flex-shrink-0" />
+    if (s === 'error') return <FiXCircle className="text-red-500 flex-shrink-0" />
     return <FiInfo className="text-blue-500 flex-shrink-0" />
   }
 
   const severityBg = (s) => {
     if (s === 'success') return 'border-l-green-500'
     if (s === 'warning') return 'border-l-yellow-500'
-    if (s === 'error')   return 'border-l-red-500'
-    return 'border-l-rose-500'
+    if (s === 'error') return 'border-l-red-500'
+    return 'border-l-red-500'
   }
 
   const handleLogout = () => {
@@ -210,21 +210,21 @@ const Layout = () => {
 
     // Only Admin sees audit trail and user management
     if (hasRole('admin')) {
-      baseItems.push({ 
-        path: '/audit', 
-        icon: FiFileText, 
-        label: 'Audit Trail', 
-        roles: ['admin'] 
+      baseItems.push({
+        path: '/audit',
+        icon: FiFileText,
+        label: 'Audit Trail',
+        roles: ['admin']
       })
-      baseItems.push({ 
-        path: '/users', 
-        icon: FiUsers, 
-        label: 'User Management', 
-        roles: ['admin'] 
+      baseItems.push({
+        path: '/users',
+        icon: FiUsers,
+        label: 'User Management',
+        roles: ['admin']
       })
     }
 
-    return baseItems.filter(item => 
+    return baseItems.filter(item =>
       !item.roles || item.roles.includes(userRole)
     )
   }
@@ -235,20 +235,26 @@ const Layout = () => {
     <div className="h-screen overflow-hidden bg-[#F8F9FA] text-gray-900 dark:bg-gray-950 dark:text-gray-100 flex font-sans">
       {/* Sidebar */}
       <aside
-        className={`${
-          sidebarOpen ? 'w-64' : 'w-20'
-        } ${theme === 'dark' ? 'bg-[#24132d]' : 'bg-[#701460]'} 
+        className={`${sidebarOpen ? 'w-64' : 'w-20'
+          } ${theme === 'dark' ? 'bg-[#24132d]' : 'bg-[#7A2175]'} 
         text-white transition-all duration-300 ease-in-out fixed h-full z-30 shadow-2xl flex flex-col justify-between`}
       >
         {/* Top Branding Section */}
         <div>
           <div className="flex items-center justify-between px-3 py-3 border-b border-white/10">
             <div className="flex items-center space-x-1 overflow-hidden">
-              <img
+              <div className="w-36 h-14 flex items-center justify-center overflow-visible flex-shrink-0">
+                <img
+                  src={iconImage}
+                  alt="CBE Logo"
+                  className="w-32 h-20 object-contain scale-125"
+                />
+              </div>
+              {/* <img
                 src={iconImage}
                 alt="CBE Logo"
                 className="w-36 h-20 object-contain p-0 flex-shrink-0"
-              />
+              /> */}
 
               {sidebarOpen && (
                 <div className="flex flex-col min-w-0">
@@ -269,7 +275,7 @@ const Layout = () => {
                 <FiChevronsRight className="h-4 w-4" />
               )}
             </button>
-</div>
+          </div>
 
           {/* Navigation Menu */}
           <nav className="mt-4 px-3">
@@ -282,15 +288,13 @@ const Layout = () => {
                     <Link
                       to={item.path}
                       title={!sidebarOpen ? item.label : undefined}
-                      className={`flex items-center ${
-                        sidebarOpen ? 'space-x-3 px-3.5 py-2.5' : 'justify-center py-2.5 px-2'
-                      } rounded-xl text-sm font-medium transition-all duration-200 ${
-                        active
+                      className={`flex items-center ${sidebarOpen ? 'space-x-3 px-3.5 py-2.5' : 'justify-center py-2.5 px-2'
+                        } rounded-xl text-sm font-medium transition-all duration-200 ${active
                           ? theme === 'dark'
                             ? 'bg-[#3b2447] text-[#f3d7ff] font-semibold shadow-md'
                             : 'bg-white text-[#701460] font-semibold shadow-md'
                           : 'text-purple-100/80 hover:bg-white/10 hover:text-white'
-                      }`}
+                        }`}
                     >
                       <Icon className={`h-5 w-5 flex-shrink-0 ${active ? (theme === 'dark' ? 'text-[#f3d7ff]' : 'text-[#701460]') : 'text-purple-200'}`} />
                       {sidebarOpen && (
@@ -305,13 +309,12 @@ const Layout = () => {
         </div>
 
         {/* Sidebar Bottom Controls */}
-        <div className={`p-3.5 border-t border-white/10 space-y-3 ${theme === 'dark' ? 'bg-[#1b1022]' : 'bg-[#641155]'}`}>
+        <div className={`p-3.5 border-t border-white/10 space-y-3 ${theme === 'dark' ? 'bg-[#1b1022]' : 'bg-[7A2175]'}`}>
           {/* Dark Mode Switch */}
           <div
             onClick={toggleTheme}
-            className={`flex items-center ${
-              sidebarOpen ? 'justify-between px-3 py-2' : 'justify-center py-2'
-            } rounded-lg text-xs text-purple-100/90 hover:bg-white/10 cursor-pointer transition-colors`}
+            className={`flex items-center ${sidebarOpen ? 'justify-between px-3 py-2' : 'justify-center py-2'
+              } rounded-lg text-xs text-purple-100/90 hover:bg-white/10 cursor-pointer transition-colors`}
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
           >
             <div className="flex items-center space-x-2.5">
@@ -320,14 +323,12 @@ const Layout = () => {
             </div>
             {sidebarOpen && (
               <div
-                className={`w-9 h-5 flex items-center rounded-full p-0.5 duration-300 cursor-pointer ${
-                  theme === 'dark' ? 'bg-[#CFB53B]' : 'bg-white/30'
-                }`}
+                className={`w-9 h-5 flex items-center rounded-full p-0.5 duration-300 cursor-pointer ${theme === 'dark' ? 'bg-[#CFB53B]' : 'bg-white/30'
+                  }`}
               >
                 <div
-                  className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out ${
-                    theme === 'dark' ? 'translate-x-4' : 'translate-x-0'
-                  }`}
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out ${theme === 'dark' ? 'translate-x-4' : 'translate-x-0'
+                    }`}
                 />
               </div>
             )}
@@ -336,15 +337,14 @@ const Layout = () => {
           {/* Log Out Button */}
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center ${
-              sidebarOpen
+            className={`w-full flex items-center ${sidebarOpen
                 ? theme === 'dark'
                   ? 'justify-between px-3 py-2 bg-[#302038] text-gray-100 hover:bg-[#432b4f]'
                   : 'justify-between px-3 py-2 bg-white text-gray-800 hover:bg-gray-100'
                 : theme === 'dark'
                   ? 'justify-center py-2 bg-[#302038] text-gray-100 hover:bg-[#432b4f]'
                   : 'justify-center py-2 bg-white text-gray-800 hover:bg-gray-100'
-            } rounded-lg text-xs font-semibold shadow-sm transition-colors`}
+              } rounded-lg text-xs font-semibold shadow-sm transition-colors`}
             title="Log Out"
           >
             <span className={sidebarOpen ? 'block' : 'hidden'}>Log Out</span>
@@ -394,7 +394,7 @@ const Layout = () => {
                 >
                   <FiBell className="h-5 w-5" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 min-w-[16px] h-[16px] bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 shadow">
+                    <span className="absolute top-1 right-1 min-w-[16px] h-[16px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 shadow">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
@@ -448,7 +448,7 @@ const Layout = () => {
                                 {notif.link && (
                                   <button
                                     onClick={() => handleNotificationView(notif)}
-                                    className="p-1 rounded text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors"
+                                    className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                                     title="View">
                                     <FiEye className="h-3.5 w-3.5" />
                                   </button>
@@ -490,7 +490,7 @@ const Layout = () => {
                   }}
                   className={`flex items-center space-x-2.5 p-1 pl-2 rounded-full transition-colors ${theme === 'dark' ? 'bg-[#302038] hover:bg-[#432b4f]' : 'bg-purple-100 hover:bg-purple-200'}`}
                 >
-                  <div className={`w-8 h-8 rounded-full overflow-hidden text-white flex items-center justify-center font-semibold text-xs ${theme === 'dark' ? 'bg-[#5b2a68] border border-[#8e5a9e]' : 'bg-[#701460] border border-purple-200'}`}>
+                  <div className={`w-8 h-8 rounded-full overflow-hidden text-white flex items-center justify-center font-semibold text-xs ${theme === 'dark' ? 'bg-[#5b2a68] border border-[#8e5a9e]' : 'bg-[#7A2175] border border-purple-200'}`}>
                     {avatarSrc ? (
                       <img src={avatarSrc} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
@@ -520,7 +520,7 @@ const Layout = () => {
                         </div>
                       )}
                     </div>
-                    <button 
+                    <button
                       onClick={() => {
                         setShowUserMenu(false)
                         setShowProfileModal(true)
@@ -531,7 +531,7 @@ const Layout = () => {
                       <FiUser className="h-4 w-4" />
                       <span>My Profile</span>
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
                         setShowUserMenu(false)
                         setShowProfileModal(true)
@@ -543,7 +543,7 @@ const Layout = () => {
                       <span>Settings</span>
                     </button>
                     <div className="border-t border-gray-100 my-1 dark:border-gray-700"></div>
-                    <button 
+                    <button
                       onClick={handleLogout}
                       className="w-full px-4 py-2 text-left text-xs hover:bg-red-50 flex items-center space-x-2 text-red-600"
                     >
@@ -574,16 +574,16 @@ const Layout = () => {
       </div>
 
       {confirmAction && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[80] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h3 className="text-lg font-semibold text-gray-800">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[80] p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-gray-100 dark:border-gray-800">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
               {confirmAction === 'delete'
                 ? 'Delete account?'
                 : confirmAction === 'logout'
                   ? 'Logout?'
                   : 'Deactivate account?'}
             </h3>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               {confirmAction === 'delete'
                 ? 'This action is permanent and cannot be undone.'
                 : confirmAction === 'logout'
@@ -591,10 +591,10 @@ const Layout = () => {
                   : 'This will disable your access until reactivated.'}
             </p>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setConfirmAction(null)} className="w-28 h-10 rounded-lg border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+              <button onClick={() => setConfirmAction(null)} className="w-28 h-10 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                 Cancel
               </button>
-              <button onClick={confirmAccountAction} className="w-28 h-10 rounded-lg bg-pink-500 text-sm font-semibold text-white hover:bg-pink-600 transition-colors">
+              <button onClick={confirmAccountAction} className="w-28 h-10 rounded-lg bg-red-500 text-sm font-semibold text-white hover:bg-red-600 transition-colors">
                 Yes
               </button>
             </div>
@@ -603,31 +603,37 @@ const Layout = () => {
       )}
 
       {showProfileModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-y-auto rounded-lg border border-[#8E288D]/30 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-2xl">
+            <div className="flex min-h-20 items-center justify-between bg-[#efdfed] dark:bg-purple-950/50 px-6 py-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-800">
-                  {profileTab === 'theme-only' ? 'Settings' : 'My Profile'}
+                <h3 className="text-xl font-extrabold text-[#8E288D] dark:text-purple-300">
+                  {profileTab === 'theme-only' ? 'Settings' : profileTab === 'settings' ? 'Change Password' : 'My Profile'}
                 </h3>
-                <p className="text-sm text-gray-500">
-                  {profileTab === 'theme-only' ? 'Adjust the app appearance' : 'Manage your picture, account details, and password'}
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {profileTab === 'theme-only'
+                    ? 'Adjust the app appearance'
+                    : profileTab === 'settings'
+                      ? 'Update your account password'
+                      : 'Manage your picture, account details, and password'}
                 </p>
               </div>
-              <button onClick={() => setShowProfileModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+              <button type="button" onClick={() => setShowProfileModal(false)} aria-label="Close profile settings" className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e3c5df] dark:bg-purple-900/40 text-[#8E288D] dark:text-purple-300 transition hover:bg-[#d9b2d4] dark:hover:bg-purple-800/50">
+                <FiX className="h-5 w-5" />
+              </button>
             </div>
 
             {profileTab !== 'theme-only' && (
-              <div className="px-6 py-4 border-b border-gray-200 flex gap-2">
+              <div className="flex gap-2 border-b border-gray-200 dark:border-gray-800 px-6 py-4">
                 <button
                   onClick={() => setProfileTab('profile')}
-                  className={`px-4 py-2 min-w-36 h-10 rounded-lg text-sm font-medium ${profileTab === 'profile' ? 'bg-[#8E288D] text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-4 py-2 min-w-36 h-10 rounded-lg text-sm font-medium transition ${profileTab === 'profile' ? 'bg-[#8E288D] text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
                 >
                   Profile
                 </button>
                 <button
                   onClick={() => setProfileTab('settings')}
-                  className={`px-4 py-2 min-w-36 h-10 rounded-lg text-sm font-medium ${profileTab === 'settings' ? 'bg-[#8E288D] text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`px-4 py-2 min-w-36 h-10 rounded-lg text-sm font-medium transition ${profileTab === 'settings' ? 'bg-[#8E288D] text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
                 >
                   Password
                 </button>
@@ -635,15 +641,16 @@ const Layout = () => {
             )}
 
             {profileTab === 'profile' ? (
-              <form onSubmit={handleProfileSave} className="p-6 space-y-5">
+              <form onSubmit={handleProfileSave} className="flex flex-col">
+                <div className="space-y-5 px-6 py-6">
                 <div className="flex flex-col md:flex-row gap-6 items-start">
                   <div className="flex flex-col items-center gap-3">
                     <img
                       src={profilePicture || 'https://ui-avatars.com/api/?name=' + (user?.username || 'User')}
                       alt="Profile"
-                      className="w-24 h-24 rounded-full object-cover border-4 border-[#8E288D]/20"
+                      className="w-24 h-24 rounded-full object-cover border-4 border-[#8E288D]/20 dark:border-purple-400/20"
                     />
-                    <label className="cursor-pointer rounded-lg border border-dashed border-[#8E288D] px-3 py-2 text-sm text-[#8E288D] hover:bg-purple-50">
+                    <label className="cursor-pointer rounded-lg border border-dashed border-[#8E288D] dark:border-purple-400 px-3 py-2 text-sm text-[#8E288D] dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40">
                       <input type="file" accept="image/*" className="hidden" onChange={handleProfilePictureChange} />
                       Change picture
                     </label>
@@ -651,31 +658,31 @@ const Layout = () => {
 
                   <div className="flex-1 w-full space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Username</label>
                       <input
                         type="text"
                         value={profileForm.username}
                         onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Email</label>
                       <input
                         type="email"
                         value={profileForm.email}
                         onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
                         required
                       />
                     </div>
                   </div>
                 </div>
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setShowProfileModal(false)} className="px-4 py-2 min-w-36 h-10 rounded-lg border border-gray-300 text-gray-700">Cancel</button>
-                  <button type="submit" disabled={isSaving} className="px-4 py-2 min-w-36 h-10 rounded-lg bg-[#8E288D] text-white disabled:opacity-60">
+                </div>
+                <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800 px-6 py-5">
+                  <button type="button" onClick={() => setShowProfileModal(false)} className="px-4 py-2 min-w-36 h-10 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+                  <button type="submit" disabled={isSaving} className="px-4 py-2 min-w-36 h-10 rounded-lg bg-[#8E288D] text-white disabled:opacity-60 transition-colors hover:bg-[#7A1E79]">
                     {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
@@ -705,70 +712,70 @@ const Layout = () => {
               </div>
             ) : (
               <div className="p-6 space-y-6">
-                <form onSubmit={handlePasswordSave} className="space-y-4">
+                <form onSubmit={handlePasswordSave} className="-m-6 flex flex-col">
+                  <div className="space-y-4 px-6 py-6">
                   <div className="relative">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Current password</label>
                     <input
                       type={showCurrentPassword ? "text" : "password"}
                       value={passwordForm.current_password}
                       onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 pr-10 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowCurrentPassword((prev) => !prev)}
-                      className="absolute right-2 mt-1/2 top-1/2 -translate-y-0 text-slate-400 hover:text-slate-600"
+                      className="absolute right-3 top-[2.35rem] text-slate-400 hover:text-slate-600 dark:text-gray-400 dark:hover:text-gray-200"
                       aria-label={showCurrentPassword ? "Hide password" : "Show password"}>
                       {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                   <div className="relative">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">New password</label>
                     <input
                       type={showNewPassword ? "text" : "password"}
                       value={passwordForm.new_password}
                       onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 pr-10 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowNewPassword((prev) => !prev)}
-                      className="absolute right-2 mt-1/2 top-1/2 -translate-y-0 text-slate-400 hover:text-slate-600"
+                      className="absolute right-3 top-[2.35rem] text-slate-400 hover:text-slate-600 dark:text-gray-400 dark:hover:text-gray-200"
                       aria-label={showNewPassword ? "Hide password" : "Show password"}>
                       {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                   <div className="relative">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Confirm password</label>
                     <input
                       type={showConfirmPassword ? "text" : "password"}
                       value={passwordForm.confirm_password}
                       onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2 pr-10 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword((prev) => !prev)}
-                      className="absolute right-2 mt-1/2 top-1/2 -translate-y-0 text-slate-400 hover:text-slate-600"
+                      className="absolute right-3 top-[2.35rem] text-slate-400 hover:text-slate-600 dark:text-gray-400 dark:hover:text-gray-200"
                       aria-label={showConfirmPassword ? "Hide password" : "Show password"}>
                       {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
-
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={() => setShowProfileModal(false)} className="px-4 py-2 min-w-36 h-10 rounded-lg border border-gray-300 text-gray-700">Cancel</button>
-                    <button type="submit" disabled={isSaving} className="px-4 py-2 min-w-36 h-10 rounded-lg bg-[#8E288D] text-white disabled:opacity-60">
+                  </div>
+                  <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800 px-6 py-5">
+                    <button type="button" onClick={() => setShowProfileModal(false)} className="px-4 py-2 min-w-36 h-10 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+                    <button type="submit" disabled={isSaving} className="px-4 py-2 min-w-36 h-10 rounded-lg bg-[#8E288D] text-white disabled:opacity-60 transition-colors hover:bg-[#7A1E79]">
                       {isSaving ? 'Updating...' : 'Change Password'}
                     </button>
                   </div>
                 </form>
 
-                <div className="border-t border-gray-200 pt-4">
-                  {/* <h4 className="text-sm font-semibold text-gray-800">Password update</h4> */}
-                  <p className="mt-1 text-sm text-gray-500">Use this form to change your account password.</p>
+                <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Use this form to change your account password.</p>
                 </div>
               </div>
             )}
@@ -778,8 +785,8 @@ const Layout = () => {
 
       {/* Click outside to close dropdowns */}
       {(showUserMenu || showNotifications) && (
-        <div 
-          className="fixed inset-0 z-10" 
+        <div
+          className="fixed inset-0 z-10"
           onClick={() => {
             setShowUserMenu(false)
             setShowNotifications(false)
