@@ -31,17 +31,18 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
   const hasData = (categoryData && categoryData.length > 0) || Number(totalCount || 0) > 0
 
   const allItems = (categoryData || []).map(cat => {
-        const resolved = (cat.reconciled || 0)
+        const resolved   = (cat.reconciled || 0)
           + (cat.surplus_assets || 0)
           + (cat.exist_in_erp_not_physical || 0)
-          + (cat.duplicated || 0)
           + (cat.unique || 0)
-        const unmatched = cat.unreconciled || 0
+        const duplicated = cat.duplicated || 0
+        const unmatched  = cat.unreconciled || 0
         const pending    = cat.pending || 0
-        const total      = resolved + unmatched + pending
+        const total      = resolved + duplicated + unmatched + pending
         return {
-          name:         cat.name || 'Unknown',
+          name: cat.name || 'Unknown',
           resolved,
+          duplicated,
           unmatched,
           pending,
           total,
@@ -53,10 +54,11 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
     items.push(remainingItems.reduce((other, item) => ({
       name: 'Other categories',
       resolved: other.resolved + item.resolved,
+      duplicated: other.duplicated + item.duplicated,
       unmatched: other.unmatched + item.unmatched,
       pending: other.pending + item.pending,
       total: other.total + item.total,
-    }), { name: 'Other categories', resolved: 0, unmatched: 0, pending: 0, total: 0 }))
+    }), { name: 'Other categories', resolved: 0, duplicated: 0, unmatched: 0, pending: 0, total: 0 }))
   }
   const categoryTotal = allItems.reduce((sum, item) => sum + item.total, 0)
   const unclassifiedTotal = Math.max(Number(totalCount || 0) - categoryTotal, 0)
@@ -96,9 +98,10 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
                 ...(item.unclassified
                   ? [{ key: 'unclassified', value: item.total, color: '#9CA3AF', label: 'No detail data' }]
                   : [
-                      { key: 'resolved', value: item.resolved, color: '#8E288D', label: 'Reconciled' },
-                      { key: 'unmatched', value: item.unmatched, color: '#BE123C', label: 'Unmatched' },
-                      { key: 'pending', value: item.pending, color: '#6B7280', label: 'Pending' },
+                      { key: 'resolved',   value: item.resolved,   color: '#8E288D', label: 'Reconciled' },
+                      { key: 'duplicated', value: item.duplicated, color: '#8c8c8c', label: 'Duplicate' },
+                      { key: 'unmatched',  value: item.unmatched,  color: '#BE123C', label: 'Unmatched' },
+                      { key: 'pending',    value: item.pending,    color: '#6B7280', label: 'Pending' },
                     ]),
               ].map(segment => segment.value > 0 && (
                 <div key={segment.key} className="flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
@@ -119,6 +122,10 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#8E288D' }} />
           <span className="text-xs font-semibold" style={{ color: '#8E288D' }}>Reconciled</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#8c8c8c' }} />
+          <span className="text-xs font-semibold" style={{ color: '#8c8c8c' }}>Duplicate</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm flex-shrink-0 bg-red-500" />
