@@ -2,7 +2,7 @@ from flask import Blueprint, current_app, request, jsonify, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from werkzeug.utils import secure_filename
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 import pandas as pd
 import json
@@ -907,11 +907,10 @@ def get_analytics():
             scope = 'own'
 
         if period == 'current_month':
+            dashboard_cutoff = now - timedelta(days=32)
             reconciliations = [
                 reconciliation for reconciliation in reconciliations
-                if reconciliation.created_at
-                and reconciliation.created_at.year == now.year
-                and reconciliation.created_at.month == now.month
+                if reconciliation.created_at and reconciliation.created_at >= dashboard_cutoff
             ]
             recon_ids = [reconciliation.id for reconciliation in reconciliations]
         elif period == 'latest' and reconciliations:
@@ -2897,12 +2896,10 @@ def get_aging_analysis():
             recon_ids = [r.id for r in reconciliations]
 
         if period == 'current_month':
-            now = date.today()
+            cutoff_date = date.today() - timedelta(days=32)
             reconciliations = [
                 reconciliation for reconciliation in reconciliations
-                if reconciliation.created_at
-                and reconciliation.created_at.year == now.year
-                and reconciliation.created_at.month == now.month
+                if reconciliation.created_at and reconciliation.created_at.date() >= cutoff_date
             ]
             recon_ids = [reconciliation.id for reconciliation in reconciliations]
         elif period == 'latest' and reconciliations:

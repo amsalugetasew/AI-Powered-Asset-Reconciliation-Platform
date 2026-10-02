@@ -1010,7 +1010,7 @@ const ApprovalPage = () => {
             return (
               <button key={cat.key}
                 onClick={() => { setSelectedCategory(cat.key); setPage(1); setSelectedRecordMap(new Map()) }}
-                className={`rounded-lg h-10 w-44 border px-4 py-1.5 text-xs font-semibold transition-colors ${isActive ? activeCls[cat.key] : inactiveCls[cat.key]}`}>
+                className={`rounded-lg h-10 w-48 border px-4 py-1.5 text-xs font-semibold transition-colors ${isActive ? activeCls[cat.key] : inactiveCls[cat.key]}`}>
                 {cat.label}
                 {cat.key !== 'all' && (
                   <span className="ml-1 opacity-80">

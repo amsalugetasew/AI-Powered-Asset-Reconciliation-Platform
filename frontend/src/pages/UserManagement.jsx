@@ -292,14 +292,14 @@ const UserManagement = () => {
         <h2 className="text-[22px] font-extrabold text-[#1E293B] dark:text-gray-100 leading-[100%]"
           style={{
             height: '27px',
-            fontFamily: 'inter sans-serif',
+            fontFamily: 'Geist, sans-serif',
             fontWeight: 800,
             fontStyle: 'extra-bold',
           }}>User &amp; Permission Directory</h2>
         <p className="text-[14px] text-[#64748B] dark:text-gray-400"
           style={{
             height: '17px',
-            fontFamily: 'inter sans-serif',
+            fontFamily: 'Geist, sans-serif',
             fontWeight: 400,
             fontStyle: 'normal',
           }}>Manage system access, user roles, and permissions for the reconciliation platform.</p>

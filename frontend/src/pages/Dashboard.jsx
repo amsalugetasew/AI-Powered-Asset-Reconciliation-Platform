@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -11,7 +12,8 @@ import {
   FiUpload, FiDownload, FiClock, FiCheckCircle, FiXCircle, FiLoader,
   FiFileText, FiFilter, FiSearch, FiCheck, FiCopy, FiTarget,
   FiTrash2, FiChevronLeft, FiChevronRight, FiUser, FiBarChart2, FiEye,FiArrowLeft,
-  FiRefreshCw, FiMinusCircle, FiPlus, FiLayers, FiMapPin,FiPackage, FiHelpCircle
+  FiRefreshCw, FiMinusCircle, FiPlus, FiLayers, FiMapPin,FiPackage, FiHelpCircle,
+  FiMoreVertical
 } from 'react-icons/fi'
 
 // ── Palette for charts ─────────────────────────────────────────────────────────
@@ -101,7 +103,7 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
                       { key: 'resolved',   value: item.resolved,   color: '#8E288D', label: 'Reconciled' },
                       { key: 'duplicated', value: item.duplicated, color: '#8c8c8c', label: 'Duplicate' },
                       { key: 'unmatched',  value: item.unmatched,  color: '#BE123C', label: 'Unmatched' },
-                      { key: 'pending',    value: item.pending,    color: '#6B7280', label: 'Pending' },
+                      { key: 'pending',    value: item.pending,    color: '#D97706', label: 'Pending' },
                     ]),
               ].map(segment => segment.value > 0 && (
                 <div key={segment.key} className="flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
@@ -132,8 +134,8 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
           <span className="text-xs font-semibold text-red-500">Unmatched</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#6B7280' }} />
-          <span className="text-xs font-semibold" style={{ color: '#6B7280' }}>Pending</span>
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#D97706' }} />
+          <span className="text-xs font-semibold" style={{ color: '#D97706' }}>Pending</span>
         </div>
       </div>
 
@@ -144,7 +146,7 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
 const BREAKDOWN_COLORS = {
   reconciled: '#8E288D',
   unreconciled: '#BE123C',
-  pending: '#6B7280',
+  pending: '#D97706',
   surplus_assets: '#B45309',
   exist_in_erp_not_physical: '#F33838',
   duplicated: '#8c8c8c',
@@ -506,6 +508,8 @@ const Dashboard = () => {
   const [assignmentModal, setAssignmentModal] = useState(null)
   const [assignableUsers, setAssignableUsers] = useState([])
   const [assignmentSubmitting, setAssignmentSubmitting] = useState(false)
+  const [openActionMenuId, setOpenActionMenuId] = useState(null)
+  const [actionMenuPosition, setActionMenuPosition] = useState({ left: 0, top: 0 })
 
   // AI Insights State
   const [showAIModal, setShowAIModal] = useState(false)
@@ -537,6 +541,22 @@ const Dashboard = () => {
     }
     setCurrentPage(1)
   }, [showTrash, userRole])
+
+  useEffect(() => {
+    if (openActionMenuId === null) return undefined
+    const closeMenu = event => {
+      if (!event.target.closest('[data-dashboard-action-menu]')) setOpenActionMenuId(null)
+    }
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') setOpenActionMenuId(null)
+    }
+    document.addEventListener('mousedown', closeMenu)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeMenu)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [openActionMenuId])
 
   const fetchTrash = async () => {
     try {
@@ -608,12 +628,28 @@ const Dashboard = () => {
   const currentMonth = now.getMonth()
   const currentYear = now.getFullYear()
 
-  // Filter reconciliations belonging to the current month in user's access scope
-  const currentMonthReconciliations = scopedReconciliations.filter(r => {
-    if (!r.created_at) return false
-    const d = new Date(r.created_at)
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+  // Dashboard-only 32-day window: recent jobs can span the previous month as long as
+  // they are no older than 32 days, while stale jobs are excluded from KPI/chart/table display.
+  const dashboardDateCutoff = new Date()
+  dashboardDateCutoff.setDate(dashboardDateCutoff.getDate() - 32)
+
+  const dashboardWindowReconciliations = scopedReconciliations.filter(reconciliation => {
+    const referenceDates = [
+      reconciliation.completed_at,
+      reconciliation.created_at,
+      reconciliation.updated_at,
+      reconciliation.uploaded_at,
+    ].filter(Boolean)
+
+    if (!referenceDates.length) {
+      return true
+    }
+
+    const latestDate = new Date(Math.max(...referenceDates.map(date => new Date(date).getTime())))
+    return !Number.isNaN(latestDate.getTime()) && latestDate >= dashboardDateCutoff
   })
+
+  const currentMonthReconciliations = dashboardWindowReconciliations
 
   const activeMonthReconciliations = currentMonthReconciliations
 
@@ -801,7 +837,7 @@ const Dashboard = () => {
   }
 
   // Filter and pagination for table scoped to user's access privilege
-  const filteredReconciliations = scopedReconciliations.filter(recon => {
+  const filteredReconciliations = dashboardWindowReconciliations.filter(recon => {
     const matchesSearch = (recon.customer_file || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (recon.internal_file || '').toLowerCase().includes(searchTerm.toLowerCase())
     const matchesFilter = filterStatus === 'all' || recon.status === filterStatus
@@ -860,7 +896,7 @@ const Dashboard = () => {
   return (
     <div className="space-y-2">
       {/* ── Scope indicator bar ──────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-xl px-2 py-1.5 border border-gray-100 dark:border-gray-800 shadow-sm">
+      {/* <div className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-xl px-2 py-1.5 border border-gray-100 dark:border-gray-800 shadow-sm">
         <div className="flex items-center gap-2 text-xs">
           <span className="font-semibold text-gray-600 dark:text-gray-300">Data Scope:</span>
           {(userRole === 'admin' || userRole === 'manager') ? (
@@ -881,7 +917,7 @@ const Dashboard = () => {
           &nbsp;·&nbsp; Physical: <span className="font-semibold text-gray-700 dark:text-gray-200">{physicalTotal.toLocaleString()}</span>
           &nbsp;·&nbsp; Records: <span className="font-semibold text-gray-700 dark:text-gray-200">{totalRecordCount.toLocaleString()}</span>
         </span>
-      </div>
+      </div> */}
 
       {/* ── Top 4 KPI Metric Cards ─────────────────────────────────────────── */}
       <div className="grid w-full grid-cols-1 gap-4 p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -1368,7 +1404,10 @@ const Dashboard = () => {
             <table className="reconciliation-table w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 text-[12px] font-bold uppercase tracking-wider text-[#64748B] dark:text-gray-200 text-center">
-                  <th className="py-3 px-3">Requested By</th>
+                  <th className="py-3 px-3">Uploaded File</th>
+                  <th className="py-3 px-3">Maker</th>
+                  <th className="py-3 px-3">Checker</th>
+                  {/* <th className="py-3 px-3">Approver</th> */}
                   <th className="py-3 px-3">RECONCILIATION DATE</th>
                   <th className="py-3 px-3">RECORDS ANALYZED</th>
                   <th className="py-3 px-3">CURRENT STATUS</th>
@@ -1394,24 +1433,34 @@ const Dashboard = () => {
                       {/* Name & Type */}
                       <td className="py-3.5 px-3">
                         <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-950/60 text-[#701460] dark:text-purple-300 flex items-center justify-center flex-shrink-0">
-                            <FiRefreshCw className="h-4 w-4" />
+                          <div>
+                            <p className="text-gray-800 dark:text-gray-100 capitalize">
+                              <span className='font-bold'>File:</span>
+                              {jobTitle}
+                            </p>
                           </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center space-x-3">
                           <div>
                             <p className="text-[12px] text-gray-700 dark:text-gray-500">
-                              <span className='font-bold'>Requester:</span> <span className='text-[#8E288D]'> {recon.requester_username || `User #${recon.user_id || 'Unknown'}`} : {recon.requester_email || 'Email unavailable'}</span>
+                              {/* <span className='font-bold'>Requester:</span>  */}
+                              <span className='text-[#8E288D]'> {recon.requester_username || `User #${recon.user_id || 'Unknown'}`} : {recon.requester_email || 'Email unavailable'}</span>
                             </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-3">
+                        <div className="flex items-center space-x-3">
+                          <div>
                             <p className="text-[12px] text-gray-700 dark:text-gray-500">
-                              <span className="font-bold">Checker:</span>{' '}
+                              <span className="font-bold">Assigned to:</span>{' '}
                               <span className="text-[#8E288D]">
                                 {recon.assignment_scope === 'specific_user'
                                   ? recon.assigned_to_username || `User #${recon.assigned_to}`
                                   : 'All officers'}
                               </span>
-                            </p>
-                            <p className="text-gray-800 dark:text-gray-100 capitalize">
-                              <span className='font-bold'>File:</span>
-                              {jobTitle}
                             </p>
                           </div>
                         </div>
@@ -1444,90 +1493,147 @@ const Dashboard = () => {
                         {matchRateVal}%
                       </td>
 
-                      {/* Action Buttons: View, Dashboard, Review & Approve, Download, Delete */}
+                      {/* Action Menu: compact three-dot dropdown preserving the same handlers */}
                       <td className="py-3.5 px-3 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
-                          {!showTrash && <>
-                          {/* 1. View Results Button */}
+                        <div className="relative inline-block" data-dashboard-action-menu>
                           <button
-                            onClick={() => {
-                              logActivity(window.location.pathname, `VIEW_RESULTS_ID_${recon.id}`)
-                              navigate(`/results/${recon.id}`)
+                            type="button"
+                            onClick={event => {
+                              if (openActionMenuId === recon.id) {
+                                setOpenActionMenuId(null)
+                                return
+                              }
+                              const rect = event.currentTarget.getBoundingClientRect()
+                              const menuWidth = 176
+                              const menuItemCount = showTrash
+                                ? 1
+                                : 4 + (recon.status === 'completed' ? 1 : 0) + (hasRole('admin') ? 1 : 0)
+                              const menuHeight = menuItemCount * 36 + 10
+                              const openAbove = window.innerHeight - rect.bottom - 4 < menuHeight
+                              setActionMenuPosition({
+                                left: Math.min(window.innerWidth - menuWidth - 8, Math.max(8, rect.right - menuWidth)),
+                                top: openAbove ? Math.max(8, rect.top - menuHeight - 4) : rect.bottom + 4,
+                              })
+                              setOpenActionMenuId(recon.id)
                             }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-[#701460] hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors"
-                            title="View Results"
+                            aria-label={`Actions for ${jobTitle}`}
+                            aria-expanded={openActionMenuId === recon.id}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8E288D] dark:text-purple-400 transition-colors hover:bg-purple-50 dark:hover:bg-purple-950/40 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
                           >
-                            <FiEye className="h-4 w-4" />
+                            <FiMoreVertical className="h-5 w-5" />
                           </button>
 
-                          {/* 2. Dashboard Button */}
-                          <button
-                            onClick={() => {
-                              logActivity('/', `VIEW_REPORT_DASHBOARD_ID_${recon.id}`)
-                              navigate(`/report/${recon.id}`)
-                            }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-[#701460] hover:bg-purple-300 dark:hover:bg-purple-950/50 transition-colors"
-                            title="View Visual Dashboard"
-                          >
-                            <FiBarChart2 className="h-4 w-4" />
-                          </button>
-
-                          {/* 3. Review & Approve Button (Role-Aware) */}
-                          <button
-                            onClick={() => {
-                              logActivity(window.location.pathname, `VIEW_APPROVAL_ID_${recon.id}`)
-                              navigate(`/approval/${recon.id}`)
-                            }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors"
-                            title={hasRole('manager') ? "Review & Approve Exceptions" : "View Approval Status"}
-                          >
-                            <FiCheckCircle className="h-4 w-4" />
-                          </button>
-
-                          {/* 4. Download Report Button */}
-                          {recon.status === 'completed' && (
-                            <button
-                              onClick={() => handleDownload(recon.id)}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors"
-                              title="Download Enriched Excel Report"
+                          {openActionMenuId === recon.id && createPortal(
+                            <div
+                              data-dashboard-action-menu
+                              className="fixed z-[100] w-44 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 text-left shadow-xl"
+                              style={{
+                                left: actionMenuPosition.left,
+                                top: actionMenuPosition.top,
+                              }}
                             >
-                              <FiDownload className="h-4 w-4" />
-                            </button>
-                          )}
-                          </>}
+                              {!showTrash && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionMenuId(null)
+                                      logActivity(window.location.pathname, `VIEW_RESULTS_ID_${recon.id}`)
+                                      navigate(`/results/${recon.id}`)
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-purple-50 dark:hover:bg-gray-700"
+                                  >
+                                    <FiEye className="h-4 w-4 text-[#8E288D] dark:text-purple-400" />
+                                    View Results
+                                  </button>
 
-                          {!showTrash && (
-                            <button
-                              onClick={() => setAssignmentModal({
-                                id: recon.id,
-                                assignment_scope: 'all_officers',
-                                assignee_id: '',
-                                assignment_note: recon.assignment_note || '',
-                              })}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/50 transition-colors"
-                              title="Assign review to another officer"
-                            >
-                              <FiUser className="h-4 w-4" />
-                            </button>
-                          )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionMenuId(null)
+                                      logActivity('/', `VIEW_REPORT_DASHBOARD_ID_${recon.id}`)
+                                      navigate(`/report/${recon.id}`)
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                  >
+                                    <FiBarChart2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                    View Dashboard
+                                  </button>
 
-                          {showTrash ? (
-                            <button
-                              onClick={() => handleRecover(recon.id)}
-                              disabled={recovering}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors disabled:opacity-50"
-                              title="Recover Reconciliation Job"
-                            >
-                              <FiRefreshCw className={`h-4 w-4 ${recovering ? 'animate-spin' : ''}`} />
-                            </button>
-                          ) : hasRole('admin') && (
-                            <button
-                              onClick={() => setDeleteConfirmId(recon.id)}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/50 transition-colors"
-                              title="Move Reconciliation to Trash"
-                            >
-                              <FiTrash2 className="h-4 w-4" />
-                            </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionMenuId(null)
+                                      logActivity(window.location.pathname, `VIEW_APPROVAL_ID_${recon.id}`)
+                                      navigate(`/approval/${recon.id}`)
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                  >
+                                    <FiCheckCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                    {hasRole('manager') ? 'Review & Approve' : 'View Approval'}
+                                  </button>
+
+                                  {recon.status === 'completed' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenActionMenuId(null)
+                                        handleDownload(recon.id)
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                    >
+                                      <FiDownload className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                      Download Report
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenActionMenuId(null)
+                                      setAssignmentModal({
+                                        id: recon.id,
+                                        assignment_scope: 'all_officers',
+                                        assignee_id: '',
+                                        assignment_note: recon.assignment_note || '',
+                                      })
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                  >
+                                    <FiUser className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                    Assign Reviewer
+                                  </button>
+                                </>
+                              )}
+
+                              {showTrash ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null)
+                                    handleRecover(recon.id)
+                                  }}
+                                  disabled={recovering}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400 transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                  <FiRefreshCw className={`h-4 w-4 text-emerald-600 dark:text-emerald-400 ${recovering ? 'animate-spin' : ''}`} />
+                                  Recover Job
+                                </button>
+                              ) : hasRole('admin') ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenActionMenuId(null)
+                                    setDeleteConfirmId(recon.id)
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-500 dark:text-red-400 transition-colors hover:bg-red-50 dark:hover:bg-red-950/30"
+                                >
+                                  <FiTrash2 className="h-4 w-4 text-red-500 dark:text-red-400" />
+                                  Move to Trash
+                                </button>
+                              ) : null}
+                            </div>,
+                            document.body
                           )}
                         </div>
                       </td>
