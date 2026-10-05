@@ -14,25 +14,25 @@ import { clearCachedGets } from '../services/cachedGet'
 
 // ── Status definitions ────────────────────────────────────────────────────────
 const STATUSES = [
-  { value: 'pending', label: 'Pending', color: '#6B7280' },
-  { value: 'reconciled', label: 'Reconciled', color: '#8E288D' },
-  { value: 'unreconciled', label: 'Unreconciled', color: '#BE123C' },
-  { value: 'surplus_assets', label: 'Surplus Assets', color: '#BE123C' },
-  { value: 'exist_in_erp_not_physical', label: 'Shortage Assets', color: '#BE123C' },
-  { value: 'duplicated', label: 'Duplicated', color: '#000000' },
-  { value: 'unique', label: 'Unique', color: '#8E288D' },
+  { value: 'pending', label: 'Pending', color: '#CFCFCF' },
+  { value: 'reconciled', label: 'Reconciled', color: '#95298E' },
+  { value: 'unreconciled', label: 'Unreconciled', color: '#FF7373' },
+  { value: 'surplus_assets', label: 'Surplus Assets', color: '#558AFF' },
+  { value: 'exist_in_erp_not_physical', label: 'Shortage Assets', color: '#F6DB6F' },
+  { value: 'duplicated', label: 'Duplicated', color: '#FF8342' },
+  { value: 'unique', label: 'Unique', color: '#95298E' },
 ]
 
 const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.value, s]))
 
 const statusBadgeCls = {
-  pending: 'bg-gray-100 text-gray-700',
-  reconciled: 'bg-gray-10 text-[#8E288D]',
-  unreconciled: 'bg-red-100 text-red-800',
-  surplus_assets: 'bg-orange-100 text-orange-800',
-  exist_in_erp_not_physical: 'bg-purple-100 text-purple-800',
-  duplicated: 'bg-pink-100 text-pink-800',
-  unique: 'bg-teal-100 text-teal-800',
+  pending: 'bg-[#CFCFCF10] text-[#CFCFCF]',
+  reconciled: 'bg-[#95298E10] text-[#95298E]',
+  unreconciled: 'bg-[#FF737310] text-[#FF7373]',
+  surplus_assets: 'bg-[#558AFF10] text-[#558AFF]',
+  exist_in_erp_not_physical: 'bg-[#F6DB6F10] text-[#F6DB6F]',
+  duplicated: 'bg-[#FF834210] text-[#FF8342]',
+  unique: 'bg-[#95298E10] text-[#95298E]',
 }
 
 // ── Category definitions ──────────────────────────────────────────────────────
@@ -840,9 +840,9 @@ const ApprovalPage = () => {
             ) : (
               <>
                 <span className="text-[#CFB53B] font-medium">⏳ {overall.pending} pending</span>
-                <span className="text-[#8E288D] font-medium">✓ {overall.reconciled} reconciled</span>
-                <span className="text-red-600 font-medium">✗ {overall.unreconciled} unreconciled</span>
-                <span className="text-orange-600 font-medium">◈ {overall.surplus_assets} surplus</span>
+                <span className="text-[#95298E] font-medium">✓ {overall.reconciled} reconciled</span>
+                <span className="text-[#FF7373] font-medium">✗ {overall.unreconciled} unreconciled</span>
+                <span className="text-[#558AFF] font-medium">◈ {overall.surplus_assets} surplus</span>
               </>
             )}
           </div>
@@ -1236,7 +1236,7 @@ const ApprovalPage = () => {
                         rec.dept_reconcile === 'Diff Dept, Same District' ? '#ffedd5' :
                         rec.dept_reconcile === 'Different'                ? '#fee2e2' : '#f8fafc',
                       color:
-                        rec.dept_reconcile === 'Same'                     ? '#1a3a5c' :
+                        rec.dept_reconcile === 'Same'                     ? '#95298E' :
                         rec.dept_reconcile === 'Same Dept, Diff District' ? '#1e40af' :
                         rec.dept_reconcile === 'Diff Dept, Same District' ? '#92400e' :
                         rec.dept_reconcile === 'Different'                ? '#991b1b' : '#64748b',
@@ -1303,10 +1303,10 @@ const ApprovalPage = () => {
                       <div className="px-4 py-2.5">
                         <span className="text-xs font-bold" style={{
                           color: {
-                            reconciled: '#1a3a5c', unreconciled: '#991b1b',
-                            surplus_assets: '#4c1d95', exist_in_erp_not_physical: '#831843',
-                            duplicated: '#334155', unique: '#134e4a', pending: '#6B7280',
-                          }[rec.approver_status || rec.approval_status || 'pending'] || '#475569'
+                            reconciled: '#95298E', unreconciled: '#FF7373',
+                            surplus_assets: '#558AFF', exist_in_erp_not_physical: '#F6DB6F',
+                            duplicated: '#FF8342', unique: '#95298E', pending: '#CFCFCF',
+                          }[rec.approver_status || rec.approval_status || 'pending'] || '#CFCFCF'
                         }}>
                           {!isRecordChecked(rec) && canApprove
                             ? 'Awaiting check'
@@ -1438,12 +1438,12 @@ const ApprovalPage = () => {
             ) : (
               <>
                 <div className="flex justify-between">
-                  <span className="text-[#6B7280]">{s.pending} pending</span>
-                  <span className="text-[#8E288D]">{s.reconciled} reconciled</span>
+                  <span className="text-[#CFCFCF]">{s.pending} pending</span>
+                  <span className="text-[#95298E]">{s.reconciled} reconciled</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-red-600">{s.unreconciled} unreconciled</span>
-                  <span className="text-orange-600">{s.surplus_assets} surplus</span>
+                  <span className="text-[#FF7373]">{s.unreconciled} unreconciled</span>
+                  <span className="text-[#558AFF]">{s.surplus_assets} surplus</span>
                 </div>
               </>
             )}

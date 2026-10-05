@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -28,11 +28,11 @@ const duration = (seconds) => {
 }
 
 const APPROVAL_COLORS = {
-  reconciled: '#8E288D',
-  unmatched: '#BE123C',
-  surplus_assets: '#B45309',
-  exist_in_erp_not_physical: '#F33838',
-  pending: '#6B7280',
+  reconciled: '#95298E',
+  unmatched: '#FF7373',
+  surplus_assets: '#558AFF',
+  exist_in_erp_not_physical: '#F6DB6F',
+  pending: '#CFCFCF',
 }
 
 const KPI_THEMES = {
@@ -373,19 +373,21 @@ const ReconciliationReport = () => {
 
   // ── Shared status palette for ALL breakdown tabs ──────────────────────────
   const STATUS_COLORS = {
-    reconciled:                  '#8E288D',
-    unmatched:                '#BE123C',
-    duplicated:                  '#8c8c8c',
-    unique:                      '#14b8a6',
-    pending:                     '#6B7280',
+    reconciled:                  '#95298E',
+    unmatched:                   '#FF7373',
+    unreconciled:                '#FF7373',
+    duplicated:                  '#FF8342',
+    unique:                      '#95298E',
+    pending:                     '#CFCFCF',
     ...(reportSide === 'erp'
-      ? { exist_in_erp_not_physical: '#F33838' }
-      : { surplus_assets: '#B45309' }),
+      ? { exist_in_erp_not_physical: '#F6DB6F' }
+      : { surplus_assets: '#558AFF' }),
   }
   
   const STATUS_LABELS = {
     reconciled:                  'Reconciled',
-    unmatched:                'Unmatched',
+    unmatched:                   'Unreconciled',
+    unreconciled:                'Unreconciled',
     duplicated:                  'Duplicated',
     unique:                      'Unique',
     pending:                     'Pending',
@@ -398,7 +400,8 @@ const ReconciliationReport = () => {
   // ── Donut category colors — uses the same palette as horizontal stacked charts ──
 const DONUT_CATEGORY_STATUS_MAP = {
   Reconciled: 'reconciled',
-  unmatched: 'unreconciled',
+  Unreconciled: 'unmatched',
+  unmatched: 'unmatched',
   Duplicated: 'duplicated',
   Duplicate: 'duplicated',
   Unique: 'unique',
@@ -423,14 +426,14 @@ const DONUT_CATEGORY_STATUS_MAP = {
 
   const selectedSide = kpis.side_counts?.[reportSide] || {}
   const matchTypeData = [
-    { label: 'Exact Match', value: Number(kpis.exact_matched || 0), color: '#8E288D' },
+    { label: 'Exact Match', value: Number(kpis.exact_matched || 0), color: '#95298E' },
     { label: 'Near Match', value: Number(kpis.near_match || 0), color: '#CFB53B' },
     { label: 'AI Match', value: Number(kpis.ai_matched || 0), color: '#CFB53B' },
-    { label: 'Unmatched', value: Number(selectedSide.unmatched || 0), color: '#BE123C' },
+    { label: 'Unmatched', value: Number(selectedSide.unmatched || 0), color: '#FF7373' },
     { label: reportSide === 'erp' ? 'Shortage' : 'Surplus',
       value: Number(reportSide === 'erp' ? selectedSide.shortage : selectedSide.surplus) || 0,
-      color: '#B45309' },
-    { label: 'Duplicate', value: Number(selectedSide.duplicate || 0), color: '#8c8c8c' },
+      color: '#558AFF' },
+    { label: 'Duplicate', value: Number(selectedSide.duplicate || 0), color: '#FF8342' },
   ].filter(item => item.value > 0)
 
   return (
@@ -479,7 +482,7 @@ const DONUT_CATEGORY_STATUS_MAP = {
           unit="Assets"
           description="Total assets recorded in ERP"
           icon={FiDatabase}
-          color="#8E288D"
+          color="#95288E"
           lightColor="#E1C3DF"
         />
 
@@ -818,12 +821,12 @@ const DONUT_CATEGORY_STATUS_MAP = {
             </div>
             <div className="space-y-4">
               {[
-                { label: 'Exact Match', value: kpis.exact_matched, color: '#8E288D' },
+                { label: 'Exact Match', value: kpis.exact_matched, color: '#95298E' },
                 { label: 'AI Match', value: kpis.ai_matched, color: '#CFB53B' },
                 { label: 'Near Match', value: kpis.near_match, color: '#CFB53B' },
-                { label: 'Unmatched', value: kpis.customer_unmatched, color: '#BE123C' },
-                { label: 'Physical Duplicates', value: kpis.customer_duplicates || 0, color: '#8c8c8c' },
-                { label: 'ERP Duplicates', value: kpis.internal_duplicates || 0, color: '#8c8c8c' },
+                { label: 'Unmatched', value: kpis.customer_unmatched, color: '#FF7373' },
+                { label: 'Physical Duplicates', value: kpis.customer_duplicates || 0, color: '#FF8342' },
+                { label: 'ERP Duplicates', value: kpis.internal_duplicates || 0, color: '#FF8342' },
               ].map(item => {
                 const total = kpis.physical_count || 1
                 const r = ((item.value / total) * 100).toFixed(1)

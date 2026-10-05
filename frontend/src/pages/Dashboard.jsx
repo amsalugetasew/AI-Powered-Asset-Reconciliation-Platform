@@ -76,7 +76,7 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
         <div>
           <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">
             Category Distribution
-            {monthLabel && <span className="text-xs font-normal text-[#8E288D] ml-1.5">({monthLabel})</span>}
+            {monthLabel && <span className="text-xs font-normal text-[#95298E] ml-1.5">({monthLabel})</span>}
           </h2>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
             Reconciled, Unmatched, and Pending per asset category
@@ -100,10 +100,10 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
                 ...(item.unclassified
                   ? [{ key: 'unclassified', value: item.total, color: '#9CA3AF', label: 'No detail data' }]
                   : [
-                      { key: 'resolved',   value: item.resolved,   color: '#8E288D', label: 'Reconciled' },
-                      { key: 'duplicated', value: item.duplicated, color: '#8c8c8c', label: 'Duplicate' },
-                      { key: 'unmatched',  value: item.unmatched,  color: '#BE123C', label: 'Unmatched' },
-                      { key: 'pending',    value: item.pending,    color: '#D97706', label: 'Pending' },
+                      { key: 'resolved',   value: item.resolved,   color: '#95298E', label: 'Reconciled' },
+                      { key: 'duplicated', value: item.duplicated, color: '#FF8342', label: 'Duplicate' },
+                      { key: 'unmatched',  value: item.unmatched,  color: '#FF7373', label: 'Unmatched' },
+                      { key: 'pending',    value: item.pending,    color: '#CFCFCF', label: 'Pending' },
                     ]),
               ].map(segment => segment.value > 0 && (
                 <div key={segment.key} className="flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
@@ -122,20 +122,20 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
       {/* Legend */}
       <div className="flex items-center gap-5 pt-2 border-t border-gray-100 dark:border-gray-800">
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#8E288D' }} />
-          <span className="text-xs font-semibold" style={{ color: '#8E288D' }}>Reconciled</span>
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#95298E' }} />
+          <span className="text-xs font-semibold" style={{ color: '#95298E' }}>Reconciled</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#8c8c8c' }} />
-          <span className="text-xs font-semibold" style={{ color: '#8c8c8c' }}>Duplicate</span>
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#FF8342' }} />
+          <span className="text-xs font-semibold" style={{ color: '#FF8342' }}>Duplicate</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm flex-shrink-0 bg-red-500" />
-          <span className="text-xs font-semibold text-red-500">Unmatched</span>
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#FF7373' }} />
+          <span className="text-xs font-semibold" style={{ color: '#FF7373' }}>Unmatched</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#D97706' }} />
-          <span className="text-xs font-semibold" style={{ color: '#D97706' }}>Pending</span>
+          <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: '#CFCFCF' }} />
+          <span className="text-xs font-semibold" style={{ color: '#CFCFCF' }}>Pending</span>
         </div>
       </div>
 
@@ -144,19 +144,19 @@ const CategoryDistributionChart = ({ categoryData, monthLabel, totalCount }) => 
 }
 
 const BREAKDOWN_COLORS = {
-  reconciled: '#8E288D',
-  unreconciled: '#BE123C',
-  pending: '#D97706',
-  surplus_assets: '#B45309',
-  exist_in_erp_not_physical: '#F33838',
-  duplicated: '#8c8c8c',
-  unique: '#8E288D',
+  reconciled: '#95298E',
+  unreconciled: '#FF7373',
+  pending: '#CFCFCF',
+  surplus_assets: '#558AFF',
+  exist_in_erp_not_physical: '#F6DB6F',
+  duplicated: '#FF8342',
+  unique: '#95298E',
 }
 
 const LOCATION_COLORS = {
   same_dept_diff_district: '#CFB53B',
-  different: '#BE123C',
-  same_dept: '#8E288D',
+  different: '#FF7373',
+  same_dept: '#95298E',
   na: '#6B7280',
 }
 const LOCATION_LABELS = {
@@ -185,7 +185,7 @@ const ReportingBreakdownChart = ({ title, subtitle, data, side, dimension, icon:
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
       <div className="mb-5 flex items-start gap-2">
-        {Icon && <Icon className="mt-0.5 h-5 w-5 text-[#8E288D]" />}
+        {Icon && <Icon className="mt-0.5 h-5 w-5 text-[#95298E]" />}
         <div>
           <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">{title}</h2>
           <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">{subtitle}</p>
@@ -248,7 +248,7 @@ const LocationReconciliationChart = ({ data, side }) => {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
       <div className="mb-5 flex items-start gap-2">
-        <FiMapPin className="mt-0.5 h-5 w-5 text-[#8E288D]" />
+        <FiMapPin className="mt-0.5 h-5 w-5 text-[#95298E]" />
         <div>
           <h2 className="text-base font-bold text-gray-800 dark:text-gray-100">Location Reconciliation</h2>
           <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
@@ -932,7 +932,7 @@ const Dashboard = () => {
           >
             {/* Icon */}
             <span
-              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px] text-[#8E288D] dark:text-purple-300"
+              className="absolute left-3 flex h-5 w-5 items-center justify-center rounded-[6px] text-[16px] text-[#95298E] dark:text-purple-300"
             >
               <FiCheckCircle />
             </span>
@@ -987,7 +987,7 @@ const Dashboard = () => {
               </p>
 
               <span
-                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold text-[#8E288D] bg-[#E1C3DF] dark:text-purple-200 dark:bg-purple-900/60"
+                className="inline-flex h-[24px] w-[77px] shrink-0 flex-row items-center justify-center rounded-[8px] px-2 text-[14px] font-extrabold text-[#95298E] bg-[#E1C3DF] dark:text-purple-200 dark:bg-purple-900/60"
               >
                 {reconciledRate}%
               </span>
@@ -1226,7 +1226,7 @@ const Dashboard = () => {
           <button type="button" key={side} onClick={event => { event.preventDefault(); setDashboardSide(side) }}
             className={`border-b-2 px-5 py-3 text-sm font-semibold ${
               dashboardSide === side
-                ? 'border-[#8E288D] text-[#8E288D] dark:border-purple-400 dark:text-purple-400'
+                ? 'border-[#95298E] text-[#95298E] dark:border-purple-400 dark:text-purple-400'
                 : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
             }`}>
             {side === 'erp' ? 'ERP' : 'Physical'}
@@ -1246,7 +1246,7 @@ const Dashboard = () => {
               ].map(tab => (
                 <button type="button" key={tab.key} onClick={event => { event.preventDefault(); setDashboardChartTab(tab.key) }}
                   className={`flex h-10 w-44 items-center justify-center px-4 text-sm font-medium transition-colors ${dashboardChartTab === tab.key
-                      ? 'text-[#8E288D] shadow border-b-2 border-[#8E288D] dark:text-purple-400 dark:border-purple-400'
+                      ? 'text-[#95298E] shadow border-b-2 border-[#95298E] dark:text-purple-400 dark:border-purple-400'
                       : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
                     }`}>
                   {tab.label}
@@ -1446,7 +1446,7 @@ const Dashboard = () => {
                           <div>
                             <p className="text-[12px] text-gray-700 dark:text-gray-500">
                               {/* <span className='font-bold'>Requester:</span>  */}
-                              <span className='text-[#8E288D]'> {recon.requester_username || `User #${recon.user_id || 'Unknown'}`} : {recon.requester_email || 'Email unavailable'}</span>
+                              <span className='text-[#95298E]'> {recon.requester_username || `User #${recon.user_id || 'Unknown'}`} : {recon.requester_email || 'Email unavailable'}</span>
                             </p>
                           </div>
                         </div>
@@ -1456,7 +1456,7 @@ const Dashboard = () => {
                           <div>
                             <p className="text-[12px] text-gray-700 dark:text-gray-500">
                               <span className="font-bold">Assigned to:</span>{' '}
-                              <span className="text-[#8E288D]">
+                              <span className="text-[#95298E]">
                                 {recon.assignment_scope === 'specific_user'
                                   ? recon.assigned_to_username || `User #${recon.assigned_to}`
                                   : 'All officers'}
@@ -1518,7 +1518,7 @@ const Dashboard = () => {
                             }}
                             aria-label={`Actions for ${jobTitle}`}
                             aria-expanded={openActionMenuId === recon.id}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8E288D] dark:text-purple-400 transition-colors hover:bg-purple-50 dark:hover:bg-purple-950/40 focus:outline-none focus:ring-2 focus:ring-[#8E288D]/30"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#95298E] dark:text-purple-400 transition-colors hover:bg-purple-50 dark:hover:bg-purple-950/40 focus:outline-none focus:ring-2 focus:ring-[#95298E]/30"
                           >
                             <FiMoreVertical className="h-5 w-5" />
                           </button>
@@ -1543,7 +1543,7 @@ const Dashboard = () => {
                                     }}
                                     className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-purple-50 dark:hover:bg-gray-700"
                                   >
-                                    <FiEye className="h-4 w-4 text-[#8E288D] dark:text-purple-400" />
+                                    <FiEye className="h-4 w-4 text-[#95298E] dark:text-purple-400" />
                                     View Results
                                   </button>
 
@@ -1756,7 +1756,7 @@ const Dashboard = () => {
                 type="button"
                 onClick={handleAssignReconciliation}
                 disabled={assignmentSubmitting || (assignmentModal.assignment_scope === 'specific_user' && !assignmentModal.assignee_id)}
-                className="w-32 h-10 rounded-lg bg-[#8E288D] text-sm font-semibold text-white hover:bg-[#7D207C] transition-colors disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center"
+                className="w-32 h-10 rounded-lg bg-[#95298E] text-sm font-semibold text-white hover:bg-[#7D207C] transition-colors disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center"
               >
                 {assignmentSubmitting ? <FiLoader className="animate-spin h-3.5 w-3.5" /> : 'Save assignment'}
               </button>

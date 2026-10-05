@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toast } from 'react-toastify'
@@ -25,13 +25,13 @@ const RESULT_COLUMN_PAIRS = [
 ]
 
 const APPROVAL_BADGE_CLS = {
-  pending: 'bg-gray-10 text-[#6B7280] border-gray-30',
+  pending: 'bg-[#FF737310] text-[#FF7373] border-gray-30',
   reconciled: 'bg-purple-10 text-[#8E288D] border-purple-30',
-  unreconciled: 'bg-red-10 text-red-800 border-red-30',
-  surplus_assets: 'bg-orange-10 text-orange-800 border-orange-30',
-  exist_in_erp_not_physical: 'bg-purple-100 text-purple-800 border-purple-30',
-  duplicated: 'bg-pink-10 text-pink-800 border-pink-30',
-  unique: 'bg-teal-10 text-teal-800 border-teal-30',
+  unreconciled: 'bg-red-10 text-[#FF7373] border-red-30',
+  surplus_assets: 'bg-orange-10 text-[#558AFF] border-orange-30',
+  exist_in_erp_not_physical: 'bg-purple-100 text-[#95298E] border-purple-30',
+  duplicated: 'bg-pink-10 text-[#FF8342] border-pink-30',
+  unique: 'bg-teal-10 text-[#95298E] border-teal-30',
 }
 
 const APPROVAL_LABEL = {
@@ -242,7 +242,7 @@ const Results = () => {
     { name: 'Rule Matched', value: stats.rule_matched, color: '#7a2175' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#95298E' },
     { name: 'Manual Review', value: stats.manual_review, color: '#a34d9c' },
-    { name: 'Unmatched', value: stats.customer_unmatched, color: '#BE123C' }
+    { name: 'Unmatched', value: stats.customer_unmatched, color: '#FF7373' }
   ]
 
   // Physical records breakdown
@@ -251,8 +251,8 @@ const Results = () => {
     { name: 'Rule Matched', value: stats.rule_matched, color: '#7a2175' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#95298E' },
     { name: 'Manual Review', value: stats.manual_review, color: '#a34d9c' },
-    { name: 'Unmatched', value: stats.customer_unmatched, color: '#BE123C' },
-    { name: 'Duplicate', value: stats.customer_duplicates || 0, color: '#8c8c8c' }
+    { name: 'Unmatched', value: stats.customer_unmatched, color: '#FF7373' },
+    { name: 'Duplicate', value: stats.customer_duplicates || 0, color: '#FF8342' }
   ]
 
   // ERP records breakdown (assuming similar distribution)
@@ -261,8 +261,8 @@ const Results = () => {
     { name: 'Rule Matched', value: stats.rule_matched, color: '#7a2175' },
     { name: 'AI Matched', value: stats.ai_matched, color: '#95298E' },
     { name: 'Manual Review', value: stats.manual_review, color: '#a34d9c' },
-    { name: 'Unmatched', value: stats.internal_unmatched, color: '#BE123C' },
-    { name: 'Duplicate', value: stats.internal_duplicates || 0, color: '#8c8c8c' }
+    { name: 'Unmatched', value: stats.internal_unmatched, color: '#FF7373' },
+    { name: 'Duplicate', value: stats.internal_duplicates || 0, color: '#FF8342' }
   ]
 
   // Comparison bar chart data
@@ -596,10 +596,10 @@ const Results = () => {
                         <span className="text-xs font-bold"
                           style={{
                             color: {
-                              reconciled: '#1a3a5c', unreconciled: '#991b1b',
-                              surplus_assets: '#3c4349ff', exist_in_erp_not_physical: '#9c5b75ff',
-                              duplicated: '#334155', unique: '#134e4a', pending: '#6B7280',
-                            }[rec.checker_status || rec.check_status || 'pending'] || '#64748b'
+                              reconciled: '#95298E', unreconciled: '#FF7373',
+                              surplus_assets: '#558AFF', exist_in_erp_not_physical: '#F6DB6F',
+                              duplicated: '#FF8342', unique: '#95298E', pending: '#CFCFCF',
+                            }[rec.checker_status || rec.check_status || 'pending'] || '#CFCFCF'
                           }}>
                           {APPROVAL_LABEL[rec.checker_status || rec.check_status || 'pending'] || 'Pending'}
                         </span>
@@ -621,10 +621,10 @@ const Results = () => {
                         <span className="text-xs font-bold"
                           style={{
                             color: {
-                              reconciled: '#1a3a5c', unreconciled: '#991b1b',
-                              surplus_assets: '#3c4349ff', exist_in_erp_not_physical: '#9c5b75ff',
-                              duplicated: '#334155', unique: '#134e4a', pending: '#6B7280',
-                            }[rec.approver_status || rec.approval_status || 'pending'] || '#64748b'
+                              reconciled: '#95298E', unreconciled: '#FF7373',
+                              surplus_assets: '#558AFF', exist_in_erp_not_physical: '#F6DB6F',
+                              duplicated: '#FF8342', unique: '#95298E', pending: '#CFCFCF',
+                            }[rec.approver_status || rec.approval_status || 'pending'] || '#CFCFCF'
                           }}>
                           {APPROVAL_LABEL[rec.approver_status || rec.approval_status || 'pending'] || 'Pending'}
                         </span>
